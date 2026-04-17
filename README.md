@@ -21,58 +21,59 @@ Neon ışıklı bir dünyada, sadece blok yerleştirmekle kalmazsınız; her ham
 *   **Joker Sistemi:** Run sırasında satıcıdan alacağınız kalıcı pasif güçlendirmelerle (Blue Pill, Golden Stamp vb.) oyunun kurallarını kendi lehine çevir.
 *   **Aktif Itemlar:** Balyoz, Boya Bombası veya Vakum gibi tek kullanımlık eşyalarla sıkıştığın anlarda sahadan kurtul.
 
-### 👤 3. Eşsiz Karakter Kadrosu
-Her karakterin kendine has bir **Pasif** yeteneği ve oyunun gidişatını değiştiren bir **Overdrive (Aktif)** gücü vardır.
+### 👥 Karakter Roster'ı ve Yetenekler
 
-| Karakter | Portre | Özellik |
-| :--- | :---: | :--- |
-| **BLOCK-E** | <img src="docs/readme_assets/character_block_e.png" width="60"> | **Başlangıç:** Her 10 saniyede bir rastgele blok siler. |
-| **ARCHITECT** | <img src="docs/readme_assets/character_architect.png" width="60"> | **İnşaatçı:** Kare (O) bloklara +%20 puan verir; 3x3 alanı anında temizler. |
+Block-Jack'te her karakter, oyun tarzınızı tamamen değiştiren benzersiz bir **Pasif** ve **Overdrive (Aktif)** yeteneğe sahiptir. Karakterler, run sırasında kazandığınız elmaslarla açılır.
 
----
-
-## 🔥 Matematiksel Motor: Chips & Mult
-
-Oyunun temelinde **(Base Chips) × (Multiplier)** formülü yatar.
-
-*   **Standard:** ×1 Çarpan
-*   **Flush!** (Tamamı aynı renk): **×5 Çarpan** 🔥
-*   **Double Flush!**: **×25 Çarpan** 🚀
+| Karakter | Portre | Özellikler & Güçler | Kilit |
+| :--- | :---: | :--- | :---: |
+| **BLOCK-E** | <img src="docs/readme_assets/character_block_e.png" width="80"> | **Pasif (Eraser):** Her 10 saniyede bir sahadaki rastgele bir bloğu siler.<br>**Overdrive:** 5 saniye boyunca tüm kombo çarpanlarını ×5 yapar. | **Başlangıç** |
+| **THE ARCHITECT** | <img src="docs/readme_assets/character_architect.png" width="80"> | **Pasif:** Kare (O) bloklara +%20 puan bonusu verir.<br>**Overdrive:** Sahadaki 3x3'lük bir alanı anında temizler. | **500 💎** |
+| **TIME BENDER** | <img src="docs/readme_assets/character_timebender.png" width="80"> | **Pasif:** Kombo süresi %50 daha yavaş düşer.<br>**Overdrive:** Zamanı ve çarpanı 3 hamle boyunca dondurur. | **800 💎** |
+| **THE GAMBLER** | <img src="docs/readme_assets/character_gambler.png" width="80"> | **Pasif:** %7 ihtimalle yapılan hamlenin puanı ×10 olur.<br>**Overdrive:** Elindeki ve sahadaki 3 bloğu rastgele yeniler. | **1200 💎** |
+| **NEON WRAITH** | <img src="docs/readme_assets/character_neonwraith.png" width="80"> | **Pasif:** Süre <%10 kaldığında tüm puanlar ×3 olur.<br>**Overdrive:** Dolu karelerin üzerine blok koyabilir ve alttakileri siler. | **3000 💎** |
 
 ---
 
-## 👹 Boss Rounds & Engeller
+## ⚡ Gelişmiş Oyun Mekanikleri
 
-Her 5. roundda karşınıza çıkan Boss'lar, oyunu zorlaştıracak benzersiz mekaniklerle gelir:
-*   **Glitch:** Grid üzerindeki kareleri kilitler.
-*   **Fog:** Süre barını gizleyerek gerilimi artırır.
-*   **Weight:** Blokların patlaması için iki kez temizlenmesi gerekir.
+### 🧬 Çarpan (Mult) Sistemi
+Sadece satır silmek yetmez! **Balatro** tarzı çarpan sistemimizle skorunuzu katlayın:
+- **Flush!:** Satırın %100'ü aynı renk ise **×5 mult**.
+- **Double Flush:** İki satır aynı anda %100 renk ise **×25 mult!**
+- **Streak:** Üst üste başarılı hamleler çarpanı **+3.0** değerine kadar artırır.
 
-<img src="docs/readme_assets/boss_neon_overlord.png" width="200" alt="Neon Overlord Boss">
+### 🃏 Jokerler & İtemler
+Marketten alacağınız 3 farklı slotla stratejinizi kurun:
+- **Blue Pill 💊:** Mavi bloklar ×2 Chips verir.
+- **Prism 🔷:** Flush yapınca ekstra +0.5 Mult eklenir.
+- **Vakum 🌀:** Tablodaki tüm 1x1 boşlukları tek seferde siler.
 
----
-
-## 🛠 Teknik Mimari
-
-Oyun, modern iOS geliştirme standartları kullanılarak **SwiftUI** ve **Xcode** ile inşa edilmiştir.
-
-*   **Mimari:** MVVM + Service Pattern
-*   **UI/UX:** Neon Synthwave / Retro-Futuristik Tema
-*   **Motorlar:**
-    *   `ScoreEngine`: Dinamik Chips/Mult hesaplamaları.
-    *   `PerkEngine`: Joker ve pasif yetenek yönetimi.
-    *   `MapEngine`: Roguelite yol haritası ve ilerleme.
+### 👾 Boss Karşılaşmaları (Her 5. Round)
+- **Glitch:** Rastgele kareleri kilitler, blok konulamaz.
+- **Fog:** Süre barını gizleyerek sizi karanlıkta bırakır.
+- **Weight:** Bloklar "ağır" olur, patlaması için 2 kez temizlenmesi gerekir.
 
 ---
 
-## 📦 Kurulum
+## 🛠️ Kurulum ve Çalıştırma
+
+> [!IMPORTANT]
+> **Özel Proje Notu:** Bu proje kişisel gelişim ve portfolyo amacıyla geliştirilmiştir. Tüm hakları saklıdır, izinsiz kopyalanması veya ticari amaçla kullanılması yasaktır.
 
 1. Repoyu klonlayın:
    ```bash
    git clone git@github.com:YakupSd/BlockJack.git
    ```
 2. `Block-Jack.xcodeproj` dosyasını Xcode ile açın.
-3. Simülatör veya gerçek bir iOS cihaz üzerinden çalıştırın.
+3. iOS 17.0+ hedefleyen bir simülatör veya gerçek cihaz seçin.
+4. `Cmd + R` ile projeyi derleyin ve çalıştırın.
+
+---
+
+## 🛡️ Lisans ve Kullanım
+
+Bu proje **Yakup Suda**'ya özel bir projedir. Kodların kopyalanması, dağıtılması veya üzerinde değişiklik yapılması kesinlikle yasaktır. Proje sadece inceleme amaçlı yayındadır.
 
 ---
 
@@ -88,4 +89,4 @@ Oyun, modern iOS geliştirme standartları kullanılarak **SwiftUI** ve **Xcode*
 ---
 
 ### 👨‍💻 Geliştirici
-**Yakup Suda** tarafından tutkuyla geliştirildi.
+**Yakup Suda** - Roguelite Puzzle enthusiast.
