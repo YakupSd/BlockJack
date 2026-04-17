@@ -38,3 +38,6 @@ DerivedData/
 
 # Carthage
 Carthage/Build/
+
+# Un-ignore Contents.json (critically needed for Xcode Assets)
+!Contents.json

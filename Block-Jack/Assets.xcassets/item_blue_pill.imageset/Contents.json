@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "item_blue_pill.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

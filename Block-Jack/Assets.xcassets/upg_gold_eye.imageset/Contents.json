@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "upg_gold_eye.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
