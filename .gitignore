@@ -1,0 +1,40 @@
+# Xcode
+#
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.playground
+xcuserdata/
+
+# Bundle config
+*.bundle
+
+# Crash reports
+*.crash
+
+# Root directory
+.DS_Store
+
+# User-specific
+*.moved-aside
+*.xcuserstate
+
+# Packages
+.swiftpm/
+.build/
+Packages/
+Package.resolved
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# CocoaPods
+Pods/
+DerivedData/
+
+# Carthage
+Carthage/Build/
