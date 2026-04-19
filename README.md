@@ -56,21 +56,6 @@ Marketten alacağınız 3 farklı slotla stratejinizi kurun:
 
 ---
 
-## 🛠️ Kurulum ve Çalıştırma
-
-> [!IMPORTANT]
-> **Özel Proje Notu:** Bu proje kişisel gelişim ve portfolyo amacıyla geliştirilmiştir. Tüm hakları saklıdır, izinsiz kopyalanması veya ticari amaçla kullanılması yasaktır.
-
-1. Repoyu klonlayın:
-   ```bash
-   git clone git@github.com:YakupSd/BlockJack.git
-   ```
-2. `Block-Jack.xcodeproj` dosyasını Xcode ile açın.
-3. iOS 17.0+ hedefleyen bir simülatör veya gerçek cihaz seçin.
-4. `Cmd + R` ile projeyi derleyin ve çalıştırın.
-
----
-
 ## 🛡️ Lisans ve Kullanım
 
 Bu proje **Yakup Suda**'ya özel bir projedir. Kodların kopyalanması, dağıtılması veya üzerinde değişiklik yapılması kesinlikle yasaktır. Proje sadece inceleme amaçlı yayındadır.

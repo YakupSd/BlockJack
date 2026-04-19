@@ -41,6 +41,11 @@ struct PerkHUDIcon: View {
     @ObservedObject var vm: GameViewModel
     
     @State private var isAnimating = false
+    @State private var showDetails = false
+    
+    var hasSynergy: Bool {
+        vm.activeSynergies.contains(where: { $0.requiredPerkIds.contains(perk.id) })
+    }
     
     var body: some View {
         Button(action: {
@@ -51,6 +56,19 @@ struct PerkHUDIcon: View {
             }
         }) {
             ZStack {
+                // Synergy Glow
+                if hasSynergy {
+                    Circle()
+                        .stroke(ThemeColors.neonPurple, lineWidth: 2)
+                        .blur(radius: 4)
+                        .scaleEffect(1.2)
+                        .phaseAnimator([1.0, 1.2]) { content, scale in
+                            content.scaleEffect(scale).opacity(1.5 - scale)
+                        } animation: { _ in
+                            .easeInOut(duration: 1.5).repeatForever()
+                        }
+                }
+
                 // Glow if interactable and selected block exists
                 if isInteractable && vm.selectedBlock != nil {
                     Circle()
@@ -98,18 +116,59 @@ struct PerkHUDIcon: View {
                         .offset(x: 10, y: -10)
                 }
                 
-                if perk.id == "sculptor" {
-                    // Kullanım hakkı göstergesi (Tier'a bağlı)
-                    let maxUses = perk.tier * 2
-                    Text("\(maxUses - vm.run.sculptorUses)")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(3)
-                        .background(ThemeColors.neonPink)
-                        .clipShape(Circle())
-                        .offset(x: 14, y: 14) // Alt köşeye alalım level ile çakışmasın
+                if hasSynergy {
+                    // Synergy Icon Indicator
+                    Image(systemName: "bolt.horizontal.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(ThemeColors.neonPurple)
+                        .background(Color.black.clipShape(Circle()))
+                        .offset(x: -14, y: -14)
                 }
             }
         )
+        .popover(isPresented: $showDetails) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    ZStack {
+                        Circle().fill(ThemeColors.surfaceMid).frame(width: 44, height: 44)
+                        Text(perk.icon).font(.title3)
+                    }
+                    VStack(alignment: .leading) {
+                        Text(perk.name).font(.headline).foregroundStyle(.white)
+                        Text("Tier \(perk.tier)").font(.caption).foregroundStyle(ThemeColors.electricYellow)
+                    }
+                    Spacer()
+                }
+                
+                Text(perk.desc)
+                    .font(.subheadline)
+                    .foregroundStyle(ThemeColors.textSecondary)
+                
+                if !perk.synergyPartnerIds.isEmpty {
+                    Divider().background(ThemeColors.gridStroke)
+                    Text("Sinerji Ortakları:").font(.caption).bold()
+                    HStack {
+                        ForEach(perk.synergyPartnerIds, id: \.self) { partnerId in
+                            if let partner = PerkEngine.perkPool.first(where: { $0.id == partnerId }) {
+                                Text("\(partner.icon) \(partner.name)")
+                                    .font(.caption2)
+                                    .padding(6)
+                                    .background(ThemeColors.neonPurple.opacity(0.2))
+                                    .cornerRadius(6)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding()
+            .presentationCompactAdaptation(.popover)
+            .background(ThemeColors.cosmicBlack)
+        }
+        .disabled(!isInteractable && perk.id != "sculptor" && !showDetails) 
+        .simultaneousGesture(TapGesture().onEnded {
+            if perk.id != "sculptor" {
+                showDetails = true
+            }
+        })
     }
 }

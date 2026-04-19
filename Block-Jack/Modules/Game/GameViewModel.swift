@@ -60,6 +60,10 @@ final class GameViewModel: ObservableObject {
     @Published var draggingBlock: GameBlock? = nil
     @Published var gridFrame: CGRect = .zero
 
+    // VFX State
+    @Published var shakeAmount: CGFloat = 0
+    @Published var flashOpacity: Double = 0
+
     // MARK: - Overdrive State
     @Published var overdriveCharge: Double = 0.0 // 0.0 to 3.0
     @Published var currentOverdriveTier: OverdriveTier = .none
@@ -121,7 +125,14 @@ final class GameViewModel: ObservableObject {
             self.run.currentScore = slot.currentScore
             
             if let savedGrid = slot.grid {
-                self.board.grid = savedGrid
+                // Dimension validation: Ensure saved grid matches current BoardViewModel.size (12x12)
+                if savedGrid.count == BoardViewModel.size && (savedGrid.first?.count ?? 0) == BoardViewModel.size {
+                    self.board.grid = savedGrid
+                } else {
+                    // Mismatch: Reset grid to prevent Index out of range crashes
+                    self.board.resetGrid()
+                    addPopup(text: "SYNC: GRID RESET", color: ThemeColors.neonOrange)
+                }
             }
             if let savedTray = slot.trayBlocks {
                 self.blockTray = savedTray
@@ -232,6 +243,19 @@ final class GameViewModel: ObservableObject {
         if run.hasPerk("wide_load") {
             run.maxTraySlots = 4
         }
+        
+        // SYNERGY: GOLDEN FEVER (Penalty part)
+        if activeSynergies.contains(where: { $0.synergyName == "GOLDEN FEVER" }) {
+            run.currentRoundTargetScore = Int(Double(run.currentRoundTargetScore) * 1.2)
+        }
+    }
+
+    func addPerk(_ perk: PassivePerk) {
+        run.activePassivePerks.append(perk)
+        activeSynergies = PerkEngine.evaluateSynergies(perks: run.activePassivePerks)
+        
+        // Phase C: Discovery
+        UserEnvironment.shared.discoverPerk(perk.id)
     }
 
     func pauseGame() {
@@ -274,9 +298,9 @@ final class GameViewModel: ObservableObject {
         }
 
         lastPlacedBlockType = block.type
-        let clearedCells = board.placeBlock(block, at: position)
+        let clearResult = board.placeBlock(block, at: position)
 
-        if let cleared = clearedCells {
+        if let result = clearResult {
             // Yerleştirme başarılı
             haptic.play(.blockPlace)
             run.movesUsed += 1
@@ -292,6 +316,8 @@ final class GameViewModel: ObservableObject {
                             switch type {
                             case .gold(let amount):
                                 run.gold += amount
+                                UserEnvironment.shared.addGoldEarned(amount)
+                                AudioManager.shared.playSFX(.coin)
                                 addPopup(text: "+\(amount) ALTIN", color: ThemeColors.electricYellow)
                             case .star:
                                 run.addScore(500)
@@ -321,6 +347,7 @@ final class GameViewModel: ObservableObject {
                 updateOverdriveTier(previous: previousTier)
             }
 
+            let cleared = result.clearedCells
             if cleared.isEmpty {
                 // Temizleme olmadı → streak sıfırla
                 run.streak = 0
@@ -331,8 +358,11 @@ final class GameViewModel: ObservableObject {
                     run.tensionCount += 1
                 }
             } else {
+                // Track global stats
+                UserEnvironment.shared.addLinesCleared(cleared.count)
+                
                 // Satır/sütun temizlendi
-                handleClear(clearedCells: cleared)
+                handleClear(result: result)
             }
 
             // Phase 5.2: Gravity Mode (Boss Round'lar için aktif olsun - Elite eklenecek)
@@ -340,8 +370,6 @@ final class GameViewModel: ObservableObject {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                         self?.board.applyGravity()
-                        // Yerçekimi sonrası oluşan yeni kombinasyonları tetikleyebiliriz
-                        // Fakat sonsuz döngüden kaçınmak için şimdilik sadece visual shifting yapalım
                     }
                 }
             }
@@ -368,26 +396,21 @@ final class GameViewModel: ObservableObject {
         }
     }
 
-    func handleClear(clearedCells: [GameCell]) {
+    func handleClear(result: BoardViewModel.ClearResult) {
+        let clearedCells = result.clearedCells
+        let clearedRows = result.rowsCleared
+        let clearedCols = result.colsCleared
+        
         comboCount += 1
         run.streak += 1
         
-        // 3.3: Neon Flash Effect
-        // (Assuming GridView can see these, we set them and clear them after delay)
-        // To find positions, we need to know WHICH cells were cleared. 
-        // We'll approximate or use board grid logic if needed, but here we have clearedCells.
-        // Wait, BoardViewModel doesn't store positions in GameCell. 
-        // I should have improved GameCell to hold its position. 
-        // For now, I'll use a trick: search the grid for cells that are NOW empty but were in clearedCells.
-        // Better: I'll update BoardViewModel to return positions too or just use the clearedRows/Cols.
-        
-        // For simplicity, let's trigger a general flash if positions aren't available, 
-        // but I'll try to get them from the grid.
+        // 1. Particle & Flash Effects
         var flashPositions: [GridPosition] = []
         for r in 0..<BoardViewModel.size {
             for c in 0..<BoardViewModel.size {
                 if clearedCells.contains(where: { $0 == board.grid[r][c] }) {
-                    flashPositions.append(GridPosition(row: r, col: c))
+                    let pos = GridPosition(row: r, col: c)
+                    flashPositions.append(pos)
                 }
             }
         }
@@ -396,17 +419,12 @@ final class GameViewModel: ObservableObject {
             self.clearFlashPositions = []
         }
 
-        // Overdrive charge
-        if overdriveCharge < 3.0 {
-            let previousTier = currentOverdriveTier
-            overdriveCharge = min(3.0, overdriveCharge + 0.20)
-            updateOverdriveTier(previous: previousTier)
-        }
+        // 2. Haptics & Sound
+        haptic.play(.lineClear)
+        AudioManager.shared.playSFX(.lineClear)
 
-        // 3.6: Character Passive Multipliers
-        var characterMult = jokerMultBonus
-        
-        // --- STARTING & PASSIVE PERKS (Task 4: Scaling Logic) ---
+        // 3. Multiplier Calculation
+        var characterMult = jokerMultBonus + run.clockworkBonus
         
         // Lucky Clover Scaling: +0.5 per tier
         if run.hasPerk("lucky_clover") {
@@ -445,81 +463,134 @@ final class GameViewModel: ObservableObject {
                     addPopup(text: "ARCHITECT BONUS!", color: ThemeColors.neonCyan)
                 }
             case "gambler":
-                // Gelişmiş Şans (Meta-Upgrade: Lucky Dice +3% chance)
                 var triggerChance = 0.07
                 if userEnv.unlockedUpgradeIDs.contains(MetaUpgrade.luckyDice.rawValue) {
                     triggerChance = 0.10
                 }
-                
                 if Double.random(in: 0...1) < triggerChance {
-                    characterMult += 9.0 // effectively total x10 if base was 1
+                    characterMult += 9.0 
                     addPopup(text: "JACKPOT! ×10", color: ThemeColors.electricYellow)
                     haptic.play(.success)
                 }
             case "neonwraith":
                 if timer.ratio < 0.15 {
-                    characterMult += 2.0 // x3 multiplier in last 15% time
+                    characterMult += 2.0 
                     addPopup(text: "WRAITH FURY!", color: ThemeColors.neonPurple)
                 }
             default: break
             }
         }
 
-        // Satır ve sütun sayısını hesapla (clear combo için)
-        let clearedRows = countClearedRows(in: clearedCells)
-        let clearedCols = countClearedCols(in: clearedCells)
-        
-        // Blue Pill Scaling: x(Tier+1) chips for blue blocks
+        // 4. Chip Calculations (Blue/Lead Pills)
         var chipBonus = 1.0
-        if run.hasPerk("blue_pill") {
-            let blueCount = clearedCells.filter { if case .filled(let c) = $0.state { return c == .blue } else { return false } }.count
-            if blueCount > 0 {
-                let tier = run.perkTier("blue_pill")
-                chipBonus = Double(tier + 1)
-                addPopup(text: "BLUE PILL LV.\(tier)! ×\(Int(chipBonus))", color: ThemeColors.neonCyan)
-            }
+        let blueCount = clearedCells.filter { if case .filled(let c) = $0.state { return c == .blue } else { return false } }.count
+        let greenCount = clearedCells.filter { if case .filled(let c) = $0.state { return c == .green } else { return false } }.count
+        
+        if run.hasPerk("blue_pill") && blueCount > 0 {
+            let tier = run.perkTier("blue_pill")
+            chipBonus *= Double(tier + 1)
+        }
+        if run.hasPerk("lead_pill") && greenCount > 0 {
+            let tier = run.perkTier("lead_pill")
+            chipBonus *= Double(tier + 1)
         }
         
-        var result = ScoreEngine.calculate(
+        // SYNERGY: RAINBOW DOSAGE
+        if activeSynergies.contains(where: { $0.synergyName == "RAINBOW DOSAGE" }) && blueCount > 0 && greenCount > 0 {
+            characterMult += 3.0
+            addPopup(text: "RAINBOW DOSAGE! ×3", color: ThemeColors.neonPurple)
+            haptic.play(.success)
+        }
+        
+        if chipBonus > 1.0 {
+            addPopup(text: "CHIP BOOST!", color: ThemeColors.neonCyan)
+        }
+        
+        // 5. Final Score Execution
+        let scoreResult = ScoreEngine.calculate(
             clearedCells: clearedCells,
-            blockCellCount: Int(Double(clearedCells.count) * chipBonus), // Effectively doubling chips if blue exists
+            blockCellCount: Int(Double(clearedCells.count) * chipBonus),
             streak: run.streak,
             clearedRows: clearedRows,
             clearedCols: clearedCols,
             jokerMultBonus: characterMult
         )
 
-        lastScoreResult = result
-        run.addScore(result.totalScore)
+        lastScoreResult = scoreResult
+        run.addScore(scoreResult.totalScore)
 
-        // 3.4: Big Combo Label
-        if result.clearCombo != .single {
-            showBigComboLabel = result.clearCombo.label
+        // 6. UI & Perk Effects
+        if scoreResult.clearCombo != ClearCombo.single {
+            showBigComboLabel = scoreResult.clearCombo.label
+            
+            // Midas Touch
+            if scoreResult.isFlush {
+                let hasMidas = run.hasPerk("midas_touch")
+                let hasFever = activeSynergies.contains(where: { $0.synergyName == "GOLDEN FEVER" })
+                if hasFever {
+                    run.gold += 15
+                    UserEnvironment.shared.addGoldEarned(15)
+                    AudioManager.shared.playSFX(.coin)
+                    addPopup(text: "GOLDEN FEVER +15G", color: ThemeColors.electricYellow)
+                } else if hasMidas {
+                    run.gold += 5
+                    UserEnvironment.shared.addGoldEarned(5)
+                    AudioManager.shared.playSFX(.coin)
+                    addPopup(text: "MIDAS TOUCH +5G", color: ThemeColors.electricYellow)
+                }
+            }
+            
+            // Recycler
+            if scoreResult.clearedRows + scoreResult.clearedCols >= 2 {
+                let hasRecycler = run.hasPerk("recycler")
+                let hasCycle = activeSynergies.contains(where: { $0.synergyName == "ETERNAL CYCLE" })
+                let chance = hasCycle ? 0.4 : (hasRecycler ? 0.2 : 0.0)
+                if Double.random(in: 0...1) < chance {
+                    refillBlockTray()
+                    addPopup(text: "TRAY RECYCLED!", color: ThemeColors.neonCyan)
+                    haptic.play(.success)
+                }
+            }
+            
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                if self.showBigComboLabel == result.clearCombo.label {
+                if self.showBigComboLabel == scoreResult.clearCombo.label {
                     self.showBigComboLabel = nil
                 }
             }
         }
 
-        // Haptic
-        if result.isBigCombo {
+        // 7. Feedback & Juice
+        if scoreResult.isBigCombo {
             haptic.play(.flush)
-        } else if result.isFlush {
+            AudioManager.shared.playSFX(.flush)
+            triggerJuice(intensity: 10, flash: true)
+        } else if scoreResult.isFlush {
             haptic.play(.lineClear)
+            AudioManager.shared.playSFX(.lineClear)
+            triggerJuice(intensity: 6, flash: true)
         } else {
             haptic.play(.lineClear)
+            AudioManager.shared.playSFX(.lineClear)
+            triggerJuice(intensity: 2, flash: false)
         }
+        
+        AudioManager.shared.setMusicIntensity(streak: run.streak)
 
-        // Süre bonusu
-        var bonus = ScoreEngine.timeBonusSeconds(clearCombo: result.clearCombo, isFlush: result.isFlush, streakCount: run.streak)
-        
-        // 3.6: Time Bender Passive
+        // 8. Time Bonus & Scaling Perks
+        let bonus = ScoreEngine.timeBonusSeconds(clearCombo: scoreResult.clearCombo, isFlush: scoreResult.isFlush, streakCount: run.streak)
+        var finalTimeBonus = bonus
         if activeCharacterId == "timebender" {
-            bonus *= 1.5
+            finalTimeBonus *= 1.5
         }
+        timer.addTime(finalTimeBonus)
         
-        timer.addTime(bonus)
+        // Clockwork Scaling
+        if run.hasPerk("clockwork") {
+            let tier = run.perkTier("clockwork")
+            let baseInc = finalTimeBonus * 0.1
+            let scaledInc = baseInc * Double(tier)
+            run.clockworkBonus = min(2.5, run.clockworkBonus + scaledInc)
+        }
 
         // %50 hedef bonusu
         if !run.halfBonusGiven && run.scoreProgress >= 0.5 {
@@ -529,33 +600,44 @@ final class GameViewModel: ObservableObject {
         }
         
         // Echoes kayıt
-        if result.totalScore > maxRoundScore {
-            maxRoundScore = result.totalScore
-        }
-        
-        // Clockwork Scaling
-        if run.hasPerk("clockwork") {
-            let tier = run.perkTier("clockwork")
-            // Base logic moved here for direct scaling
-            let baseInc = bonus * 0.1
-            let scaledInc = baseInc * Double(tier)
-            run.clockworkBonus = min(2.5, run.clockworkBonus + scaledInc)
-            
-            if run.clockworkBonus > 0 { characterMult += run.clockworkBonus }
+        if scoreResult.totalScore > maxRoundScore {
+            maxRoundScore = scoreResult.totalScore
         }
 
         // Score popup
         addPopup(
-            text: "+\(result.totalScore)",
-            color: result.isBigCombo ? ThemeColors.neonPurple : ThemeColors.neonCyan
+            text: "+\(scoreResult.totalScore)",
+            color: scoreResult.isBigCombo ? ThemeColors.neonPurple : ThemeColors.neonCyan
         )
         // Tüm combo labellarını göster
-        for label in result.allLabels {
+        for label in scoreResult.allLabels {
             addPopup(text: label, color: ThemeColors.electricYellow)
         }
 
         // Hedef kontrolü
         checkRoundTarget()
+        
+        // --- NEW PHASE B PERKS (Last Resort) ---
+        
+        // Double Down
+        if run.movesRemaining == 0 && scoreResult.totalScore > 0 && run.hasPerk("double_down") {
+            run.movesUsed -= 3 // Geriye alarak +3 hamle kazandırır
+            addPopup(text: "DOUBLE DOWN! +3 MOVES", color: ThemeColors.neonPurple)
+            haptic.play(.success)
+        }
+        
+        // Vampiric Core
+        if run.hasPerk("vampiric_core") && scoreResult.totalScore > 0 {
+            let lastMilestone = (run.currentScore - scoreResult.totalScore) / 5000
+            let currentMilestone = run.currentScore / 5000
+            if currentMilestone > lastMilestone {
+                if Double.random(in: 0...1) < 0.25 { // %25 şans
+                    run.gainLife()
+                    addPopup(text: "VAMPIRIC LUCK! +1 ❤️", color: ThemeColors.neonPink)
+                    haptic.play(.success)
+                }
+            }
+        }
     }
     
     private func updateOverdriveTier(previous: OverdriveTier) {
@@ -659,8 +741,11 @@ final class GameViewModel: ObservableObject {
         let hasGoldEye = userEnv.unlockedUpgradeIDs.contains(MetaUpgrade.goldEye.rawValue)
         let goldAdded = ScoreEngine.goldEarned(for: result, hasGoldEye: hasGoldEye)
         run.gold += goldAdded
-        userEnv.earn(gold: goldAdded)
-        userEnv.updateHighScore(run.currentScore)
+        UserEnvironment.shared.addGoldEarned(goldAdded)
+        if goldAdded > 0 {
+            AudioManager.shared.playSFX(.coin)
+        }
+        UserEnvironment.shared.updateHighScore(run.currentScore)
 
         
         // Boss round kazanma = +1 can!
@@ -776,7 +861,8 @@ final class GameViewModel: ObservableObject {
             haptic.play(.success)
         case .goldBag:
             run.gold += 150
-            userEnv.earn(gold: 150)
+            UserEnvironment.shared.addGoldEarned(150)
+            AudioManager.shared.playSFX(.coin)
             addPopup(text: "+150 GOLD", color: ThemeColors.electricYellow)
             haptic.play(.success)
         case .cleanup:
@@ -788,6 +874,27 @@ final class GameViewModel: ObservableObject {
         // Remove from local and disk
         run.inventory.removeAll(where: { $0.id == item.id })
         SaveManager.shared.removeConsumable(slotId: activeSlotId, itemId: item.id)
+    }
+
+    // MARK: - VFX Control
+    
+    private func triggerJuice(intensity: CGFloat, flash: Bool) {
+        shakeAmount = intensity
+        if flash { flashOpacity = 0.6 }
+        
+        // Shake decay
+        withAnimation(.spring(response: 0.1, dampingFraction: 0.2, blendDuration: 0)) {
+            shakeAmount = 0
+        }
+        
+        // Flash decay
+        if flash {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeOut(duration: 0.4)) {
+                    self.flashOpacity = 0
+                }
+            }
+        }
     }
 
     // MARK: - Game Over & Saving
@@ -806,6 +913,14 @@ final class GameViewModel: ObservableObject {
         }
         // Ideally trigger the internal saveToDisk inside SaveManager, handled by assigning if @Published,
         // but we'll do an explicit update just in case.
+        // Check if boss was defeated
+        if run.round.isBossRound && run.currentScore >= run.currentRoundTargetScore {
+            UserEnvironment.shared.discoverBoss("boss_\(run.round.roundNumber)") 
+        }
+        
+        // Save global stats
+        UserEnvironment.shared.addGoldEarned(run.gold) // In practice, you might want a delta tracking
+        
         SaveManager.shared.updateSave(slotId: activeSlotId, score: run.currentScore, round: run.currentRound)
         
         // We bypass the strictly private update but since it's published, it might trigger automatically.

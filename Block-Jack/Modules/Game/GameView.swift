@@ -12,8 +12,8 @@ struct GameView: View {
 
     // Grid placement için coordinate space
     @State private var gridOrigin: CGPoint = .zero
-    private let cellSize: CGFloat = 36
-    private let cellSpacing: CGFloat = 2
+    private let cellSize: CGFloat = 26
+    private let cellSpacing: CGFloat = 1
     
     init(slotId: Int, nodeType: NodeType? = nil) {
         _vm = StateObject(wrappedValue: GameViewModel(slotId: slotId, nodeType: nodeType))
@@ -21,6 +21,7 @@ struct GameView: View {
 
     var body: some View {
         ZStack {
+            // Fix Background Scaling (Task 2)
             // Fix Background Scaling (Task 2)
             GeometryReader { geo in
                 Image("cyber_battle_arena")
@@ -56,6 +57,9 @@ struct GameView: View {
 
                 // 4. Grid
                 gridSection
+                    .offset(x: vm.shakeAmount * CGFloat.random(in: -1...1), 
+                            y: vm.shakeAmount * CGFloat.random(in: -1...1))
+                    .animation(.none, value: vm.shakeAmount) // Immediate shake, no smoothing
 
                 Spacer()
                 
@@ -141,6 +145,13 @@ struct GameView: View {
                 TutorialOverlay(vm: vm)
                     .zIndex(200)
             }
+            
+            // --- FULL SCREEN FLASH (Juiciness) ---
+            Color.white
+                .opacity(vm.flashOpacity)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .zIndex(300)
             if vm.phase == .bossDialogue {
                 BossDialogueOverlay(vm: vm, boss: vm.currentBoss)
             }
@@ -152,6 +163,12 @@ struct GameView: View {
             }
         }
         .onAppear {
+            if vm.run.round.isBossRound {
+                AudioManager.shared.playMusic(.boss)
+            } else {
+                AudioManager.shared.playMusic(.battle)
+            }
+            
             vm.gridSpaceConverter = self.gridPosition(from:)
             if vm.phase == .menu {
                 vm.startRound()

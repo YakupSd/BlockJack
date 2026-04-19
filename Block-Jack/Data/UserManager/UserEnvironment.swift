@@ -131,16 +131,56 @@ class UserEnvironment: ObservableObject {
 
     // MARK: - Settings
     @Published var isSoundEnabled: Bool {
-        didSet { UserDefaults.standard.set(isSoundEnabled, forKey: "soundEnabled") }
+        didSet { 
+            UserDefaults.standard.set(isSoundEnabled, forKey: "soundEnabled")
+            if isSoundEnabled {
+                // If music was stopped, maybe resume? For now just ensure it's not nil.
+            } else {
+                AudioManager.shared.stopMusic()
+            }
+        }
     }
     @Published var isHapticEnabled: Bool {
-        didSet { UserDefaults.standard.set(isHapticEnabled, forKey: "hapticEnabled") }
+        didSet { 
+            UserDefaults.standard.set(isHapticEnabled, forKey: "hapticEnabled")
+            if isHapticEnabled {
+                HapticManager.shared.play(.selection)
+            }
+        }
     }
 
     // MARK: - Game Stats
     @Published var highScore: Int {
         didSet { UserDefaults.standard.set(highScore, forKey: "highScore") }
     }
+    
+    // Phase C: Lifetime Stats
+    @Published var totalGoldEarned: Int {
+        didSet { UserDefaults.standard.set(totalGoldEarned, forKey: "totalGoldEarned") }
+    }
+    @Published var totalLinesCleared: Int {
+        didSet { UserDefaults.standard.set(totalLinesCleared, forKey: "totalLinesCleared") }
+    }
+    @Published var totalBossesDefeated: Int {
+        didSet { UserDefaults.standard.set(totalBossesDefeated, forKey: "totalBossesDefeated") }
+    }
+    
+    // Phase C: Discovery Tracking
+    @Published var discoveredPerkIDs: Set<String> {
+        didSet {
+            if let data = try? JSONEncoder().encode(discoveredPerkIDs) {
+                UserDefaults.standard.set(data, forKey: "discoveredPerks")
+            }
+        }
+    }
+    @Published var discoveredBossIDs: Set<String> {
+        didSet {
+            if let data = try? JSONEncoder().encode(discoveredBossIDs) {
+                UserDefaults.standard.set(data, forKey: "discoveredBosses")
+            }
+        }
+    }
+
     @Published var tutorialCompleted: Bool {
         didSet { UserDefaults.standard.set(tutorialCompleted, forKey: "tutorialCompleted") }
     }
@@ -173,6 +213,7 @@ class UserEnvironment: ObservableObject {
 
     // MARK: - Init
     init() {
+        // 1. Initialize all properties from storage
         let savedLang = UserDefaults.standard.string(forKey: "appLanguage") ?? "tr"
         self.language = AppLanguage(rawValue: savedLang) ?? .turkish
         self.gold = UserDefaults.standard.integer(forKey: "playerGold")
@@ -180,6 +221,25 @@ class UserEnvironment: ObservableObject {
         self.isSoundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
         self.isHapticEnabled = UserDefaults.standard.object(forKey: "hapticEnabled") as? Bool ?? true
         self.highScore = UserDefaults.standard.integer(forKey: "highScore")
+        
+        self.totalGoldEarned = UserDefaults.standard.integer(forKey: "totalGoldEarned")
+        self.totalLinesCleared = UserDefaults.standard.integer(forKey: "totalLinesCleared")
+        self.totalBossesDefeated = UserDefaults.standard.integer(forKey: "totalBossesDefeated")
+        
+        if let data = UserDefaults.standard.data(forKey: "discoveredPerks"),
+           let decoded = try? JSONDecoder().decode(Set<String>.self, from: data) {
+            self.discoveredPerkIDs = decoded
+        } else {
+            self.discoveredPerkIDs = []
+        }
+        
+        if let data = UserDefaults.standard.data(forKey: "discoveredBosses"),
+           let decoded = try? JSONDecoder().decode(Set<String>.self, from: data) {
+            self.discoveredBossIDs = decoded
+        } else {
+            self.discoveredBossIDs = []
+        }
+
         self.tutorialCompleted = UserDefaults.standard.bool(forKey: "tutorialCompleted")
         self.selectedCharacterID = UserDefaults.standard.string(forKey: "selectedCharacterID") ?? "block_e"
 
@@ -202,6 +262,11 @@ class UserEnvironment: ObservableObject {
             self.goldUpgradeLevels = decoded
         } else {
             self.goldUpgradeLevels = [:]
+        }
+        
+        // 2. Perform post-init logic (Testing Boost etc.)
+        if self.diamonds < 50000 {
+            self.diamonds = 50000
         }
     }
 
@@ -237,6 +302,33 @@ class UserEnvironment: ObservableObject {
         guard spend(gold: cost) else { return false }
         goldUpgradeLevels[upgrade.rawValue] = nextLevel
         return true
+    }
+
+    // MARK: - Phase C Discovery Helpers
+    
+    func discoverPerk(_ id: String) {
+        if !discoveredPerkIDs.contains(id) {
+            discoveredPerkIDs.insert(id)
+            earn(diamonds: 50) // Discovery reward
+            AudioManager.shared.playSFX(.perkUnlock)
+        }
+    }
+    
+    func discoverBoss(_ id: String) {
+        if !discoveredBossIDs.contains(id) {
+            discoveredBossIDs.insert(id)
+            earn(diamonds: 500) // Boss Discovery reward
+            AudioManager.shared.playSFX(.perkUnlock)
+        }
+        totalBossesDefeated += 1
+    }
+    
+    func addLinesCleared(_ count: Int) {
+        totalLinesCleared += count
+    }
+    
+    func addGoldEarned(_ count: Int) {
+        totalGoldEarned += count
     }
 
     func localizedString(_ trText: String, _ enText: String) -> String {

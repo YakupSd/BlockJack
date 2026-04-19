@@ -38,9 +38,9 @@ struct GridView: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            ForEach(0..<BoardViewModel.size, id: \.self) { row in
+            ForEach(board.grid.indices, id: \.self) { row in
                 HStack(spacing: 2) {
-                    ForEach(0..<BoardViewModel.size, id: \.self) { col in
+                    ForEach(board.grid[row].indices, id: \.self) { col in
                         cellView(row: row, col: col)
                     }
                 }
@@ -162,19 +162,20 @@ struct GridView: View {
             
             // Phase 8.1: Cascaded Neon Flash / Line Clear Burst
             if isFlashing {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.white, ThemeColors.neonCyan],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .shadow(color: ThemeColors.neonCyan, radius: 8)
-                    .frame(width: cellSize, height: cellSize)
-                    .opacity(flashOpacity)
-                    .blendMode(.screen)
-                    .allowsHitTesting(false)
+                ZStack {
+                    // Flash fill
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.white)
+                        .opacity(flashOpacity)
+                    
+                    // Expanding Shockwave Ring
+                    Circle()
+                        .stroke(ThemeColors.neonCyan, lineWidth: 2)
+                        .scaleEffect(isFlashing ? 2.5 : 0.5)
+                        .opacity(flashOpacity)
+                }
+                .blendMode(.screen)
+                .allowsHitTesting(false)
             }
         }
         .scaleEffect(isFlashing ? 1.08 : 1.0)
@@ -205,15 +206,19 @@ struct GridView: View {
     // MARK: - Particle System
     
     private func emitParticles(at pos: GridPosition, color: Color) {
-        let center = CGPoint(
-            x: CGFloat(pos.col) * (cellSize + 2) + cellSize/2 + 20, // Approximate offset
-            y: CGFloat(pos.row) * (cellSize + 2) + cellSize/2 + 20
-        )
+        // More accurate centering based on current layout
+        let spacing: CGFloat = 2
+        let step = cellSize + spacing
+        let centerX = CGFloat(pos.col) * step + cellSize/2
+        let centerY = CGFloat(pos.row) * step + cellSize/2
+        let center = CGPoint(x: centerX, y: centerY)
         
-        for _ in 0..<5 {
+        for _ in 0..<12 { // More particles
+            let angle = Double.random(in: 0...(2 * .pi))
+            let speed = CGFloat.random(in: 2...6)
             let p = GridParticle(
                 position: center,
-                velocity: CGPoint(x: CGFloat.random(in: -3...3), y: CGFloat.random(in: -3...3)),
+                velocity: CGPoint(x: CGFloat(Darwin.cos(angle)) * speed, y: CGFloat(Darwin.sin(angle)) * speed),
                 color: color
             )
             particles.append(p)

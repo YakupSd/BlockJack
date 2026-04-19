@@ -15,7 +15,7 @@ final class BoardViewModel: ObservableObject {
     @Published var ghostCells: Set<GridPosition> = []   // Preview için
     @Published var isGhostValid: Bool = true
 
-    static let size = 8
+    static let size = 12
 
     // MARK: - Init
     init() { resetGrid() }
@@ -44,7 +44,7 @@ final class BoardViewModel: ObservableObject {
 
     /// Bloğu grid'e yerleştir, temizlenen satır/sütun hücrelerini döndür
     @discardableResult
-    func placeBlock(_ block: GameBlock, at origin: GridPosition) -> [GameCell]? {
+    func placeBlock(_ block: GameBlock, at origin: GridPosition) -> ClearResult? {
         guard canPlace(block, at: origin) else { return nil }
 
         // Hücreleri doldur
@@ -94,8 +94,8 @@ final class BoardViewModel: ObservableObject {
             break
         }
         
-        let cleared = clearFullLines()
-        return cleared
+        let result = clearFullLines()
+        return result
     }
 
     /// Ghost (önizleme) güncelle
@@ -125,7 +125,7 @@ final class BoardViewModel: ObservableObject {
     }
 
     @discardableResult
-    private func clearFullLines() -> [GameCell] {
+    private func clearFullLines() -> ClearResult {
         var clearedCells: [GameCell] = []
 
         let fullRows = (0..<Self.size).filter { row in
@@ -135,7 +135,9 @@ final class BoardViewModel: ObservableObject {
             (0..<Self.size).allSatisfy { row in grid[row][col].isOccupied }
         }
 
-        if fullRows.isEmpty && fullCols.isEmpty { return [] }
+        if fullRows.isEmpty && fullCols.isEmpty { 
+            return ClearResult(clearedCells: [], rowsCleared: 0, colsCleared: 0)
+        }
 
         // Temizlenecek hücrelerin koordinatlarını belirle (Set ile çakışmaları önle)
         var targetPositions: Set<GridPosition> = []
@@ -158,14 +160,18 @@ final class BoardViewModel: ObservableObject {
                 } else {
                     grid[pos.row][pos.col].state = .empty
                 }
-            case .filled, .locked: // Locked normalde temizlenmez ama boss mekaniği gereği temizlenebilir mi? GDD'ye göre locked'a blok konamaz.
+            case .filled, .locked: 
                 grid[pos.row][pos.col].state = .empty
             case .empty:
                 break
             }
         }
 
-        return clearedCells
+        return ClearResult(
+            clearedCells: clearedCells,
+            rowsCleared: fullRows.count,
+            colsCleared: fullCols.count
+        )
     }
 
     // MARK: - Game State Checks

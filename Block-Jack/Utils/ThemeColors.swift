@@ -13,6 +13,7 @@ struct ThemeColors {
     static let gridStroke      = Color(hex: "#2A2A4A")   // Grid çizgileri
     static let surfaceDark     = Color(hex: "#12121C")   // Kart/panel yüzeyi
     static let surfaceMid      = Color(hex: "#1E1E30")   // İkincil panel
+    static let surfaceLight    = Color(hex: "#2E2E4A")   // Daha açık panel yüzeyi
 
     // MARK: - Neon Accents
     static let neonCyan        = Color(hex: "#00F5FF")   // Vurgu, aktif blok

@@ -120,25 +120,49 @@ struct DashboardView: View {
                 .padding(.horizontal, 32)
                 .padding(.top, 16)
                 
-                // MARKET Butonu
-                Button {
-                    HapticManager.shared.play(.buttonTap)
-                    MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(UpgradesView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "storefront.fill")
-                            .font(.system(size: 16))
-                        Text(userEnv.localizedString("MARKET & GELİŞTİRME", "META UPGRADES"))
-                            .font(.setCustomFont(name: .InterBold, size: 14))
-                            .tracking(1)
+                // MARKET & GALERİ
+                HStack(spacing: 16) {
+                    // GALERİ
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(CollectionMainView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "square.grid.3x3.topleft.filled")
+                                .font(.system(size: 16))
+                            Text(userEnv.localizedString("GALERİ", "COLLECTION"))
+                                .font(.setCustomFont(name: .InterBold, size: 14))
+                                .tracking(1)
+                        }
+                        .foregroundStyle(ThemeColors.neonPurple)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 24)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(ThemeColors.neonPurple.opacity(0.3), lineWidth: 1))
+                        .shadow(color: ThemeColors.neonPurple.opacity(0.1), radius: 10)
                     }
-                    .foregroundStyle(ThemeColors.electricYellow)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 24)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Capsule())
-                    .overlay(Capsule().stroke(ThemeColors.electricYellow.opacity(0.3), lineWidth: 1))
-                    .shadow(color: ThemeColors.electricYellow.opacity(0.1), radius: 10)
+
+                    // MARKET
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(UpgradesView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "storefront.fill")
+                                .font(.system(size: 16))
+                            Text(userEnv.localizedString("MARKET", "UPGRADES"))
+                                .font(.setCustomFont(name: .InterBold, size: 14))
+                                .tracking(1)
+                        }
+                        .foregroundStyle(ThemeColors.electricYellow)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 24)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(ThemeColors.electricYellow.opacity(0.3), lineWidth: 1))
+                        .shadow(color: ThemeColors.electricYellow.opacity(0.1), radius: 10)
+                    }
                 }
                 .padding(.top, 24)
 
@@ -150,6 +174,9 @@ struct DashboardView: View {
                 .padding(.top, 24)
                 .padding(.bottom, 48)
             }
+        }
+        .onAppear {
+            AudioManager.shared.playMusic(.menu)
         }
     }
 

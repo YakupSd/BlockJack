@@ -16,7 +16,8 @@ struct ScoreHUDView: View {
                     .font(.setCustomFont(name: .InterBold, size: 28))
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
-                    .animation(.spring(response: 0.3), value: vm.run.currentScore)
+                    .scaleEffect(vm.shakeAmount > 0 ? 1.2 : 1.0)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.3), value: vm.run.currentScore)
 
                 Text("/ \(vm.run.currentRoundTargetScore.formatted())")
                     .font(.setCustomFont(name: .InterRegular, size: 12))
@@ -85,18 +86,26 @@ struct ScorePopupView: View {
 
     @State private var offset: CGFloat = 0
     @State private var opacity: Double = 1.0
+    @State private var scale: CGFloat = 0.5
 
     var body: some View {
         Text(popup.text)
-            .font(.setCustomFont(name: .InterExtraBold, size: 20))
+            .font(.setCustomFont(name: .InterExtraBold, size: 24))
             .foregroundStyle(popup.color)
-            .shadow(color: popup.color, radius: 8)
+            .shadow(color: popup.color, radius: 10)
+            .scaleEffect(scale)
             .offset(y: offset)
             .opacity(opacity)
             .onAppear {
-                withAnimation(.easeOut(duration: 1.0)) {
-                    offset = -60
+                // Pop-in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                    scale = 1.2
+                }
+                // Float away
+                withAnimation(.easeOut(duration: 1.2).delay(0.2)) {
+                    offset = -80
                     opacity = 0
+                    scale = 1.0
                 }
             }
     }

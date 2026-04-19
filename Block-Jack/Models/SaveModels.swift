@@ -130,7 +130,19 @@ struct StartingPerk: Codable, Identifiable, Hashable {
         StartingPerk(id: "echoes", name: "Echoes", icon: "🔊", desc: "Tur sonu, en iyi hamlenin puanını tekrar ekler"),
         StartingPerk(id: "wide_load", name: "Wide Load", icon: "📦", desc: "Blok haznesine ekstra 4. bir slot açar"),
         StartingPerk(id: "clockwork", name: "Clockwork", icon: "🕰️", desc: "Kazanılan süre ilerledikçe bonus çarpan ekler"),
-        StartingPerk(id: "sculptor", name: "Sculptor", icon: "🔨", desc: "Turda 2 kez bloğu çevirme hakkı verir")
+        StartingPerk(id: "sculptor", name: "Sculptor", icon: "🔨", desc: "Turda 2 kez bloğu çevirme hakkı verir"),
+        
+        // --- NEW PHASE B PERKS ---
+        StartingPerk(id: "lead_pill", name: "Lead Pill", icon: "item_green_pill", desc: "Yeşil bloklar ×2 Chips verir"),
+        StartingPerk(id: "midas_touch", name: "Midas Touch", icon: "💰✨", desc: "Her Flush (Renkli Temizlik) +5 Altın verir"),
+        StartingPerk(id: "vampiric_core", name: "Vampiric Core", icon: "🧛", desc: "Her 5000 puanda bir +1 Can şansı verir"),
+        StartingPerk(id: "recycler", name: "Recycler", icon: "♻️", desc: "2+ satır silindiğinde %20 hazne yenileme şansı"),
+        StartingPerk(id: "chain_pulse", name: "Chain Pulse", icon: "📡", desc: "Temizlik sonrası komşu kareleri kontrol eder"),
+        StartingPerk(id: "heavy_duty", name: "Heavy Duty", icon: "🏗️", desc: "Ağır (Heavy) bloklar ×3 çarpan katkısı sağlar"),
+        StartingPerk(id: "phantom_siphon", name: "Phantom Siphon", icon: "👻🧪", desc: "Phantom kare yanına yerleşim +2s kazandırır"),
+        StartingPerk(id: "double_down", name: "Double Down", icon: "✖️2", desc: "Son hamlede temizlik yapılırsa +3 hamle verir"),
+        StartingPerk(id: "static_charge", name: "Static Charge", icon: "🔌", desc: "Static kareler overdrive barını hızla doldurur"),
+        StartingPerk(id: "tactical_lens", name: "Tactical Lens", icon: "🔍", desc: "En iyi yerleşimi 10sn aralıkla vurgular")
     ]
     
     func toPassivePerk() -> PassivePerk {
@@ -150,6 +162,9 @@ enum SynergyEffect: Codable {
     case tensionThresholdReduce(Int)
     case overkillConvertsToTime
     case wideLoadFreeRotate
+    case colorComboMult(Double)
+    case goldOnFlush(Int)
+    case trayRefillChance(Double)
     case unknown
 }
 

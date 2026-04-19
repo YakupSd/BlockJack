@@ -128,6 +128,18 @@ struct PerkSelectionView: View {
                         .font(.setCustomFont(name: .InterMedium, size: 12))
                         .foregroundStyle(ThemeColors.textSecondary)
                         .multilineTextAlignment(.leading)
+                    
+                    // Synergy Hint (New Phase B)
+                    if let partnerId = PerkEngine.perkPool.first(where: { $0.id == perk.id })?.synergyPartnerIds.first,
+                       let partnerName = PerkEngine.perkPool.first(where: { $0.id == partnerId })?.name {
+                        HStack(spacing: 4) {
+                            Image(systemName: "link")
+                            Text("Sinerji: \(partnerName)")
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(ThemeColors.neonPurple)
+                        .padding(.top, 2)
+                    }
                 }
                 
                 Spacer()

@@ -126,29 +126,29 @@ class OverdriveEngine {
     /// Hedeflenmiş yetenek tetiklenmesi
     static func executeTargeted(pos: GridPosition, tier: OverdriveTier, charId: String, vm: GameViewModel) {
         // Bounds Check
-        guard pos.row >= 0 && pos.row < 8 && pos.col >= 0 && pos.col < 8 else { return }
+        guard pos.row >= 0 && pos.row < BoardViewModel.size && pos.col >= 0 && pos.col < BoardViewModel.size else { return }
         
         switch charId {
         case "block_e":
             if tier == .tier1 {
-                let positions = (0..<8).map { GridPosition(row: pos.row, col: $0) }
+                let positions = (0..<BoardViewModel.size).map { GridPosition(row: pos.row, col: $0) }
                 let cleared = vm.board.removeCells(at: positions)
-                vm.handleClear(clearedCells: cleared)
+                vm.handleClear(result: BoardViewModel.ClearResult(clearedCells: cleared, rowsCleared: 1, colsCleared: 0))
             } else if tier == .tier2 {
                 var positions: [GridPosition] = []
-                for c in 0..<8 { positions.append(GridPosition(row: pos.row, col: c)) }
-                for r in 0..<8 { positions.append(GridPosition(row: r, col: pos.col)) }
+                for c in 0..<BoardViewModel.size { positions.append(GridPosition(row: pos.row, col: c)) }
+                for r in 0..<BoardViewModel.size { positions.append(GridPosition(row: r, col: pos.col)) }
                 let cleared = vm.board.removeCells(at: positions)
-                vm.handleClear(clearedCells: cleared)
+                vm.handleClear(result: BoardViewModel.ClearResult(clearedCells: cleared, rowsCleared: 1, colsCleared: 1))
             } else if tier == .tier3 {
                 var positions: [GridPosition] = []
-                for r in max(0, pos.row-1)...min(7, pos.row+1) {
-                    for c in max(0, pos.col-1)...min(7, pos.col+1) {
+                for r in max(0, pos.row-1)...min(BoardViewModel.size-1, pos.row+1) {
+                    for c in max(0, pos.col-1)...min(BoardViewModel.size-1, pos.col+1) {
                         positions.append(GridPosition(row: r, col: c))
                     }
                 }
                 let cleared = vm.board.removeCells(at: positions)
-                vm.handleClear(clearedCells: cleared)
+                vm.handleClear(result: BoardViewModel.ClearResult(clearedCells: cleared, rowsCleared: 0, colsCleared: 0))
             }
             vm.addPopup(text: "CLEARED!", color: ThemeColors.neonPink)
         case "architect":

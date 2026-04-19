@@ -30,6 +30,7 @@ final class HapticManager {
         switch type {
         case .blockPlace:
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            AudioManager.shared.playSFX(.blockPlace)
         case .blockFail:
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         case .lineClear:
@@ -44,6 +45,7 @@ final class HapticManager {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .buttonTap:
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            AudioManager.shared.playSFX(.buttonTap)
         case .timerWarning:
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         case .success:
