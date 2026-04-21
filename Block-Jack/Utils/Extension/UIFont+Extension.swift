@@ -36,6 +36,12 @@ public enum CustomFonts: String {
     case InterSemiBoldItalic = "Inter-SemiBoldItalic"
     case InterThin = "Inter-Thin"
     case InterThinItalic = "Inter-ThinItalic"
+
+    case ManropeBold = "Manrope-Bold"
+    case ManropeExtraBold = "Manrope-ExtraBold"
+    case ManropeMedium = "Manrope-Medium"
+    case ManropeRegular = "Manrope-Regular"
+    case ManropeSemiBold = "Manrope-SemiBold"
 }
 extension Font {
     public static func setCustomFont(name: CustomFonts, size: CGFloat = 14) -> Font {
@@ -44,6 +50,17 @@ extension Font {
         } else {
             return Font.system(size: size, weight: .bold)
         }
+    }
+
+    /// Luminescent Design System: High-tracking headers
+    public static func luminescentHeader(size: CGFloat = 22) -> Font {
+        return setCustomFont(name: .ManropeExtraBold, size: size)
+    }
+}
+
+extension View {
+    func luminescentTracking() -> some View {
+        self.tracking(1.5)
     }
 }
 

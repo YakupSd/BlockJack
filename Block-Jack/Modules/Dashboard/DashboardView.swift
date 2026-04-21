@@ -74,15 +74,15 @@ struct DashboardView: View {
                 }
                 .padding(.bottom, 40)
 
-                // YENİ OYUN Butonu
+                // SEFER (Campaign) Butonu
                 Button {
                     HapticManager.shared.play(.buttonTap)
-                    MainViewsRouter.shared.pushToSaveSlotSelection(mode: .newGame)
+                    MainViewsRouter.shared.pushToSaveSlotSelection(mode: .newGame) // Slot seçilir sonra WorldMap açılır
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "plus.circle.fill")
+                        Image(systemName: "map.fill")
                             .font(.system(size: 18, weight: .bold))
-                        Text(userEnv.localizedString("YENİ OYUN", "NEW GAME"))
+                        Text(userEnv.localizedString("SEFER MODU", "CAMPAIGN"))
                             .font(.setCustomFont(name: .InterExtraBold, size: 22))
                             .tracking(4)
                     }
@@ -121,26 +121,24 @@ struct DashboardView: View {
                 .padding(.top, 16)
                 
                 // MARKET & GALERİ
-                HStack(spacing: 16) {
-                    // GALERİ
+                HStack(spacing: 12) {
+                    // KAHRAMANLAR (NEW)
                     Button {
                         HapticManager.shared.play(.buttonTap)
-                        MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(CollectionMainView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
+                        MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(CharacterShopView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
                     } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "square.grid.3x3.topleft.filled")
+                            Image(systemName: "person.2.fill")
                                 .font(.system(size: 16))
-                            Text(userEnv.localizedString("GALERİ", "COLLECTION"))
+                            Text(userEnv.localizedString("KAHRAMANLAR", "HEROES"))
                                 .font(.setCustomFont(name: .InterBold, size: 14))
-                                .tracking(1)
                         }
-                        .foregroundStyle(ThemeColors.neonPurple)
+                        .foregroundStyle(ThemeColors.neonCyan)
                         .padding(.vertical, 12)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, 16)
                         .background(.ultraThinMaterial)
                         .clipShape(Capsule())
-                        .overlay(Capsule().stroke(ThemeColors.neonPurple.opacity(0.3), lineWidth: 1))
-                        .shadow(color: ThemeColors.neonPurple.opacity(0.1), radius: 10)
+                        .overlay(Capsule().stroke(ThemeColors.neonCyan.opacity(0.3), lineWidth: 1))
                     }
 
                     // MARKET
@@ -153,15 +151,13 @@ struct DashboardView: View {
                                 .font(.system(size: 16))
                             Text(userEnv.localizedString("MARKET", "UPGRADES"))
                                 .font(.setCustomFont(name: .InterBold, size: 14))
-                                .tracking(1)
                         }
                         .foregroundStyle(ThemeColors.electricYellow)
                         .padding(.vertical, 12)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, 16)
                         .background(.ultraThinMaterial)
                         .clipShape(Capsule())
                         .overlay(Capsule().stroke(ThemeColors.electricYellow.opacity(0.3), lineWidth: 1))
-                        .shadow(color: ThemeColors.electricYellow.opacity(0.1), radius: 10)
                     }
                 }
                 .padding(.top, 24)

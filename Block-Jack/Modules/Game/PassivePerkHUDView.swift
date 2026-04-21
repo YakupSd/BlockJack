@@ -57,13 +57,14 @@ struct PerkHUDIcon: View {
         }) {
             ZStack {
                 // Synergy Glow
+                // Synergy Glow (Breathing)
                 if hasSynergy {
-                    Circle()
+                    RoundedRectangle(cornerRadius: 14)
                         .stroke(ThemeColors.neonPurple, lineWidth: 2)
                         .blur(radius: 4)
-                        .scaleEffect(1.2)
-                        .phaseAnimator([1.0, 1.2]) { content, scale in
-                            content.scaleEffect(scale).opacity(1.5 - scale)
+                        .scaleEffect(1.1)
+                        .phaseAnimator([0.4, 1.0]) { content, opacity in
+                            content.opacity(opacity)
                         } animation: { _ in
                             .easeInOut(duration: 1.5).repeatForever()
                         }
@@ -77,27 +78,38 @@ struct PerkHUDIcon: View {
                         .scaleEffect(isAnimating ? 1.5 : 1.0)
                 }
                 
-                Circle()
-                    .fill(ThemeColors.surfaceMid)
-                    .frame(width: 40, height: 40)
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                isInteractable && vm.selectedBlock != nil ? ThemeColors.neonCyan : ThemeColors.gridStroke.opacity(0.5),
-                                lineWidth: 1.5
-                            )
-                    )
-                
-                if perk.icon.hasPrefix("item_") || perk.icon.hasPrefix("port_") {
-                    Image(perk.icon)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
-                        .scaleEffect(isAnimating ? 1.2 : 1.0)
-                } else {
-                    Text(perk.icon)
-                        .font(.system(size: 20))
-                        .scaleEffect(isAnimating ? 1.2 : 1.0)
+                ZStack {
+                    // TECH CHIP BACKGROUND
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(ThemeColors.surfaceMid)
+                        .frame(width: 44, height: 44)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    isInteractable && vm.selectedBlock != nil ? ThemeColors.neonCyan : ThemeColors.gridStroke.opacity(0.4),
+                                    lineWidth: 1.5
+                                )
+                        )
+                    
+                    // Segmented Corners (Dashed overlay for tech look)
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(
+                            isInteractable && vm.selectedBlock != nil ? ThemeColors.neonCyan : ThemeColors.textMuted.opacity(0.3),
+                            style: StrokeStyle(lineWidth: 1, dash: [2, 10])
+                        )
+                        .frame(width: 44, height: 44)
+
+                    if perk.icon.hasPrefix("item_") || perk.icon.hasPrefix("port_") {
+                        Image(perk.icon)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28, height: 28)
+                            .scaleEffect(isAnimating ? 1.2 : 1.0)
+                    } else {
+                        Text(perk.icon)
+                            .font(.system(size: 22))
+                            .scaleEffect(isAnimating ? 1.2 : 1.0)
+                    }
                 }
             }
         }
@@ -127,42 +139,78 @@ struct PerkHUDIcon: View {
             }
         )
         .popover(isPresented: $showDetails) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 16) {
                     ZStack {
-                        Circle().fill(ThemeColors.surfaceMid).frame(width: 44, height: 44)
-                        Text(perk.icon).font(.title3)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(ThemeColors.surfaceMid)
+                            .frame(width: 54, height: 54)
+                        Text(perk.icon).font(.title2)
                     }
-                    VStack(alignment: .leading) {
-                        Text(perk.name).font(.headline).foregroundStyle(.white)
-                        Text("Tier \(perk.tier)").font(.caption).foregroundStyle(ThemeColors.electricYellow)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(ThemeColors.neonCyan.opacity(0.5), lineWidth: 1))
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(perk.name)
+                            .font(.setCustomFont(name: .InterBlack, size: 18))
+                            .foregroundStyle(.white)
+                        
+                        HStack {
+                            Text("LEVEL \(perk.tier)")
+                                .font(.setCustomFont(name: .InterBold, size: 10))
+                                .foregroundStyle(ThemeColors.electricYellow)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(ThemeColors.electricYellow.opacity(0.1))
+                                .clipShape(Capsule())
+                            
+                            if hasSynergy {
+                                Text("SYNERGY ACTIVE")
+                                    .font(.setCustomFont(name: .InterBold, size: 10))
+                                    .foregroundStyle(ThemeColors.neonPurple)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(ThemeColors.neonPurple.opacity(0.1))
+                                    .clipShape(Capsule())
+                            }
+                        }
                     }
                     Spacer()
                 }
                 
                 Text(perk.desc)
-                    .font(.subheadline)
+                    .font(.setCustomFont(name: .InterMedium, size: 13))
                     .foregroundStyle(ThemeColors.textSecondary)
+                    .lineSpacing(4)
                 
                 if !perk.synergyPartnerIds.isEmpty {
-                    Divider().background(ThemeColors.gridStroke)
-                    Text("Sinerji Ortakları:").font(.caption).bold()
-                    HStack {
-                        ForEach(perk.synergyPartnerIds, id: \.self) { partnerId in
-                            if let partner = PerkEngine.perkPool.first(where: { $0.id == partnerId }) {
-                                Text("\(partner.icon) \(partner.name)")
-                                    .font(.caption2)
-                                    .padding(6)
-                                    .background(ThemeColors.neonPurple.opacity(0.2))
-                                    .cornerRadius(6)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(vm.userEnv.localizedString("SİNERJİ ORTAKLARI", "SYNERGY PARTNERS"))
+                            .font(.setCustomFont(name: .InterBold, size: 10))
+                            .foregroundStyle(ThemeColors.textMuted)
+                        
+                        HStack(spacing: 8) {
+                            ForEach(perk.synergyPartnerIds, id: \.self) { partnerId in
+                                if let partner = PerkEngine.perkPool.first(where: { $0.id == partnerId }) {
+                                    HStack(spacing: 4) {
+                                        Text(partner.icon)
+                                        Text(partner.name)
+                                            .font(.setCustomFont(name: .InterBold, size: 10))
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(ThemeColors.neonPurple.opacity(0.15))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(ThemeColors.neonPurple.opacity(0.3), lineWidth: 1))
+                                }
                             }
                         }
                     }
+                    .padding(.top, 4)
                 }
             }
-            .padding()
+            .padding(20)
             .presentationCompactAdaptation(.popover)
-            .background(ThemeColors.cosmicBlack)
+            .background(ThemeColors.backgroundGradient)
         }
         .disabled(!isInteractable && perk.id != "sculptor" && !showDetails) 
         .simultaneousGesture(TapGesture().onEnded {

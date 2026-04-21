@@ -38,60 +38,46 @@ struct MapView: View {
     
     var body: some View {
         ZStack {
-            // 1. Atmosferik Arka Plan
-            ZStack {
-                Image("cyber_map_background")
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .overlay(Color.black.opacity(0.4))
-                
-                // Synthwave Grid
-                Canvas { ctx, size in
-                    let step: CGFloat = 40
-                    for x in stride(from: 0, through: size.width, by: step) {
-                        var path = Path()
-                        path.move(to: CGPoint(x: x, y: 0))
-                        path.addLine(to: CGPoint(x: x, y: size.height))
-                        ctx.stroke(path, with: .color(ThemeColors.gridStroke.opacity(0.1)), lineWidth: 0.5)
-                    }
-                    for y in stride(from: 0, through: size.height, by: step) {
-                        var path = Path()
-                        path.move(to: CGPoint(x: 0, y: y))
-                        path.addLine(to: CGPoint(x: size.width, y: y))
-                        ctx.stroke(path, with: .color(ThemeColors.gridStroke.opacity(0.1)), lineWidth: 0.5)
-                    }
-                }
-                .opacity(0.5)
-            }
-            .ignoresSafeArea()
+            // 1. Architectural Surface Background
+            ThemeColors.surface
+                .ignoresSafeArea()
+            
+            // Subtle Grid Pattern (Luminescent Style)
+            GridPattern()
+                .stroke(ThemeColors.outlineVariant.opacity(0.15), lineWidth: 1)
+                .ignoresSafeArea()
+            
+            // Scanning Line Overlay (Tech Detail)
+            ScanningLine()
+                .ignoresSafeArea()
             
             GeometryReader { geometry in
                 let width = geometry.size.width
                 let height = geometry.size.height
                 
-                // 2. Bağlantı Çizgileri
+                // 2. Ethereal Connection Lines
                 drawConnections(width: width, height: height)
                 
-                // 3. Düğümler
+                // 3. Tech Nodes
                 drawNodes(width: width, height: height)
             }
             .padding(.top, 100)
             .padding(.bottom, 60)
             
-            // 4. Stats HUD
+            // 4. Pearl HUD
             VStack {
                 statsHeaderHUD
                 Spacer()
             }
             
-            // 5. Seçim Paneli
+            // 5. Selection Panel (Pearl/Glass container)
             if let selected = viewModel.selectedNode {
                 nodeSelectionPanel(for: selected)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(2)
             }
             
-            // 6. Alt Navigasyon
+            // 6. Navigation
             VStack {
                 Spacer()
                 HStack {
@@ -103,12 +89,13 @@ struct MapView: View {
                             Image(systemName: "chevron.left")
                             Text("ANA MENÜ")
                         }
-                        .font(.setCustomFont(name: .InterBold, size: 14))
-                        .foregroundColor(.white)
+                        .font(.setCustomFont(name: .ManropeBold, size: 14))
+                        .foregroundColor(ThemeColors.luminescentPrimary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(Capsule().fill(Color.white.opacity(0.1)))
-                        .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
+                        .background(ThemeColors.surfaceContainerLowest)
+                        .clipShape(Capsule())
+                        .shadow(color: Color.black.opacity(0.05), radius: 5)
                     }
                     Spacer()
                 }
@@ -119,56 +106,43 @@ struct MapView: View {
         .onAppear {
             AudioManager.shared.playMusic(.menu)
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.selectedNode?.id)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.selectedNode?.id)
     }
     
     // MARK: - Subcomponents
     
     private var statsHeaderHUD: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("GÖREV SEKTÖRÜ")
-                        .font(.setCustomFont(name: .InterBlack, size: 10))
-                        .foregroundStyle(ThemeColors.neonCyan)
-                        .tracking(2)
-                    Text("CHAPTER \(viewModel.currentMap.chapterIndex)")
-                        .font(.setCustomFont(name: .InterExtraBold, size: 22))
-                        .foregroundStyle(.white)
+                        .font(.luminescentHeader(size: 10))
+                        .luminescentTracking()
+                        .foregroundStyle(ThemeColors.luminescentPrimary)
+                    Text("BÖLÜM \(viewModel.currentMap.chapterIndex)")
+                        .font(.luminescentHeader(size: 22))
+                        .foregroundStyle(Color.black.opacity(0.8))
                 }
                 
                 Spacer()
                 
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     currencyBadge(icon: "icon_gold", value: "\(userEnv.gold)", color: ThemeColors.electricYellow)
-                    currencyBadge(icon: "icon_diamond", value: "\(userEnv.diamonds)", color: ThemeColors.neonCyan)
-                    
-                    HStack(spacing: 4) {
-                        Image(systemName: "heart.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(ThemeColors.neonPink)
-                        Text("3")
-                            .font(.setCustomFont(name: .InterBold, size: 16))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(ThemeColors.surfaceLight)
-                    .cornerRadius(8)
+                    currencyBadge(icon: "icon_diamond", value: "\(userEnv.diamonds)", color: ThemeColors.luminescentPrimary)
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 16)
-            
-            Rectangle()
-                .fill(LinearGradient(colors: [ThemeColors.neonCyan.opacity(0.5), .clear], startPoint: .leading, endPoint: .trailing))
-                .frame(height: 1)
-                .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                ThemeColors.surfaceContainerLowest
+                    .overlay(
+                        VStack {
+                            Spacer()
+                            ThemeColors.outlineVariant.opacity(0.1).frame(height: 1)
+                        }
+                    )
+            )
         }
-        .background(
-            LinearGradient(colors: [Color.black, .clear], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        )
     }
     
     private func currencyBadge(icon: String, value: String, color: Color) -> some View {
@@ -178,13 +152,12 @@ struct MapView: View {
                 .frame(width: 16, height: 16)
             Text(value)
                 .font(.setCustomFont(name: .InterBold, size: 14))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.black.opacity(0.7))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(color.opacity(0.1))
+        .background(ThemeColors.surfaceContainerLow)
         .cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(color.opacity(0.3), lineWidth: 1))
     }
     
     @ViewBuilder
@@ -202,8 +175,7 @@ struct MapView: View {
                     }
                 }
             }
-            .stroke(ThemeColors.neonCyan.opacity(0.15), lineWidth: 4)
-            .blur(radius: 3)
+            .stroke(ThemeColors.luminescentPrimary.opacity(0.1), lineWidth: 2)
             
             Path { path in
                 for node in viewModel.currentMap.nodes {
@@ -217,7 +189,7 @@ struct MapView: View {
                     }
                 }
             }
-            .stroke(Color.white.opacity(0.2), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+            .stroke(ThemeColors.luminescentPrimary.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
         }
     }
     
@@ -233,25 +205,10 @@ struct MapView: View {
                     HapticManager.shared.play(.buttonTap)
                     viewModel.selectNode(node)
                 }
-                .shadow(color: colorForNodeType(node.type).opacity(node.isAccessible ? 0.4 : 0), radius: 10)
             
             if viewModel.lastCompletedNodeId == node.id {
-                VStack(spacing: 2) {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 14, weight: .black))
-                        .foregroundColor(ThemeColors.neonCyan)
-                    
-                    Circle()
-                        .fill(ThemeColors.neonCyan)
-                        .frame(width: 6, height: 6)
-                }
-                .shadow(color: ThemeColors.neonCyan, radius: 8)
-                .position(x: posX, y: posY - 45)
-                .phaseAnimator([0, -8, 0]) { content, offset in
-                    content.offset(y: offset)
-                } animation: { _ in
-                    .easeInOut(duration: 2.0).repeatForever(autoreverses: true)
-                }
+                FloatingIndicator()
+                    .position(x: posX, y: posY - 40)
             }
         }
     }
@@ -261,53 +218,74 @@ struct MapView: View {
         VStack(spacing: 0) {
             Spacer()
             
-            VStack(spacing: 16) {
-                HStack {
-                    Image(systemName: iconForNodeType(node.type))
-                        .font(.title)
-                        .foregroundColor(colorForNodeType(node.type))
-                        .frame(width: 50, height: 50)
-                        .background(colorForNodeType(node.type).opacity(0.2))
-                        .clipShape(Circle())
+            VStack(spacing: 20) {
+                HStack(spacing: 16) {
+                    Circle()
+                        .fill(ThemeColors.surfaceContainerLow)
+                        .frame(width: 60, height: 60)
+                        .overlay(
+                            Image(systemName: iconForNodeType(node.type))
+                                .font(.title2)
+                                .foregroundColor(colorForNodeType(node.type))
+                        )
                     
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(titleForNodeType(node.type))
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        if viewModel.canReplay(node) {
-                            Text("⚠️ Ödül yarıya iner")
-                                .font(.caption)
-                                .foregroundColor(.yellow)
-                        }
+                            .font(.setCustomFont(name: .ManropeExtraBold, size: 18))
+                            .foregroundColor(Color.black.opacity(0.8))
+                        
+                        Text(descForNodeType(node.type))
+                            .font(.setCustomFont(name: .InterRegular, size: 14))
+                            .foregroundColor(Color.black.opacity(0.5))
                     }
                     Spacer()
                 }
-                
-                Text(descForNodeType(node.type))
-                    .foregroundColor(.gray)
-                    .font(.subheadline)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 
                 Button(action: {
                     viewModel.markNodeCompleted(node.id)
                     onNodeSelected?(node)
                 }) {
-                    Text(node.isReplayable ? "TEKRAR GİR" : "İLERLE")
-                        .font(.headline)
+                    Text(node.isReplayable ? "YENİDEN BAŞLAT" : "GÖREVE BAŞLA")
+                        .font(.luminescentHeader(size: 16))
+                        .luminescentTracking()
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(node.isAccessible || node.isReplayable ? Color.blue : Color.gray)
+                        .padding(.vertical, 16)
+                        .background(node.isAccessible || node.isReplayable ? AnyShapeStyle(ThemeColors.liquidChromeGradient) : AnyShapeStyle(Color.gray.opacity(0.3)))
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .clipShape(Capsule())
                 }
                 .disabled(!node.isAccessible && !node.isReplayable)
             }
-            .padding()
-            .background(Color(white: 0.15))
-            .cornerRadius(20)
-            .shadow(radius: 20)
-            .padding()
+            .padding(24)
+            .background(
+                ThemeColors.surfaceContainerLowest
+                    .overlay(VisualEffectBlur(blurStyle: .systemUltraThinMaterialLight))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+            // Ambient Occlusion Shadow (Spec 4)
+            .shadow(color: Color.black.opacity(0.06), radius: 60, x: 0, y: 30)
+            .padding(20)
+        }
+    }
+}
+
+// Tech Detail: Scanning Line
+struct ScanningLine: View {
+    @State private var position: CGFloat = -100
+    
+    var body: some View {
+        GeometryReader { geo in
+            Rectangle()
+                .fill(
+                    LinearGradient(colors: [.clear, ThemeColors.luminescentPrimary.opacity(0.1), .clear], startPoint: .top, endPoint: .bottom)
+                )
+                .frame(height: 2)
+                .offset(y: position)
+                .onAppear {
+                    withAnimation(.linear(duration: 4.0).repeatForever(autoreverses: false)) {
+                        position = geo.size.height + 100
+                    }
+                }
         }
     }
 }
@@ -319,57 +297,46 @@ struct MapNodeView: View {
     
     var body: some View {
         ZStack {
+            // Shadow layer
+            Circle()
+                .fill(Color.black.opacity(node.isAccessible ? 0.05 : 0))
+                .frame(width: 54, height: 54)
+                .offset(y: 4)
+                .blur(radius: 4)
+            
+            // Base layer
+            Circle()
+                .fill(node.isAccessible ? ThemeColors.surfaceContainerLowest : ThemeColors.surfaceContainerLow.opacity(0.5))
+                .frame(width: 50, height: 50)
+            
+            // Border layer
             Circle()
                 .stroke(
-                    colorForNodeType(node.type).opacity(node.isAccessible ? 0.6 : 0.2),
-                    lineWidth: 1
+                    isSelected ? ThemeColors.luminescentPrimary : colorForNodeType(node.type).opacity(node.isAccessible ? 0.3 : 0.1),
+                    lineWidth: isSelected ? 3 : 1.5
                 )
-                .frame(width: 54, height: 54)
-                .overlay(
-                    Circle()
-                        .stroke(colorForNodeType(node.type).opacity(0.2), lineWidth: 4)
-                        .blur(radius: 2)
-                )
+                .frame(width: 50, height: 50)
             
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [colorForNodeType(node.type).opacity(0.4), .clear],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 25
-                    )
-                )
-                .frame(width: 44, height: 44)
-            
+            // Icon
             VStack {
                 Image(systemName: iconForNodeType(node.type))
-                    .foregroundColor(node.isCompleted ? .white.opacity(0.5) : .white)
+                    .foregroundColor(node.isAccessible ? colorForNodeType(node.type) : Color.gray.opacity(0.3))
                     .font(.system(size: 20, weight: .bold))
-                    .shadow(color: .black, radius: 2)
             }
             
             if node.isCompleted {
                 Circle()
                     .fill(Color.green)
                     .frame(width: 14, height: 14)
-                    .overlay(Image(systemName: "checkmark").font(.system(size: 8, weight: .black)).foregroundColor(.black))
+                    .overlay(Image(systemName: "checkmark").font(.system(size: 8, weight: .black)).foregroundColor(.white))
                     .offset(x: 18, y: -18)
             }
             
             if isSelected {
-                Circle()
-                    .stroke(ThemeColors.neonCyan, lineWidth: 2)
-                    .frame(width: 64, height: 64)
-                    .phaseAnimator([1.0, 1.25]) { content, scale in
-                        content.scaleEffect(scale).opacity(2.0 - scale)
-                    } animation: { _ in
-                        .linear(duration: 1.0).repeatForever(autoreverses: false)
-                    }
+                PulsingCircle(color: ThemeColors.luminescentPrimary, size: 65)
             }
         }
-        .opacity(node.isAccessible || node.isCompleted ? 1.0 : 0.4)
-        .scaleEffect(isSelected ? 1.15 : 1.0)
+        .scaleEffect(isSelected ? 1.2 : 1.0)
         .animation(.spring(response: 0.3), value: isSelected)
     }
 }
@@ -378,48 +345,65 @@ struct MapNodeView: View {
 
 func colorForNodeType(_ type: NodeType) -> Color {
     switch type {
-    case .normal:   return ThemeColors.textSecondary
-    case .elite:    return ThemeColors.neonOrange
-    case .merchant: return ThemeColors.electricYellow
+    case .normal:   return ThemeColors.luminescentPrimary
+    case .elite:    return Color.orange
+    case .merchant: return Color.blue
     case .treasure: return Color.green
-    case .rest:     return ThemeColors.neonCyan
+    case .rest:     return Color.cyan
     case .mystery:  return Color.purple
-    case .boss:     return ThemeColors.neonPink
+    case .boss:     return Color.red
     }
 }
 
 func iconForNodeType(_ type: NodeType) -> String {
     switch type {
-    case .normal:   return "bolt.shield.fill"
-    case .elite:    return "flame.fill"
-    case .merchant: return "cart.fill"
-    case .treasure: return "gift.fill"
-    case .rest:     return "tent.fill"
-    case .mystery:  return "questionmark.diamond.fill"
-    case .boss:     return "skull.fill"
+    case .normal:   return "bolt.shield"
+    case .elite:    return "flame"
+    case .merchant: return "cart"
+    case .treasure: return "gift"
+    case .rest:     return "leaf"
+    case .mystery:  return "questionmark"
+    case .boss:     return "skull"
     }
 }
 
 func titleForNodeType(_ type: NodeType) -> String {
     switch type {
-    case .normal:   return "BÖLGESEL ÇATIŞMA"
-    case .elite:    return "ELİT DÜŞMAN"
-    case .merchant: return "TÜCCAR"
-    case .treasure: return "HAZİNE ODASI"
-    case .rest:     return "DİNLENME NOKTASI"
-    case .mystery:  return "GİZEMLİ OLAY"
-    case .boss:     return "BÖLÜM PATRONU"
+    case .normal:   return "Sektörel Temizlik"
+    case .elite:    return "Zorlu Müdahale"
+    case .merchant: return "Veri Tüccarı"
+    case .treasure: return "Sistem Ödülü"
+    case .rest:     return "Veri Yedekleme"
+    case .mystery:  return "Anomali Tespiti"
+    case .boss:     return "Kritik Protokol"
     }
 }
 
 func descForNodeType(_ type: NodeType) -> String {
     switch type {
-    case .normal:   return "Standart tur. Hedef skora ulaş ve altın kazan."
-    case .elite:    return "Zorlu bir sınav. Daha yüksek risk, daha yüksek ödül."
-    case .merchant: return "Topladığın altınlarla run boyunca geçerli jokerler satın al."
-    case .treasure: return "Ücretsiz bir pasif perk veya büyük bir ödül."
-    case .rest:     return "Canını fulle veya elindeki var olan bir perki yükselt."
-    case .mystery:  return "Ne olacağı belirsiz! İyi de olabilir kötü de."
-    case .boss:     return "Ağır modifiye edilmiş zindan. Geçersen sonraki bölüme atlarsın!"
+    case .normal:   return "Standart glitch temizleme görevi."
+    case .elite:    return "Yüksek yoğunluklu veri anomalisi."
+    case .merchant: return "Eski donanımları yeni modüllerle takas et."
+    case .treasure: return "Sistem tarafından bırakılmış sahipsiz yetenekler."
+    case .rest:     return "Sistem sağlığını onar veya modülleri optimize et."
+    case .mystery:  return "Analiz edilemeyen dış kaynaklı bir sinyal."
+    case .boss:     return "Ana sunucuyu ele geçiren karanlık protokol."
     }
 }
+
+struct FloatingIndicator: View {
+    @State private var offset: CGFloat = 0
+    var body: some View {
+        Circle()
+            .fill(ThemeColors.luminescentPrimary)
+            .frame(width: 8, height: 8)
+            .offset(y: offset)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    offset = -5
+                }
+            }
+    }
+}
+
+// Helpers are now in UIComponents.swift

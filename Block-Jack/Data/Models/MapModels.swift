@@ -58,36 +58,39 @@ struct ChapterMap: Codable, Identifiable {
 // MARK: - Chapter Map Generator
 class ChapterMapGenerator {
     static func generate(chapterIndex: Int) -> ChapterMap {
-        let nodeCount = Int.random(in: 8...12)
+        let isBossChapter = (chapterIndex == 3 || chapterIndex % 5 == 0) && chapterIndex > 0
+        let nodeCount = isBossChapter ? Int.random(in: 5...7) : Int.random(in: 8...12)
         var nodes: [MapNode] = []
         
         let startNode = MapNode(type: .normal, position: CGPoint(x: 0.5, y: 0.9), isAccessible: true, layerIndex: 0)
         let levels = nodeCount / 2 // Approximately
         let bossNode = MapNode(type: .boss, position: CGPoint(x: 0.5, y: 0.1), layerIndex: levels)
         
-        // Simple linear generation for now to ensure working structure
-        // This easily creates a path from start to boss with intermediate nodes
         nodes.append(startNode)
         
         var previousLevelNodes: [MapNode] = [startNode]
         
         for level in 1..<levels {
-            let numNodesInLevel = Int.random(in: 1...2) // Max 2 branches
+            let numNodesInLevel = isBossChapter ? 1 : Int.random(in: 1...2) 
             var currentLevelNodes: [MapNode] = []
             
             for _ in 0..<numNodesInLevel {
-                // Determine node type based on level
                 var type: NodeType = .normal
                 let rand = Double.random(in: 0...1)
                 
                 if level == levels / 2 {
-                    type = .treasure
+                    type = isBossChapter ? .elite : .treasure
                 } else if level == levels - 1 {
                     type = .rest
                 } else {
-                    if rand < 0.2 { type = .elite }
-                    else if rand < 0.35 { type = .merchant }
-                    else if rand < 0.5 { type = .mystery }
+                    if isBossChapter {
+                        if rand < 0.3 { type = .elite }
+                        else if rand < 0.6 { type = .mystery }
+                    } else {
+                        if rand < 0.2 { type = .elite }
+                        else if rand < 0.35 { type = .merchant }
+                        else if rand < 0.5 { type = .mystery }
+                    }
                 }
                 
                 let yPos = 0.9 - (0.8 * (Double(level) / Double(levels)))
@@ -98,30 +101,24 @@ class ChapterMapGenerator {
                 nodes.append(node)
             }
             
-            // Connect previous level to current level
             for i in 0..<previousLevelNodes.count {
                 if let index = nodes.firstIndex(where: { $0.id == previousLevelNodes[i].id }) {
-                    // Connect to random node in next level
-                    if let targetNode = currentLevelNodes.randomElement() {
+                    for targetNode in currentLevelNodes {
                         if !nodes[index].connections.contains(targetNode.id) {
                             nodes[index].connections.append(targetNode.id)
                         }
                     }
                 }
             }
-            
             previousLevelNodes = currentLevelNodes
         }
         
-        // Connect last level to boss
         for prev in previousLevelNodes {
             if let index = nodes.firstIndex(where: { $0.id == prev.id }) {
                 nodes[index].connections.append(bossNode.id)
             }
         }
-        
         nodes.append(bossNode)
-        
         return ChapterMap(id: UUID(), chapterIndex: chapterIndex, nodes: nodes, startNodeId: startNode.id, bossNodeId: bossNode.id)
     }
 }

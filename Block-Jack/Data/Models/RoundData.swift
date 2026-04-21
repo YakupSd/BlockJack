@@ -41,25 +41,37 @@ struct RoundData {
     
     var isBossRound: Bool { roundNumber % 5 == 0 && roundNumber > 0 }
 
-    /// R1:500, R2:1200, R3:2100, R4:3200, R5(boss):4800...
-    static func makeTarget(for round: Int) -> Int {
+    /// R1:500, R2:1200, R3:2100, R4:3200, R5(boss):4800... 
+    /// PLUS: World Level scaling (+25% per level)
+    static func makeTarget(for round: Int, worldLevel: Int = 1) -> Int {
         // Taban: round başı 500, her round +700 artar, üstelişel
         let base = 500 + (round - 1) * 700 + (round - 1) * (round - 1) * 50
         
+        // World Level Çarpanı: 1. level = 1.0, 2. level = 1.25, 3. level = 1.50... (Lineer artış sordu user ama genelde logaritmik veya üstel daha iyi)
+        // User sormadı ama +25% per level (Lineer üzerinden gidelim kafa karıştırmasın)
+        let worldMultiplier = 1.0 + (Double(worldLevel - 1) * 0.25)
+        
+        var finalTarget = Double(base) * worldMultiplier
+        
         if round % 5 == 0 && round > 0 {
             let bossIndex = round / 5
-            let bump = 1.25 + Double(bossIndex) * 0.15 // 8x8 avantajı için %25 taban artışı
-            return Int(Double(base) * bump)
+            let bump = 1.25 + Double(bossIndex) * 0.15 
+            finalTarget *= bump
+        } else {
+            finalTarget *= 1.25
         }
-        return Int(Double(base) * 1.25) // Normal roundlar için de %25 artış
+        
+        return Int(finalTarget)
     }
 
-    static func make(round: Int, modifier: BossModifier? = nil) -> RoundData {
-        RoundData(
+    static func make(round: Int, worldLevel: Int = 1, modifier: BossModifier? = nil) -> RoundData {
+        // Süre: Round 1 = 240sn, her round -3sn azalır, minimum 180sn
+        let timeLimit = max(180.0, 240.0 - Double(round - 1) * 3.0)
+        return RoundData(
             roundNumber: round,
-            targetScore: makeTarget(for: round),
+            targetScore: makeTarget(for: round, worldLevel: worldLevel),
             moveLimit: 300,
-            timeLimit: max(25.0, 90.0 - Double(round - 1) * 5.0), // R1: 90s, R2: 85s... min 25s
+            timeLimit: timeLimit,
             modifier: (round % 5 == 0 && round > 0) ? (modifier ?? BossModifier.allCases.randomElement()) : nil
         )
     }
@@ -86,6 +98,7 @@ struct RunState {
     var completedNodeIds: Set<UUID> = []
     var overkillCarryover: Int = 0
     var sculptorUses: Int = 0
+    var worldLevel: Int = 1 // New: Current world level for scaling
     
     // NEW PERK FLAGS
     var maxTraySlots: Int = 3
@@ -100,7 +113,7 @@ struct RunState {
     mutating func gainLife() { lives = min(maxLives, lives + 1) }
     var isGameOver: Bool { lives <= 0 }
 
-    var round: RoundData { RoundData.make(round: currentRound, modifier: activeModifier) }
+    var round: RoundData { RoundData.make(round: currentRound, worldLevel: worldLevel, modifier: activeModifier) }
 
     var scoreProgress: Double {
         let target = currentRoundTargetScore > 0 ? currentRoundTargetScore : round.targetScore

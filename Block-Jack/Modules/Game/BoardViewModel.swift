@@ -14,8 +14,9 @@ final class BoardViewModel: ObservableObject {
     @Published var grid: [[GameCell]] = []
     @Published var ghostCells: Set<GridPosition> = []   // Preview için
     @Published var isGhostValid: Bool = true
+    @Published var hintPositions: Set<GridPosition> = [] // AAA: For Clear Hints
 
-    static let size = 12
+    static let size = 13
 
     // MARK: - Init
     init() { resetGrid() }
@@ -26,6 +27,7 @@ final class BoardViewModel: ObservableObject {
             (0..<Self.size).map { _ in GameCell() }
         }
         ghostCells = []
+        hintPositions = []
     }
 
     // MARK: - Placement Logic
@@ -94,11 +96,11 @@ final class BoardViewModel: ObservableObject {
             break
         }
         
-        let result = clearFullLines()
+        let result = clearFullLinesAndZones()
         return result
     }
 
-    /// Ghost (önizleme) güncelle
+    /// Ghost (önizleme) güncelle — sadece değişince publish et
     func updateGhost(_ block: GameBlock, at origin: GridPosition) {
         var positions: Set<GridPosition> = []
         for (dr, dc) in block.cells {
@@ -108,8 +110,10 @@ final class BoardViewModel: ObservableObject {
                 positions.insert(GridPosition(row: r, col: c))
             }
         }
-        ghostCells = positions
-        isGhostValid = canPlace(block, at: origin)
+        let valid = canPlace(block, at: origin)
+        // Gereksiz re-render önle
+        if positions != ghostCells { ghostCells = positions }
+        if valid != isGhostValid { isGhostValid = valid }
     }
 
     func clearGhost() {
@@ -120,39 +124,76 @@ final class BoardViewModel: ObservableObject {
 
     struct ClearResult {
         let clearedCells: [GameCell]
+        let clearedPositions: [GridPosition]
         let rowsCleared: Int
         let colsCleared: Int
+        let zonesCleared: Int // NEW: 3x3 Area clears
     }
 
     @discardableResult
-    private func clearFullLines() -> ClearResult {
+    func clearFullLinesAndZones() -> ClearResult {
         var clearedCells: [GameCell] = []
-
+        var targetPositions: Set<GridPosition> = []
+        
+        // 1. Detect Rows & Cols
         let fullRows = (0..<Self.size).filter { row in
             grid[row].allSatisfy { $0.isOccupied }
         }
         let fullCols = (0..<Self.size).filter { col in
             (0..<Self.size).allSatisfy { row in grid[row][col].isOccupied }
         }
-
-        if fullRows.isEmpty && fullCols.isEmpty { 
-            return ClearResult(clearedCells: [], rowsCleared: 0, colsCleared: 0)
-        }
-
-        // Temizlenecek hücrelerin koordinatlarını belirle (Set ile çakışmaları önle)
-        var targetPositions: Set<GridPosition> = []
+        
         for r in fullRows {
             for c in 0..<Self.size { targetPositions.insert(GridPosition(row: r, col: c)) }
         }
         for c in fullCols {
             for r in 0..<Self.size { targetPositions.insert(GridPosition(row: r, col: c)) }
         }
+        
+        // 2. Detect Specific Scoring Zones (4x4 Corners, 5x5 Center)
+        var zoneCount = 0
+        
+        let scoringZones: [(String, Range<Int>, Range<Int>)] = [
+            ("Top Left", 0..<4, 0..<4),
+            ("Top Right", 0..<4, 9..<13),
+            ("Bottom Left", 9..<13, 0..<4),
+            ("Bottom Right", 9..<13, 9..<13),
+            ("Center", 4..<9, 4..<9)
+        ]
+        
+        for (_, rows, cols) in scoringZones {
+            var isFull = true
+            for r in rows {
+                for c in cols {
+                    if !grid[r][c].isOccupied {
+                        isFull = false
+                        break
+                    }
+                }
+                if !isFull { break }
+            }
+            
+            if isFull {
+                zoneCount += 1
+                for r in rows {
+                    for c in cols {
+                        targetPositions.insert(GridPosition(row: r, col: c))
+                    }
+                }
+            }
+        }
 
+        if targetPositions.isEmpty { 
+            return ClearResult(clearedCells: [], clearedPositions: [], rowsCleared: 0, colsCleared: 0, zonesCleared: 0)
+        }
+
+        // Temizlenecek hücrelerin koordinatlarını belirle (targetPositions zaten yukarıda toplandı)
+        
         // Hücreleri işle
         for pos in targetPositions {
             let cell = grid[pos.row][pos.col]
             clearedCells.append(cell)
-
+            
             switch cell.state {
             case .heavy(let hits):
                 if hits > 1 {
@@ -160,18 +201,81 @@ final class BoardViewModel: ObservableObject {
                 } else {
                     grid[pos.row][pos.col].state = .empty
                 }
-            case .filled, .locked: 
+            case .filled, .locked:
                 grid[pos.row][pos.col].state = .empty
             case .empty:
                 break
             }
         }
-
+        
         return ClearResult(
             clearedCells: clearedCells,
+            clearedPositions: Array(targetPositions),
             rowsCleared: fullRows.count,
-            colsCleared: fullCols.count
+            colsCleared: fullCols.count,
+            zonesCleared: zoneCount
         )
+    }
+    
+    /// Simüle ederek yerleştirildiğinde hangi hücrelerin patlayacağını söyler (HINT)
+    func detectPotentialClears(block: GameBlock, at origin: GridPosition) {
+        guard canPlace(block, at: origin) else {
+            if !hintPositions.isEmpty { hintPositions = [] }
+            return
+        }
+        
+        // Geçici doluluk seti
+        var tempOccupied: Set<GridPosition> = []
+        for (dr, dc) in block.cells {
+            tempOccupied.insert(GridPosition(row: origin.row + dr, col: origin.col + dc))
+        }
+        
+        var targets: Set<GridPosition> = []
+        
+        // 1. Satırlar — sadece bloğun etkilediği satırları tara
+        let affectedRows = Set(block.cells.map { origin.row + $0.0 }).filter { $0 >= 0 && $0 < Self.size }
+        for r in affectedRows {
+            let rowFull = (0..<Self.size).allSatisfy { c in
+                grid[r][c].isOccupied || tempOccupied.contains(GridPosition(row: r, col: c))
+            }
+            if rowFull {
+                for c in 0..<Self.size { targets.insert(GridPosition(row: r, col: c)) }
+            }
+        }
+        
+        // 2. Sütunlar — sadece bloğun etkilediği sütunları tara
+        let affectedCols = Set(block.cells.map { origin.col + $0.1 }).filter { $0 >= 0 && $0 < Self.size }
+        for c in affectedCols {
+            let colFull = (0..<Self.size).allSatisfy { r in
+                grid[r][c].isOccupied || tempOccupied.contains(GridPosition(row: r, col: c))
+            }
+            if colFull {
+                for r in 0..<Self.size { targets.insert(GridPosition(row: r, col: c)) }
+            }
+        }
+        
+        // Gereksiz re-render'ı önle: sadece değiştiyse güncelle
+        if targets != hintPositions {
+            hintPositions = targets
+        }
+    }
+    
+    private func is3x3ZoneMatched(startRow: Int, startCol: Int) -> Bool {
+        // First check if all are occupied
+        for r in startRow..<startRow+3 {
+            for c in startCol..<startCol+3 {
+                if !grid[r][c].isOccupied { return false }
+            }
+        }
+        
+        // Match same color
+        let firstColor = grid[startRow][startCol].color
+        for r in startRow..<startRow+3 {
+            for c in startCol..<startCol+3 {
+                if grid[r][c].color != firstColor { return false }
+            }
+        }
+        return true
     }
 
     // MARK: - Game State Checks
@@ -292,6 +396,7 @@ final class BoardViewModel: ObservableObject {
                 }
             }
         }
+        grid = grid
         return clearedCells
     }
 
@@ -307,6 +412,16 @@ final class BoardViewModel: ObservableObject {
         }
         return result
     }
+    
+    func allOccupiedPositions() -> [GridPosition] {
+        var result: [GridPosition] = []
+        for r in 0..<Self.size {
+            for c in 0..<Self.size {
+                if grid[r][c].isOccupied { result.append(GridPosition(row: r, col: c)) }
+            }
+        }
+        return result
+    }
 
     func removeCell(at pos: GridPosition) {
         guard pos.row >= 0, pos.row < Self.size, pos.col >= 0, pos.col < Self.size else { return }
@@ -314,17 +429,20 @@ final class BoardViewModel: ObservableObject {
     }
     
     @discardableResult
-    func removeCells(at positions: [GridPosition]) -> [GameCell] {
+    func removeCells(at positions: [GridPosition]) -> ClearResult {
         var cleared: [GameCell] = []
+        var posList: [GridPosition] = []
         for pos in positions {
             guard pos.row >= 0, pos.row < Self.size, pos.col >= 0, pos.col < Self.size else { continue }
             let cell = grid[pos.row][pos.col]
             if cell.isOccupied {
                 cleared.append(cell)
+                posList.append(pos)
                 grid[pos.row][pos.col].state = .empty
             }
         }
-        return cleared
+        grid = grid
+        return ClearResult(clearedCells: cleared, clearedPositions: posList, rowsCleared: 0, colsCleared: 0, zonesCleared: 0)
     }
 }
 

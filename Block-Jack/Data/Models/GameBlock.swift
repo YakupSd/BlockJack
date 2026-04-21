@@ -92,6 +92,13 @@ struct GameBlock: Identifiable, Equatable, Codable {
     var rotationSteps: Int = 0 // 0: 0°, 1: 90°, 2: 180°, 3: 270°
     
     var isSpecial: Bool { ability != .normal || type == .chain || type == .hollow }
+    
+    var isRotatable: Bool {
+        switch type {
+        case .O, .single, .plus, .star5, .hollow: return false
+        default: return true
+        }
+    }
 
     init(id: UUID = UUID(), type: BlockType, color: BlockDisplayColor, ability: BlockAbility = .normal, pairedBlockId: UUID? = nil, rotationSteps: Int = 0) {
         self.id = id

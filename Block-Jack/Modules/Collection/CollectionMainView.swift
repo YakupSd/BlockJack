@@ -81,7 +81,7 @@ struct CollectionMainView: View {
             
             // Percentage
             VStack(alignment: .trailing, spacing: 2) {
-                let totalItems = PerkEngine.perkPool.count + BossRegistry.shared.bosses.count
+                let totalItems = PerkEngine.perkPool.count + BossRegistry.shared.bossesSnapshot.count
                 let discovered = userEnv.discoveredPerkIDs.count + userEnv.discoveredBossIDs.count
                 let percent = totalItems > 0 ? (discovered * 100 / totalItems) : 0
                 
@@ -178,7 +178,7 @@ struct CollectionMainView: View {
     
     private var bossesTab: some View {
         VStack(spacing: 20) {
-            ForEach(BossRegistry.shared.bosses) { boss in
+            ForEach(BossRegistry.shared.bossesSnapshot) { boss in
                 let isDiscovered = userEnv.discoveredBossIDs.contains(boss.id)
                 
                 HStack(spacing: 16) {

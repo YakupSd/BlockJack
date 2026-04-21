@@ -46,6 +46,8 @@ struct BlockTileView: View {
 // MARK: - BlockTrayView (alt bar)
 struct BlockTrayView: View {
     @ObservedObject var vm: GameViewModel
+    /// Drag sırasında her frame çağrılır — GameView @State dragPosition günceller
+    var onDragChanged: ((CGPoint) -> Void)? = nil
 
     var body: some View {
         HStack(spacing: vm.run.maxTraySlots > 3 ? 8 : 16) {
@@ -114,20 +116,41 @@ struct BlockTrayView: View {
                         .tracking(1)
                         .padding(.bottom, 4)
                 }
+            } else if block.isRotatable {
+                // Rotation Hint Icon
+                VStack {
+                    Spacer()
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(ThemeColors.textMuted)
+                        .padding(.bottom, 4)
+                }
             }
         }
         .frame(width: 80, height: 80)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                vm.rotateBlockInTray(id: block.id)
+            }
+        }
         .gesture(
-            DragGesture(minimumDistance: 5, coordinateSpace: .global)
+            DragGesture(minimumDistance: 10, coordinateSpace: .global)
                 .onChanged { value in
                     if !vm.isDragging {
                         vm.draggingBlock = block
                         vm.isDragging = true
                         HapticManager.shared.playSelection()
                     }
+                    // dragPosition callback — GameView @State'i günceller (overlay için)
+                    onDragChanged?(value.location)
+                    // Ghost/hint — vm.updateDrag throttle'lıdır, her framede render'a neden olmaz
                     vm.dragLocation = value.location
+                    let gridPos = vm.gridSpaceConverter?(value.location)
+                    vm.updateDrag(location: value.location, gridPosition: gridPos)
                 }
                 .onEnded { value in
+                    onDragChanged?(value.location)
                     vm.dragLocation = value.location
                     vm.handleDragEnd()
                 }

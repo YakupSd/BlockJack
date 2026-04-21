@@ -5,6 +5,7 @@
 
 import AVFoundation
 import Foundation
+import SwiftUI
 
 enum SoundEffect: String {
     case blockPlace = "sfx_place"
@@ -79,17 +80,24 @@ class AudioManager {
         bgmPlayer = nil
     }
     
-    func setMusicIntensity(streak: Int) {
+    func setIntensity(streak: Int, lowTime: Bool) {
         guard let player = bgmPlayer, isSoundEnabled else { return }
         
-        // Dynamic intensity based on streak
-        // Increase volume and speed slightly
-        let volumeBoost = min(0.4, Double(streak) * 0.05) // max +0.4
-        let speedBoost = min(0.15, Double(streak) * 0.02)  // max +0.15 speed
+        // Dynamic intensity based on streak and time stress
+        let volumeBase: Float = 0.5
+        let streakVolumeBoost = Float(min(0.3, Double(streak) * 0.04))
+        let timeVolumeBoost: Float = lowTime ? 0.2 : 0.0
         
-        player.volume = 0.5 + Float(volumeBoost)
+        let streakSpeedBoost = Float(min(0.2, Double(streak) * 0.02))
+        let timeSpeedBoost: Float = lowTime ? 0.15 : 0.0
+        
         player.enableRate = true
-        player.rate = 1.0 + Float(speedBoost)
+        
+        // Smooth transition simulation (SwiftUI/AVKit limitation workaround)
+        withAnimation(.linear(duration: 1.0)) {
+            player.volume = volumeBase + streakVolumeBoost + timeVolumeBoost
+            player.rate = 1.0 + streakSpeedBoost + timeSpeedBoost
+        }
     }
     
     // MARK: - SFX Logic

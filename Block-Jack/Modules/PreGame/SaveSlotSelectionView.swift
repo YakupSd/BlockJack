@@ -169,20 +169,22 @@ struct SaveSlotSelectionView: View {
     private func handleSlotTap(_ slot: SaveSlot) {
         HapticManager.shared.play(.buttonTap)
         
+        // Slot verilerini UserEnvironment'a yükle (Geliştirmeler ve İlerleme)
+        if !slot.isEmpty {
+            userEnv.loadFromSlot(slot)
+        }
+        
         if mode == .newGame {
             guard slot.isEmpty else {
-                // Alert we can only create on empty, or ask to overwrite
                 slotToDelete = slot.id
                 showingDeleteAlert = true
                 return
             }
-            // Navigate to Character Select
             MainViewsRouter.shared.pushToCharacterSelection(slotId: slot.id)
         } else {
             guard !slot.isEmpty else { return }
-            // Load game with save data (For now, just pushes to game)
-            // TODO: In Future, GameViewModel needs to load `slot` 
-            MainViewsRouter.shared.pushToGame(slotId: slot.id)
+            // Kayıtlı oyunda direkt Dünya Haritasına (Campaign) gidilir
+            MainViewsRouter.shared.pushToWorldMap(slotId: slot.id)
         }
     }
 }

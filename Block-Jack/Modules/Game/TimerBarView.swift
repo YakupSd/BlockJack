@@ -26,10 +26,17 @@ struct TimerBarView: View {
                     fogOverlay
                 } else {
                     // Normal bar
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(barColor)
-                        .frame(width: geo.size.width * max(0, ratio))
-                        .animation(.linear(duration: 0.05), value: ratio)
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(barColor)
+                            .frame(width: geo.size.width * max(0, ratio))
+                        
+                        // Data Flow animation
+                        FlowOverlay(color: .white.opacity(0.3))
+                            .frame(width: geo.size.width * max(0, ratio))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                    .animation(.linear(duration: 0.05), value: ratio)
 
                     // Glow efekti
                     RoundedRectangle(cornerRadius: 4)
@@ -61,6 +68,30 @@ struct TimerBarView: View {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(ThemeColors.textMuted.opacity(0.4))
                     .frame(width: 8, height: 8)
+            }
+        }
+    }
+
+    struct FlowOverlay: View {
+        let color: Color
+        @State private var phase: CGFloat = 0
+
+        var body: some View {
+            GeometryReader { geo in
+                ZStack {
+                    ForEach(0..<10) { i in
+                        Rectangle()
+                            .fill(color)
+                            .frame(width: 2, height: 10)
+                            .rotationEffect(.degrees(30))
+                            .offset(x: -geo.size.width + (CGFloat(i) * (geo.size.width / 5)) + phase)
+                    }
+                }
+                .onAppear {
+                    withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                        phase = geo.size.width / 5
+                    }
+                }
             }
         }
     }

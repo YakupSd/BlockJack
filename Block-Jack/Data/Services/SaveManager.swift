@@ -59,6 +59,11 @@ class SaveManager: ObservableObject {
         newSlot.gold = 0
         newSlot.lives = 3 // Starting lives
         
+        // Phase 11: World Map & Upgrades
+        newSlot.unlockedWorldLevel = 1
+        newSlot.goldUpgradeLevels = [:]
+        newSlot.unlockedMetaUpgradeIDs = []
+        
         slots[index] = newSlot
         saveToDisk()
     }
@@ -159,6 +164,16 @@ class SaveManager: ObservableObject {
     func removePassivePerk(slotId: Int, perkId: String) {
         guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
         slots[index].activePassivePerks.removeAll { $0.id == perkId }
+        slots[index].lastSaved = Date()
+        saveToDisk()
+    }
+    
+    // MARK: - Slot Progression (Phase 11)
+    func updateSlotProgression(slotId: Int, worldLevel: Int, goldUpgrades: [String: Int], metaUpgrades: [String]) {
+        guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        slots[index].unlockedWorldLevel = worldLevel
+        slots[index].goldUpgradeLevels = goldUpgrades
+        slots[index].unlockedMetaUpgradeIDs = metaUpgrades
         slots[index].lastSaved = Date()
         saveToDisk()
     }

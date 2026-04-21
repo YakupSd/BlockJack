@@ -34,6 +34,8 @@ enum ClearCombo {
     case double              // 2 satır/sütun
     case triple              // 3+
     case cross               // Satır + sütun aynı anda
+    case zoneBlast           // 3x3 Alan patlaması
+    case megaZone            // Birden fazla alan veya Line + Area
     
     var multiplierBonus: Double {
         switch self {
@@ -41,6 +43,8 @@ enum ClearCombo {
         case .double: return 2.5
         case .triple: return 5.0
         case .cross:  return 3.5
+        case .zoneBlast: return 4.0
+        case .megaZone: return 7.5
         }
     }
     
@@ -50,6 +54,8 @@ enum ClearCombo {
         case .double: return "DOUBLE CLEAR! ×2.5"
         case .triple: return "MEGA CLEAR! ×5"
         case .cross:  return "CROSS CLEAR! ×3.5"
+        case .zoneBlast: return "ZONE BLAST! ×4.0"
+        case .megaZone: return "OMEGA BLAST! ×7.5"
         }
     }
 }
@@ -85,53 +91,69 @@ struct ScoreResult {
 // MARK: - ScoreEngine
 struct ScoreEngine {
 
-    // MARK: - Ana hesaplama (Güncel: boyuta göre chip, multiplier sistemi)
+    // MARK: - Ana hesaplama
+    // Sadece satır, sütun veya zone temizlendiğinde puan kazanılır.
+    //  • Satır temizliği: +150 puan/satır
+    //  • Zone temizliği (4x4/5x5): +1000 puan/zone (Çok daha zor olduğu için yüksek ödül)
+    //  • Çarpanlar: combo türü + flush + streak + joker
     static func calculate(
         clearedCells: [GameCell],
-        blockCellCount: Int = 4,   // Yerleştirilen bloğun hücre sayısı (chip değeri için)
+        blockCellCount: Int = 4,   // Chip değeri için artık ikincil önemde
         streak: Int,
         clearedRows: Int,
         clearedCols: Int,
+        clearedZones: Int = 0,
         jokerMultBonus: Double = 0.0
     ) -> ScoreResult {
 
-        // Chip değeri: Temizlenen hücre sayısına göre tier × hücre
-        let chipsPerCell: Int
-        switch clearedCells.count {
-        case 0..<6:   chipsPerCell = 5
-        case 6..<10:  chipsPerCell = 8
-        case 10..<16: chipsPerCell = 12
-        default:      chipsPerCell = 15
-        }
+        // --- BASE SCORE ---
+        // Sadece temizlenen hücreler üzerinden hesaplanır. Chip puanı artik sadece temizlik bonusunun bir parçası.
+        let cellPoints = clearedCells.count * 15 // Her temizlenen hücre 15 puan
+        let lineClearBonus = (clearedRows + clearedCols) * 150
+        let zoneClearBonus = clearedZones * 1000 // 4x4 veya 5x5 alan temizleme ödülü
         
-        let baseChips = clearedCells.count * chipsPerCell
+        let baseScore = cellPoints + lineClearBonus + zoneClearBonus
         
-        // Clear combo detects: cross > triple > double > single
         let totalLines = clearedRows + clearedCols
         let clearCombo: ClearCombo
-        if clearedRows > 0 && clearedCols > 0 {
+        
+        if clearedZones > 0 {
+            if clearedZones > 1 || totalLines > 0 {
+                clearCombo = .megaZone
+            } else {
+                clearCombo = .zoneBlast
+            }
+        } else if clearedRows > 0 && clearedCols > 0 {
             clearCombo = .cross
-        } else if totalLines >= 3 {
-            clearCombo = .triple
-        } else if totalLines == 2 {
-            clearCombo = .double
         } else {
-            clearCombo = .single
+            switch totalLines {
+            case 2:  clearCombo = .double
+            case 3...: clearCombo = .triple
+            default: clearCombo = .single
+            }
         }
         
-        // Flush detection
+        // Flush detection (Renk uyumu)
         let flush = detectFlush(cells: clearedCells)
         
-        // Streak bonus: her 3 combo +0.5 mult, max +3.0
-        let streakBonus = min(Double(streak / 3) * 0.5, 3.0)
+        // Streak bonus: her 2 combo +0.5 mult, max +5.0 (Daha agresif streak)
+        let streakBonus = min(Double(streak / 2) * 0.5, 5.0)
         
-        // Final multiplier = base (1.0) + clear combo + flush + streak + joker
-        let mult = clearCombo.multiplierBonus + flush.multiplier - 1.0 + streakBonus + jokerMultBonus
+        // Final multiplier
+        let hasAnyClear = totalLines > 0 || clearedZones > 0
+        let mult: Double
+        if hasAnyClear {
+            // Combo + Flush + Streak birleşimi
+            mult = clearCombo.multiplierBonus + (flush.multiplier - 1.0) + streakBonus + jokerMultBonus
+        } else {
+            // Clear yoksa çarpan 1.0 (Zaten VM seviyesinde engellendi ama güvenlik için)
+            mult = 1.0
+        }
         
-        let total = max(10, Int(Double(baseChips) * max(1.0, mult)))
+        let total = Int(Double(baseScore) * max(1.0, mult))
 
         return ScoreResult(
-            baseChips: baseChips,
+            baseChips: baseScore,
             multiplier: mult,
             totalScore: total,
             flushType: flush,
@@ -167,6 +189,8 @@ struct ScoreEngine {
         case .double: bonus = 5.0
         case .triple: bonus = 10.0
         case .cross:  bonus = 8.0
+        case .zoneBlast: bonus = 12.0
+        case .megaZone: bonus = 15.0
         }
         if isFlush { bonus += 4.0 }
         if streakCount >= 5 { bonus += 3.0 }

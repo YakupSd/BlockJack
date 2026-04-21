@@ -61,6 +61,7 @@ struct GameCell: Identifiable, Equatable, Codable {
     let id: UUID
     var state: CellState = .empty
     var modifier: CellModifierType? = nil
+    var isSynergySubject: Bool = false // AAA: Flag for Rainbow VFX
     
     init(id: UUID = UUID(), state: CellState = .empty, modifier: CellModifierType? = nil) {
         self.id = id

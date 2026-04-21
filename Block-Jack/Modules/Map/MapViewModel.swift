@@ -67,9 +67,22 @@ class MapViewModel: ObservableObject {
         
         // --- BOSS COMPLETION CHECK ---
         if currentMap.nodes[index].type == .boss {
-            // Wait slightly for visual feedback before jumping
+            // Seviye atla
+            UserEnvironment.shared.unlockedWorldLevel += 1
+            
+            // Başarıyı kaydet
+            SaveManager.shared.updateSlotProgression(
+                slotId: slotId,
+                worldLevel: UserEnvironment.shared.unlockedWorldLevel,
+                goldUpgrades: UserEnvironment.shared.goldUpgradeLevels,
+                metaUpgrades: UserEnvironment.shared.unlockedUpgradeIDs
+            )
+            
+            // 1.5 saniye sonra Dünya Haritasına dön
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                self.generateNextChapterMap()
+                // Not: Router'da popToWorldMap yoksa Dashboard'a dönüp oradan gitmek garanti olur 
+                // ama biz WorldMap'e pushToWorldMap yapmıştık, popFromBottom ile geri dönebiliriz.
+                MainViewsRouter.shared.popViewControllers(count: 1) // MapView'dan çık
             }
         }
         

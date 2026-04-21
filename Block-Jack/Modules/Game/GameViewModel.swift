@@ -56,30 +56,60 @@ final class GameViewModel: ObservableObject {
     
     // MARK: - Dragging State
     @Published var isDragging: Bool = false
-    @Published var dragLocation: CGPoint = .zero
+    // dragLocation: @Published DEĞİL — her frame güncellenir, @Published olursa tüm view yeniden render olur (lag!)
+    // GameView'da @State dragPosition ile overlay render edilir.
+    var dragLocation: CGPoint = .zero
     @Published var draggingBlock: GameBlock? = nil
     @Published var gridFrame: CGRect = .zero
 
     // VFX State
     @Published var shakeAmount: CGFloat = 0
     @Published var flashOpacity: Double = 0
+    
+    // MARK: - Partikül Event
+    // GameView'a hangi tür patlamanın nerede çıkacağını iletir
+    struct ParticleBurstEvent: Equatable {
+        enum Kind: Equatable {
+            case lineClear(positions: [GridPosition], color: Color)
+            case zoneBlast(centerRow: Int, centerCol: Int, radius: CGFloat, color: Color)
+            case overdriveBoom(centerRow: Int, centerCol: Int)
+        }
+        let id: UUID = UUID()
+        let kind: Kind
+        static func == (lhs: ParticleBurstEvent, rhs: ParticleBurstEvent) -> Bool {
+            lhs.id == rhs.id
+        }
+    }
+    @Published var particleBurst: ParticleBurstEvent? = nil
 
     // MARK: - Overdrive State
     @Published var overdriveCharge: Double = 0.0 // 0.0 to 3.0
     @Published var currentOverdriveTier: OverdriveTier = .none
     @Published var isOverdriveActive: Bool = false
     @Published var isTargetingOverdrive: Bool = false
-    private var activeOverdriveTierForTargeting: OverdriveTier = .none
+    var activeOverdriveTierForTargeting: OverdriveTier = .none
     
     // Character Specific State
     @Published var isWraithActive: Bool = false    // Neon Wraith skill
     @Published var isPhantomVisible: Bool = true   // Boss Phantom pulse
     @Published var showTutorial: Bool = false      // 4: Tutorial Overlay
     @Published var activeSynergies: [PerkSynergy] = [] // Phase 4 Synergy Cache
+    @Published var bossIntent: String? = nil           // AAA: Boss Warning Intent
+    @Published var isSynergyClear: Bool = false        // AAA: Rainbow VFX Flag
+    private var bossIntentCooldown: Int = 3            // Moves until intent clears
     
     private var lastPlacedBlockType: BlockType? = nil // Architect passive için
     var jokerMultBonus: Double = 0.0   // Joker bonusu — OverdriveEngine erişir
     private var maxRoundScore: Int = 0 // Echoes perk için
+    
+    // MARK: - Enemy Attack System
+    @Published var enemy: EnemyState = EnemyState()
+    @Published var showEnemyAttackWarning: Bool = false  // Uyarı overlay göster
+    @Published var enemyCountdown: Double = 3.0          // Uyarı geri sayım
+    private var enemyAttackTimer: AnyCancellable? = nil
+    private var enemyWarningTimer: AnyCancellable? = nil
+    private var enemyTrayUnlockTimer: AnyCancellable? = nil
+    var lastPlacedPositions: [GridPosition] = []         // Son yerleştirilen blok pozisyonları (erase için)
     var activeCharacterId: String? {
         SaveManager.shared.slots.first(where: { $0.id == activeSlotId })?.characterId
     }
@@ -89,17 +119,21 @@ final class GameViewModel: ObservableObject {
     }
     
     var currentBoss: BossEncounter {
-        BossRegistry.shared.getBoss(for: ((run.currentRound - 1) / 5) + 1)
+        BossRegistry.shared.getBoss(for: run.worldLevel)
     }
     
     // MARK: - Logic Bridge
     // GameView tarafından sağlanır, ekran koordinatını grid koordinatına çevirir
     var gridSpaceConverter: ((CGPoint) -> GridPosition?)?
 
+    // Drag throttle: ghost/hint güncellemesini saniyede max ~30 kez yap (33ms aralık)
+    private var lastGhostUpdate: Date = .distantPast
+    private let ghostThrottleInterval: TimeInterval = 0.033
+
     // MARK: - Private
     private var cancellables = Set<AnyCancellable>()
     private let haptic = HapticManager.shared
-    private let userEnv: UserEnvironment
+    let userEnv: UserEnvironment
     // jokerMultBonus aşağıda (sat 68) tanımlandı - OverdriveEngine erişimi için internal
 
     let activeSlotId: Int
@@ -159,7 +193,9 @@ final class GameViewModel: ObservableObject {
     }
 
     func startRound() {
-        // Phase 9: NodeType'a göre zorluğu ayarla (run.round bir computed property - direkt set edilemez)
+        board.resetGrid() // FORCE RESET (Reset Bug Fix)
+        
+        // Phase 9: NodeType'a göre zorluğu ayarla
         if nodeType == .boss {
             run.activeModifier = BossModifier.allCases.randomElement()
             run.currentRoundTargetScore = RoundData.makeTarget(for: run.currentRound)
@@ -181,7 +217,7 @@ final class GameViewModel: ObservableObject {
         // Timer: nodeType'a göre süre ayarla
         var initialTime = run.round.timeLimit
         if nodeType == .elite {
-            initialTime = max(15.0, initialTime - 10.0)
+            initialTime = max(120.0, initialTime - 30.0) // Elite: -30sn, minimum 120sn
         }
         
         // Kalıcı Geliştirme: Iron Will kontrolü
@@ -209,8 +245,16 @@ final class GameViewModel: ObservableObject {
             refillBlockTray()
         }
         
-        phase = .playing
-        timer.start()
+        if nodeType == .boss {
+            phase = .bossDialogue
+            timer.pause()
+        } else {
+            phase = .playing
+            timer.start()
+            
+            // D\u00fc\u015fman atak sistemi ba\u015flat
+            startEnemyAttackLoop()
+        }
         
         // 4.2: Tutorial Check (Sadece 1. round ve eğer tamamlanmadıysa)
         if run.currentRound == 1 && !userEnv.tutorialCompleted {
@@ -298,9 +342,42 @@ final class GameViewModel: ObservableObject {
         }
 
         lastPlacedBlockType = block.type
+        
+        // Tray kilitliyse yerleştirme
+        if enemy.isTrayLocked {
+            haptic.play(.error)
+            addPopup(text: "🔒 TEPSİ KİTLİ!", color: ThemeColors.electricYellow)
+            return
+        }
+        
         let clearResult = board.placeBlock(block, at: position)
+        let placementSuccess = clearResult != nil
+        
+        if placementSuccess, let result = clearResult {
+            // Son yerleştirilen pozisyonları kaydet (düşman erase atağı için)
+            lastPlacedPositions = block.cells.compactMap { (dr, dc) -> GridPosition? in
+                let r = position.row + dr
+                let c = position.col + dc
+                guard r >= 0, r < BoardViewModel.size, c >= 0, c < BoardViewModel.size else { return nil }
+                return GridPosition(row: r, col: c)
+            }
+            // AAA: Manage Boss Intent cooldown
+            if run.round.isBossRound {
+                bossIntentCooldown -= 1
+                if bossIntentCooldown <= 0 {
+                    bossIntent = nil
+                }
+                
+                // Show new intent every 4 moves
+                if bossIntentCooldown <= -1 {
+                    bossIntent = currentBoss.getRandomIntent()
+                    bossIntentCooldown = 3
+                }
+            } else {
+                bossIntent = nil
+            }
 
-        if let result = clearResult {
+            // placeBlock'tan gelen clear result'ı kullanıyoruz (artık tekrar clearFullLinesAndZones çağırmaya gerek yok)
             // Yerleştirme başarılı
             haptic.play(.blockPlace)
             run.movesUsed += 1
@@ -340,16 +417,16 @@ final class GameViewModel: ObservableObject {
                 }
             }
             
-            // Minor charge per block
+            // Minor charge per block (Faster charge)
             if overdriveCharge < 3.0 {
                 let previousTier = currentOverdriveTier
-                overdriveCharge = min(3.0, overdriveCharge + 0.05)
+                overdriveCharge = min(3.0, overdriveCharge + 0.15)
                 updateOverdriveTier(previous: previousTier)
             }
 
             let cleared = result.clearedCells
             if cleared.isEmpty {
-                // Temizleme olmadı → streak sıfırla
+                // Temizleme olmadı → streak sıfırla, hiç puan yok
                 run.streak = 0
                 comboCount = 0
                 
@@ -357,12 +434,13 @@ final class GameViewModel: ObservableObject {
                 if run.hasPerk("momentum") {
                     run.tensionCount += 1
                 }
+                // Puan verilmiyor — sadece satır/sütun/zone dolunca puan kazanılır
             } else {
                 // Track global stats
                 UserEnvironment.shared.addLinesCleared(cleared.count)
                 
-                // Satır/sütun temizlendi
-                handleClear(result: result)
+                // Satır/sütun/alan temizlendi
+                handleClear(result: result, blockCellCount: block.cells.count)
             }
 
             // Phase 5.2: Gravity Mode (Boss Round'lar için aktif olsun - Elite eklenecek)
@@ -396,7 +474,7 @@ final class GameViewModel: ObservableObject {
         }
     }
 
-    func handleClear(result: BoardViewModel.ClearResult) {
+    func handleClear(result: BoardViewModel.ClearResult, blockCellCount: Int = 4) {
         let clearedCells = result.clearedCells
         let clearedRows = result.rowsCleared
         let clearedCols = result.colsCleared
@@ -405,18 +483,45 @@ final class GameViewModel: ObservableObject {
         run.streak += 1
         
         // 1. Particle & Flash Effects
-        var flashPositions: [GridPosition] = []
-        for r in 0..<BoardViewModel.size {
-            for c in 0..<BoardViewModel.size {
-                if clearedCells.contains(where: { $0 == board.grid[r][c] }) {
-                    let pos = GridPosition(row: r, col: c)
-                    flashPositions.append(pos)
-                }
-            }
-        }
+        let flashPositions = result.clearedPositions
         clearFlashPositions = flashPositions
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             self.clearFlashPositions = []
+        }
+        
+        // --- Partikül olayını yayınla ---
+        if result.zonesCleared > 0 {
+            // Zone blast — her temizlenen zone için merkez hesapla
+            // Köşe zone merkezleri (4x4): (1,1) (1,10) (10,1) (10,10)
+            // Merkez zone merkezi (5x5): (6,6)
+            let zoneCenters: [(Int, Int, Color)] = [
+                (1,  1,  ThemeColors.electricYellow),  // Sol üst köşe
+                (1,  10, ThemeColors.electricYellow),  // Sağ üst köşe
+                (10, 1,  ThemeColors.electricYellow),  // Sol alt köşe
+                (10, 10, ThemeColors.electricYellow),  // Sağ alt köşe
+                (6,  6,  ThemeColors.neonPurple),      // Merkez
+            ]
+            // Temizlenen zone pozisyonlarına en yakın merkezi bul
+            if let firstPos = flashPositions.first {
+                let zoneCenter = zoneCenters.min(by: {
+                    let d0 = abs($0.0 - firstPos.row) + abs($0.1 - firstPos.col)
+                    let d1 = abs($1.0 - firstPos.row) + abs($1.1 - firstPos.col)
+                    return d0 < d1
+                })
+                if let zc = zoneCenter {
+                    particleBurst = ParticleBurstEvent(kind: .zoneBlast(
+                        centerRow: zc.0, centerCol: zc.1,
+                        radius: result.zonesCleared > 0 ? 60 : 40,
+                        color: zc.2
+                    ))
+                }
+            }
+        } else if clearedRows > 0 || clearedCols > 0 {
+            // Satır/Sütun temizleme partikülü
+            particleBurst = ParticleBurstEvent(kind: .lineClear(
+                positions: flashPositions,
+                color: ThemeColors.neonCyan
+            ))
         }
 
         // 2. Haptics & Sound
@@ -509,12 +614,29 @@ final class GameViewModel: ObservableObject {
         // 5. Final Score Execution
         let scoreResult = ScoreEngine.calculate(
             clearedCells: clearedCells,
-            blockCellCount: Int(Double(clearedCells.count) * chipBonus),
+            blockCellCount: max(blockCellCount, clearedCells.count),
             streak: run.streak,
             clearedRows: clearedRows,
             clearedCols: clearedCols,
+            clearedZones: result.zonesCleared,
             jokerMultBonus: characterMult
         )
+
+        // AAA: Detect Synergy Context for VFX
+        let isGoldenFever = activeSynergies.contains(where: { $0.synergyName == "GOLDEN FEVER" }) && scoreResult.isFlush
+        let isEternalCycle = activeSynergies.contains(where: { $0.synergyName == "ETERNAL CYCLE" }) && (result.rowsCleared + result.colsCleared >= 2)
+        let isRainbowDosage = activeSynergies.contains(where: { $0.synergyName == "RAINBOW DOSAGE" }) && blueCount > 0 && greenCount > 0
+        
+        if isGoldenFever || isEternalCycle || isRainbowDosage {
+            isSynergyClear = true
+            // Mark cells for rainbow effect
+            for i in 0..<result.clearedPositions.count {
+                let pos = result.clearedPositions[i]
+                board.grid[pos.row][pos.col].isSynergySubject = true
+            }
+        } else {
+            isSynergyClear = false
+        }
 
         lastScoreResult = scoreResult
         run.addScore(scoreResult.totalScore)
@@ -574,7 +696,7 @@ final class GameViewModel: ObservableObject {
             triggerJuice(intensity: 2, flash: false)
         }
         
-        AudioManager.shared.setMusicIntensity(streak: run.streak)
+        AudioManager.shared.setIntensity(streak: run.streak, lowTime: timer.timeRemaining < 15)
 
         // 8. Time Bonus & Scaling Perks
         let bonus = ScoreEngine.timeBonusSeconds(clearCombo: scoreResult.clearCombo, isFlush: scoreResult.isFlush, streakCount: run.streak)
@@ -674,11 +796,11 @@ final class GameViewModel: ObservableObject {
         guard isTargetingOverdrive else { return }
         guard let charId = activeCharacterId else { return }
         
-        // Execute targeting via engine (the charge was already consumed)
-        // Since we consumed the charge in activateOverdrive, we just use the selected mechanic
-        
+        // Charge was already consumed in activateOverdrive()
         OverdriveEngine.executeTargeted(pos: pos, tier: activeOverdriveTierForTargeting, charId: charId, vm: self)
         haptic.play(.flush)
+        
+        // Sadece UI bayrağını sıfırla — charge zaten activateOverdrive'da sıfırlandı
         isTargetingOverdrive = false
     }
 
@@ -703,6 +825,7 @@ final class GameViewModel: ObservableObject {
 
     private func completeRound() {
         timer.pause()
+        stopEnemyLoop() // Düşman atak timer'larını durdur
         let result = lastScoreResult ?? ScoreResult(
             baseChips: 0, multiplier: 1, totalScore: 0,
             flushType: .none, clearCombo: .single, clearedRows: 0, clearedCols: 0, streakBonus: 0
@@ -995,14 +1118,32 @@ final class GameViewModel: ObservableObject {
 
     // MARK: - Drag Handling
     
+    func rotateBlockInTray(id: UUID) {
+        guard let index = blockTray.firstIndex(where: { $0.id == id }) else { return }
+        var block = blockTray[index]
+        
+        if block.isRotatable {
+            block.rotate()
+            blockTray[index] = block
+            haptic.play(.buttonTap)
+        }
+    }
+    
     func updateDrag(location: CGPoint, gridPosition: GridPosition?) {
         guard isDragging, let block = draggingBlock else { return }
         dragLocation = location
         
+        // Throttle: ghost + hint güncellemesini saniyede max ~30 kez yap
+        let now = Date()
+        guard now.timeIntervalSince(lastGhostUpdate) >= ghostThrottleInterval else { return }
+        lastGhostUpdate = now
+        
         if let pos = gridPosition {
             board.updateGhost(block, at: pos)
+            board.detectPotentialClears(block: block, at: pos)
         } else {
             board.clearGhost()
+            board.hintPositions = []
         }
     }
     
@@ -1032,7 +1173,9 @@ final class GameViewModel: ObservableObject {
     private func resetDrag() {
         isDragging = false
         draggingBlock = nil
+        dragLocation = .zero
         board.clearGhost()
+        board.hintPositions = [] // AAA: Reset hints
     }
     
     // MARK: - Timer Binding
@@ -1165,4 +1308,151 @@ final class GameViewModel: ObservableObject {
         }
         return count
     }
+    
+    // MARK: - Enemy Attack System
+    
+    func startEnemyAttackLoop() {
+        // Önceki timer'ları temizle
+        stopEnemyLoop()
+        
+        // Bu round için rastgele bir düşman seç
+        enemy = EnemyState()
+        enemy.currentAttack = EnemyAttackType.random(forRound: run.currentRound)
+        
+        let interval = EnemyAttackType.attackInterval(forRound: run.currentRound)
+        enemy.nextAttackIn = interval
+        
+        // Ana atak timer'ı: her `interval` saniyede bir çalışır
+        enemyAttackTimer = Timer.publish(every: interval, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self, self.phase == .playing else { return }
+                self.triggerEnemyWarning()
+            }
+    }
+    
+    private func triggerEnemyWarning() {
+        guard let attackType = enemy.currentAttack else { return }
+        
+        // 3sn uyarı aşaması
+        showEnemyAttackWarning = true
+        enemyCountdown = 3.0
+        haptic.play(.timerWarning)
+        
+        // Geri sayım timer'ı (her 0.1sn)
+        enemyWarningTimer?.cancel()
+        enemyWarningTimer = Timer.publish(every: 0.1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                self.enemyCountdown -= 0.1
+                if self.enemyCountdown <= 0 {
+                    self.enemyWarningTimer?.cancel()
+                    self.showEnemyAttackWarning = false
+                    self.executeEnemyAttack(attackType)
+                }
+            }
+    }
+    
+    private func executeEnemyAttack(_ attack: EnemyAttackType) {
+        haptic.play(.error)
+        AudioManager.shared.playSFX(.lineClear) // Düşman sesini özelleştirebilirsin
+        
+        switch attack {
+        
+        // --- SABOTAJ: Rastgele 5 dolu hücreyi sil ---
+        case .gridSabotage:
+            let occupied = board.allOccupiedPositions().shuffled().prefix(5)
+            let positions = Array(occupied)
+            if !positions.isEmpty {
+                let result = board.removeCells(at: positions)
+                clearFlashPositions = positions
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.clearFlashPositions = [] }
+                addPopup(text: "💥 SABOTAJ! 5 BLOK SİLİNDİ", color: ThemeColors.neonPink)
+            } else {
+                addPopup(text: "💥 SABOTAJ: Grid Boş!", color: ThemeColors.textMuted)
+            }
+            
+        // --- SON BLOK SİL: Son yerleştirilen bloğu yok et ---
+        case .lastBlockErase:
+            if !lastPlacedPositions.isEmpty {
+                board.removeCells(at: lastPlacedPositions)
+                clearFlashPositions = lastPlacedPositions
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.clearFlashPositions = [] }
+                addPopup(text: "🗑️ SON BLOK SİLİNDİ!", color: ThemeColors.neonOrange)
+                lastPlacedPositions = []
+            } else {
+                addPopup(text: "🗑️ Erase: Hedef Yok", color: ThemeColors.textMuted)
+            }
+            
+        // --- KİLİTLEME: Tepsiyi 12sn kilitle ---
+        case .trayLockdown:
+            enemy.isTrayLocked = true
+            enemy.trayLockRemainingTime = 12.0
+            addPopup(text: "🔒 TEPSİ 12SN KİLİTLENDİ!", color: ThemeColors.electricYellow)
+            
+            // 12sn sonra kilit aç — geri sayımla
+            let lockDuration = 12.0
+            enemyTrayUnlockTimer?.cancel()
+            enemyTrayUnlockTimer = Timer.publish(every: 1.0, on: .main, in: .common)
+                .autoconnect()
+                .scan(0) { count, _ in count + 1 }
+                .sink { [weak self] elapsed in
+                    guard let self = self else { return }
+                    self.enemy.trayLockRemainingTime = lockDuration - Double(elapsed)
+                    if elapsed >= Int(lockDuration) {
+                        self.enemy.isTrayLocked = false
+                        self.enemy.trayLockRemainingTime = 0
+                        self.enemyTrayUnlockTimer?.cancel()
+                        self.addPopup(text: "🔓 KİLİT AÇILDI!", color: ThemeColors.neonCyan)
+                    }
+                }
+            
+        // --- KARIŞTIRMA: Tüm tray bloklarını rastgele döndür ---
+        case .scramble:
+            for i in blockTray.indices {
+                let rotationCount = Int.random(in: 1...3)
+                for _ in 0..<rotationCount {
+                    blockTray[i].rotate()
+                }
+            }
+            addPopup(text: "🌀 TEPSI KARISTIRILDI!", color: ThemeColors.neonPurple)
+            
+        // --- LANET YAYICISI: 5 boş hücreye lanet yayar ---
+        case .curseSpreader:
+            board.applyCursedCells(count: 5)
+            addPopup(text: "☠️ 5 LANET YERLEŞTİRİLDİ!", color: Color(red: 0.6, green: 0.1, blue: 0.8))
+            
+        // --- ZAMAN HIRSIZI: 20sn çal ---
+        case .timeHeist:
+            timer.addTime(-20)
+            addPopup(text: "⏳ -20SN ÇALINDI!", color: ThemeColors.neonCyan)
+            
+        // --- AĞIR ZIRH: 4 adet ağır hücre yerleştir ---
+        case .heavyArmor:
+            let positions = board.allEmptyPositions().shuffled().prefix(4)
+            for pos in positions {
+                board.grid[pos.row][pos.col].state = .heavy(hits: 2)
+            }
+            addPopup(text: "🛡️ 4 AĞIR ENGEL KOYULDU!", color: ThemeColors.neonOrange)
+        }
+        
+        // Sonraki atak türünü değiştir (her ataktan sonra farklı biri)
+        let nextAttack = EnemyAttackType.allCases
+            .filter { $0 != attack }
+            .randomElement() ?? attack
+        enemy.currentAttack = nextAttack
+    }
+    
+    func stopEnemyLoop() {
+        enemyAttackTimer?.cancel()
+        enemyAttackTimer = nil
+        enemyWarningTimer?.cancel()
+        enemyWarningTimer = nil
+        enemyTrayUnlockTimer?.cancel()
+        enemyTrayUnlockTimer = nil
+        enemy.isTrayLocked = false
+        showEnemyAttackWarning = false
+    }
 }
+

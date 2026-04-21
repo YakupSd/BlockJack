@@ -201,6 +201,13 @@ extension MainViewsRouter {
         )
     }
     
+    func pushToWorldMap(slotId: Int) {
+        let vm = WorldMapViewModel(slotId: slotId, userEnv: UserEnvironment.shared)
+        push(
+            WorldMapView(vm: vm).environmentObject(UserEnvironment.shared)
+        )
+    }
+    
     func popToMap(slotId: Int) {
         if let nav = nav, let mapVC = nav.viewControllers.first(where: { String(describing: type(of: $0)).contains("MapView") || String(describing: type(of: $0)).contains("MapHost") }) {
             nav.popToViewController(mapVC, animated: true)

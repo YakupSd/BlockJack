@@ -68,8 +68,13 @@ struct PerkSelectionView: View {
                         perkId: selectedPerkId
                     )
                     
-                    // Direkt MapView'a geç
-                    MainViewsRouter.shared.pushToMap(slotId: slotId)
+                    // UserEnvironment'ı bu slot ile senkronize et
+                    if let newSlot = SaveManager.shared.slots.first(where: { $0.id == slotId }) {
+                        userEnv.loadFromSlot(newSlot)
+                    }
+                    
+                    // Dünya Haritasına (Campaign) geç
+                    MainViewsRouter.shared.pushToWorldMap(slotId: slotId)
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "play.fill")

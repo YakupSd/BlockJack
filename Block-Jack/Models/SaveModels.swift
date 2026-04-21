@@ -24,12 +24,14 @@ enum UnlockCondition: Codable, Hashable {
     case free
     case gold(Int)
     case chapterClear(Int)
+    case goldAndLevel(amount: Int, level: Int) // Phase 11: Mastery
     
     var descriptionTR: String {
         switch self {
         case .free: return "Açık"
         case .gold(let amount): return "\(amount) Altın ile Açılır"
         case .chapterClear(let chapter): return "Bölüm \(chapter)'i Tamamla"
+        case .goldAndLevel(let amount, let level): return "\(amount) Altın + Seviye \(level) Gerekli"
         }
     }
     
@@ -38,6 +40,7 @@ enum UnlockCondition: Codable, Hashable {
         case .free: return "Unlocked"
         case .gold(let amount): return "Unlocks with \(amount) Gold"
         case .chapterClear(let chapter): return "Clear Chapter \(chapter)"
+        case .goldAndLevel(let amount, let level): return "\(amount) Gold + Reach Level \(level)"
         }
     }
 }
@@ -86,25 +89,26 @@ struct GameCharacter: Codable, Identifiable, Hashable {
         GameCharacter(id: "neonwraith", name: "NEON WRAITH", icon: "port_neonwraith", passiveDesc: "Süre <%10 ise tüm puanlar ×3 olur", activeDesc: "Dolu karenin üzerine blok koyup alttakileri siler", isPremium: true, cost: 3000,
                       loreTR: "Sokakların hayaleti. Kimse yüzünü görmedi. Sadece hızıyla ve ardında bıraktığı yıkımla bilinir.",
                       loreEN: "Ghost of the streets. Known only for its speed and destruction left behind.",
-                      favoriteBlockType: .Z, strongMode: "Panik Kontrolü", difficulty: .expert, unlockCondition: .gold(3000)),
+                      favoriteBlockType: .Z, strongMode: "Panik Kontrolü", difficulty: .expert, unlockCondition: .goldAndLevel(amount: 3000, level: 5)),
         
+        // Bu karakterler hem Altın hem de belirli bir Seviye gerektirecek şekilde güncellendi
         GameCharacter(id: "ghost", name: "GHOST", icon: "port_ghost", passiveDesc: "Stealth oyuncusu, gizli hamleler sağlar", activeDesc: "Phantom yerleştirme, görünmez blok", isPremium: true, cost: 2000,
                       overdriveThresholds: [0.33, 0.66, 1.0],
                       loreTR: "Sistemin arka kapısı. O varken bloklar sessizce kaybolur.",
                       loreEN: "Backdoor of the system. Blocks vanish quietly when it's around.",
-                      favoriteBlockType: .single, strongMode: "Gizlilik ve Sabır", difficulty: .expert, unlockCondition: .chapterClear(2)),
+                      favoriteBlockType: .single, strongMode: "Gizlilik ve Sabır", difficulty: .expert, unlockCondition: .goldAndLevel(amount: 2000, level: 10)),
         
         GameCharacter(id: "alchemist", name: "ALCHEMIST", icon: "port_alchemist", passiveDesc: "Dönüşüm temalı yetenekler", activeDesc: "Blok rengini değiştirir", isPremium: true, cost: 2500,
                       overdriveThresholds: [0.4, 0.7, 1.0],
                       loreTR: "Veri tiplerini altına çevirir. Kuralları esnetir ve yeniden yazar.",
                       loreEN: "Turns data types into gold. Bends and rewrites the rules.",
-                      favoriteBlockType: .L, strongMode: "Dönüşüm Zincirleri", difficulty: .advanced, unlockCondition: .chapterClear(3)),
+                      favoriteBlockType: .L, strongMode: "Dönüşüm Zincirleri", difficulty: .advanced, unlockCondition: .goldAndLevel(amount: 2500, level: 15)),
         
         GameCharacter(id: "titan", name: "TITAN", icon: "port_titan", passiveDesc: "Dev bloklar ile ağır ve yıkıcı hamleler", activeDesc: "Büyük 4x4 blok yerleştirme", isPremium: true, cost: 4000,
                       overdriveThresholds: [0.5, 0.8, 1.2],
                       loreTR: "Son teknoloji savaş makinesi modifikasyonu. O düştüğünde grid titrer.",
                       loreEN: "High-tech war machine mod. The grid shakes when it drops.",
-                      favoriteBlockType: .I, strongMode: "Dev Şekiller", difficulty: .beginner, unlockCondition: .chapterClear(5))
+                      favoriteBlockType: .I, strongMode: "Dev Şekiller", difficulty: .beginner, unlockCondition: .goldAndLevel(amount: 4000, level: 20))
     ]
 }
 
@@ -244,6 +248,11 @@ struct SaveSlot: Codable, Identifiable {
     var inventory: [ConsumableItem] = []
     var gold: Int = 0
     var lives: Int = 3
+    
+    // Phase 11: Persistent World Map and Slot-Based Upgrades
+    var unlockedWorldLevel: Int = 1
+    var goldUpgradeLevels: [String: Int] = [:]
+    var unlockedMetaUpgradeIDs: [String] = []
     
     var character: GameCharacter? {
         GameCharacter.roster.first(where: { $0.id == characterId })

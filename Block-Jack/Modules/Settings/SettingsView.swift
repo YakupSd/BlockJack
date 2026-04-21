@@ -145,7 +145,7 @@ struct SettingsView: View {
             
             Toggle("", isOn: isOn)
                 .tint(ThemeColors.neonCyan)
-                .onChange(of: isOn.wrappedValue) { newValue in
+                .onChange(of: isOn.wrappedValue) { oldValue, newValue in
                     if newValue { HapticManager.shared.play(.buttonTap) }
                 }
         }

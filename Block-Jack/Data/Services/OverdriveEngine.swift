@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 class OverdriveEngine {
     
@@ -34,9 +35,9 @@ class OverdriveEngine {
             }
         case "architect":
             switch tier {
-            case .tier1: return "2x2 altın blok yerleştir"
-            case .tier2: return "En iyi 3 hamleyi highlight et"
-            case .tier3: return "Otomatik en iyi hamleyi oynat"
+            case .tier1: return "3x3 alan temizle"
+            case .tier2: return "En iyi hamleyi göster"
+            case .tier3: return "Otomatik en iyi hamleyi oyna"
             default: return ""
             }
         case "ghost":
@@ -111,7 +112,13 @@ class OverdriveEngine {
                vm.board.resetGrid()
                vm.addPopup(text: "EARTHQUAKE!", color: ThemeColors.electricYellow)
             } else {
-               vm.addPopup(text: "DEV BLOK ÜRETİLDİ", color: ThemeColors.electricYellow)
+                let giantBlock = GameBlock(type: .plus, color: .yellow, ability: .bomb)
+                if vm.blockTray.count < 3 {
+                    vm.blockTray.append(giantBlock)
+                } else {
+                    vm.blockTray[0] = giantBlock
+                }
+                vm.addPopup(text: "TITAN: GIANT BLOCK READY", color: ThemeColors.electricYellow)
             }
             
         default:
@@ -132,14 +139,14 @@ class OverdriveEngine {
         case "block_e":
             if tier == .tier1 {
                 let positions = (0..<BoardViewModel.size).map { GridPosition(row: pos.row, col: $0) }
-                let cleared = vm.board.removeCells(at: positions)
-                vm.handleClear(result: BoardViewModel.ClearResult(clearedCells: cleared, rowsCleared: 1, colsCleared: 0))
+                let res = vm.board.removeCells(at: positions)
+                vm.handleClear(result: BoardViewModel.ClearResult(clearedCells: res.clearedCells, clearedPositions: res.clearedPositions, rowsCleared: 1, colsCleared: 0, zonesCleared: 0))
             } else if tier == .tier2 {
                 var positions: [GridPosition] = []
                 for c in 0..<BoardViewModel.size { positions.append(GridPosition(row: pos.row, col: c)) }
                 for r in 0..<BoardViewModel.size { positions.append(GridPosition(row: r, col: pos.col)) }
-                let cleared = vm.board.removeCells(at: positions)
-                vm.handleClear(result: BoardViewModel.ClearResult(clearedCells: cleared, rowsCleared: 1, colsCleared: 1))
+                let res = vm.board.removeCells(at: positions)
+                vm.handleClear(result: BoardViewModel.ClearResult(clearedCells: res.clearedCells, clearedPositions: res.clearedPositions, rowsCleared: 1, colsCleared: 1, zonesCleared: 0))
             } else if tier == .tier3 {
                 var positions: [GridPosition] = []
                 for r in max(0, pos.row-1)...min(BoardViewModel.size-1, pos.row+1) {
@@ -147,16 +154,37 @@ class OverdriveEngine {
                         positions.append(GridPosition(row: r, col: c))
                     }
                 }
-                let cleared = vm.board.removeCells(at: positions)
-                vm.handleClear(result: BoardViewModel.ClearResult(clearedCells: cleared, rowsCleared: 0, colsCleared: 0))
+                let res = vm.board.removeCells(at: positions)
+                vm.handleClear(result: BoardViewModel.ClearResult(clearedCells: res.clearedCells, clearedPositions: res.clearedPositions, rowsCleared: 0, colsCleared: 0, zonesCleared: 0))
             }
             vm.addPopup(text: "CLEARED!", color: ThemeColors.neonPink)
         case "architect":
             if tier == .tier1 {
                 let cleared = vm.board.applyArchitectOverdrive(at: pos)
                 if !cleared.isEmpty {
-                   vm.run.addScore(cleared.count * 100)
-                   vm.addPopup(text: "BOOM! +\(cleared.count * 100)", color: ThemeColors.electricYellow)
+                    // 3x3 etrafındaki pozisyonları hesapla (flash için)
+                    var clearedPos: [GridPosition] = []
+                    for r in max(0, pos.row-1)...min(BoardViewModel.size-1, pos.row+1) {
+                        for c in max(0, pos.col-1)...min(BoardViewModel.size-1, pos.col+1) {
+                            clearedPos.append(GridPosition(row: r, col: c))
+                        }
+                    }
+                    vm.clearFlashPositions = clearedPos
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        vm.clearFlashPositions = []
+                    }
+                    // Overdrive Boom partikülü — merkezden patlasın
+                    vm.particleBurst = GameViewModel.ParticleBurstEvent(kind: .overdriveBoom(
+                        centerRow: pos.row, centerCol: pos.col
+                    ))
+                    vm.handleClear(result: BoardViewModel.ClearResult(
+                        clearedCells: cleared,
+                        clearedPositions: clearedPos,
+                        rowsCleared: 0, colsCleared: 0, zonesCleared: 0
+                    ))
+                    vm.addPopup(text: "ARCHITECT ARCHIVES!", color: ThemeColors.neonCyan)
+                } else {
+                    vm.addPopup(text: "HEDEF BOŞ!", color: ThemeColors.textMuted)
                 }
             } else {
                 vm.addPopup(text: "YETENEK ALANI İŞLENDİ", color: ThemeColors.electricYellow)

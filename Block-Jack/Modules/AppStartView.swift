@@ -82,7 +82,7 @@ struct AppStartView: View {
                 glowOpacity = 0.6
             }
         }
-        .onChange(of: vm.initializationComplete) { complete in
+        .onChange(of: vm.initializationComplete) { oldValue, complete in
             if complete {
                 // Navigasyon: Ana Menüye git
                 MainViewsRouter.shared.popToDashboard()

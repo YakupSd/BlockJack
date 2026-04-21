@@ -53,6 +53,8 @@ struct StreakFireHUDView: View {
 struct OverdriveHUDView: View {
     @ObservedObject var vm: GameViewModel
     @EnvironmentObject var userEnv: UserEnvironment
+    /// Overdrive targeting drag sırasında GameView @State dragPosition günceller
+    var onDragChanged: ((CGPoint) -> Void)? = nil
     
     // Core animation states
     @State private var pulseScale: CGFloat = 1.0
@@ -140,26 +142,33 @@ struct OverdriveHUDView: View {
                             }
                         }
                     }
-                    .gesture(
+                        .gesture(
                         DragGesture(minimumDistance: 0, coordinateSpace: .global)
                             .onChanged { value in
-                                guard isReady else { return }
-                                // Targeted Overdrive Check
                                 if char.id == "architect" || char.id == "block_e" {
-                                    if !vm.isTargetingOverdrive {
+                                    if !vm.isTargetingOverdrive && isReady {
                                         HapticManager.shared.play(.selection)
-                                        vm.isTargetingOverdrive = true
+                                        vm.activateOverdrive()
                                     }
+                                    if vm.isTargetingOverdrive {
+                                        vm.dragLocation = value.location
+                                        onDragChanged?(value.location)
+                                    }
+                                } else {
+                                    guard isReady else { return }
                                     vm.dragLocation = value.location
+                                    onDragChanged?(value.location)
                                 }
                             }
                             .onEnded { value in
-                                guard isReady else { return }
-                                
                                 if char.id == "architect" || char.id == "block_e" {
-                                    vm.dragLocation = value.location
-                                    vm.handleOverdriveDrop()
+                                    if vm.isTargetingOverdrive {
+                                        vm.dragLocation = value.location
+                                        onDragChanged?(value.location)
+                                        vm.handleOverdriveDrop()
+                                    }
                                 } else {
+                                    guard isReady else { return }
                                     vm.activateOverdrive()
                                 }
                             }
@@ -183,7 +192,7 @@ struct OverdriveHUDView: View {
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(isReady ? tierColor.opacity(0.5) : ThemeColors.gridStroke.opacity(0.3), lineWidth: 1))
             }
-            .onChange(of: vm.currentOverdriveTier) { newTier in
+            .onChange(of: vm.currentOverdriveTier) { oldValue, newTier in
                 if newTier != .none {
                     // Phase 8.3: Tier ready pulse
                     withAnimation(Animation.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {

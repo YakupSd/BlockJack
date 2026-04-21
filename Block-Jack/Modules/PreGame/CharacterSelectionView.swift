@@ -70,13 +70,8 @@ struct CharacterSelectionView: View {
                     if isUnlocked {
                         MainViewsRouter.shared.pushToPerkSelection(slotId: slotId, characterId: char.id)
                     } else {
-                        // Attempt buy
-                        if userEnv.spend(gold: char.cost) { // Note: GDD says diamond, adjust later if needed. Use diamond or gold.
-                            userEnv.unlockedCharacterIDs.append(char.id)
-                            HapticManager.shared.play(.success)
-                        } else {
-                            HapticManager.shared.play(.error)
-                        }
+                        // Attempt buy using diamonds as base for quick unlock in selection
+                        _ = userEnv.unlockCharacter(char, useDiamonds: true)
                     }
                 } label: {
                     Text(isUnlocked ? userEnv.localizedString("SEÇ VE DEVAM ET", "SELECT & CONTINUE") : "\(char.cost) 💎 UNLOCK")
@@ -210,13 +205,20 @@ struct CharacterSelectionView: View {
             
             // Phase 7: Locked Condition
             if !isUnlocked {
-                HStack(spacing: 8) {
-                    Image(systemName: "lock.circle.fill")
-                        .font(.system(size: 16))
-                    Text(userEnv.localizedString(char.unlockCondition.descriptionTR, char.unlockCondition.descriptionEN))
+                Button {
+                    HapticManager.shared.play(.buttonTap)
+                    MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(CharacterShopView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "lock.circle.fill")
+                            .font(.system(size: 16))
+                        Text(userEnv.localizedString(char.unlockCondition.descriptionTR, char.unlockCondition.descriptionEN))
+                        Text("— " + userEnv.localizedString("MAĞAZAYA GİT", "GO TO SHOP"))
+                            .underline()
+                    }
+                    .font(.setCustomFont(name: .InterBold, size: 14))
+                    .foregroundStyle(ThemeColors.neonOrange)
                 }
-                .font(.setCustomFont(name: .InterBold, size: 14))
-                .foregroundStyle(ThemeColors.neonOrange)
                 .padding(.top, 12)
             }
         }

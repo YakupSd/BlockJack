@@ -129,6 +129,12 @@ class UserEnvironment: ObservableObject {
         didSet { UserDefaults.standard.set(diamonds, forKey: "playerDiamonds") }
     }
 
+    // MARK: - Active Slot Tracking (Phase 11)
+    @Published var activeSlotId: Int? = nil
+    @Published var unlockedWorldLevel: Int = 1 {
+        didSet { syncWithSlot() }
+    }
+
     // MARK: - Settings
     @Published var isSoundEnabled: Bool {
         didSet { 
@@ -199,6 +205,7 @@ class UserEnvironment: ObservableObject {
             if let data = try? JSONEncoder().encode(unlockedUpgradeIDs) {
                 UserDefaults.standard.set(data, forKey: "unlockedUpgrades")
             }
+            syncWithSlot()
         }
     }
     
@@ -208,6 +215,7 @@ class UserEnvironment: ObservableObject {
             if let data = try? JSONEncoder().encode(goldUpgradeLevels) {
                 UserDefaults.standard.set(data, forKey: "goldUpgradeLevels")
             }
+            syncWithSlot()
         }
     }
 
@@ -290,6 +298,24 @@ class UserEnvironment: ObservableObject {
     func earn(gold amount: Int) { gold += amount }
     func earn(diamonds amount: Int) { diamonds += amount }
     
+    /// Karakter satın alma mantığı
+    func unlockCharacter(_ character: GameCharacter, useDiamonds: Bool) -> Bool {
+        if unlockedCharacterIDs.contains(character.id) { return true }
+        
+        let cost = character.cost
+        let success = useDiamonds ? spend(diamonds: cost / 10) : spend(gold: cost) // Elmasla 10 kat daha ucuz (örnek oran)
+        
+        if success {
+            unlockedCharacterIDs.append(character.id)
+            HapticManager.shared.play(.success)
+            AudioManager.shared.playSFX(.perkUnlock)
+            return true
+        }
+        
+        HapticManager.shared.play(.error)
+        return false
+    }
+
     func goldLevel(for upgrade: GoldUpgrade) -> Int {
         goldUpgradeLevels[upgrade.rawValue] ?? 0
     }
@@ -331,6 +357,24 @@ class UserEnvironment: ObservableObject {
         totalGoldEarned += count
     }
 
+    // MARK: - Slot Syncing (Phase 11)
+    func syncWithSlot() {
+        guard let slotId = activeSlotId else { return }
+        SaveManager.shared.updateSlotProgression(
+            slotId: slotId,
+            worldLevel: unlockedWorldLevel,
+            goldUpgrades: goldUpgradeLevels,
+            metaUpgrades: unlockedUpgradeIDs
+        )
+    }
+    
+    func loadFromSlot(_ slot: SaveSlot) {
+        self.activeSlotId = slot.id
+        self.unlockedWorldLevel = slot.unlockedWorldLevel
+        self.goldUpgradeLevels = slot.goldUpgradeLevels
+        self.unlockedUpgradeIDs = slot.unlockedMetaUpgradeIDs
+    }
+    
     func localizedString(_ trText: String, _ enText: String) -> String {
         language == .turkish ? trText : enText
     }
