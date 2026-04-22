@@ -65,142 +65,170 @@ struct OverdriveHUDView: View {
     var body: some View {
         if let charId = vm.activeCharacterId, let char = GameCharacter.roster.first(where: { $0.id == charId }) {
             let isReady = vm.currentOverdriveTier != .none
-            let chargePct = vm.overdriveCharge / 3.0 // 0.0 -> 1.0 overall
+            let chargePct = min(1.0, vm.overdriveCharge / 3.0)
             let tierColor = self.tierColor(for: vm.currentOverdriveTier)
             
-            VStack(spacing: 8) {
-                // Tooltip showing active tier description
-                if isReady {
-                    Text(OverdriveEngine.tierDescription(charId: char.id, tier: vm.currentOverdriveTier))
-                        .font(.caption)
-                        .foregroundColor(tierColor)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color(white: 0.1).opacity(0.8))
-                        .cornerRadius(8)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                
-                HStack(spacing: 12) {
-                    // Start dragging or tapping logic
-                    ZStack {
-                        // Phase 8.2: Streak Fire HUD
-                        if vm.run.streak >= 3 {
-                            StreakFireHUDView(streak: vm.run.streak)
-                                .transition(.opacity.combined(with: .scale))
-                        }
-                        
+            // UI Revize: Tek yatay kart — [avatar]  OVERDRIVE TIER N  [bar]  %XX
+            HStack(spacing: 10) {
+                // Avatar (drag/tap ile overdrive tetikleyen alan)
+                ZStack {
+                    if vm.run.streak >= 3 {
+                        StreakFireHUDView(streak: vm.run.streak)
+                            .transition(.opacity.combined(with: .scale))
+                    }
+                    
+                    Circle()
+                        .fill(isReady ? tierColor.opacity(0.9) : ThemeColors.surfaceDark)
+                        .frame(width: 36, height: 36)
+                        .shadow(color: isReady ? tierColor : .clear, radius: isReady ? glowRadius * 0.7 : 0)
+                        .scaleEffect(isReady ? pulseScale : 1.0)
+                    
+                    if tierTransitionFlash {
                         Circle()
-                            .fill(isReady ? tierColor : ThemeColors.surfaceDark)
-                            .frame(width: 50, height: 50)
-                            .shadow(color: isReady ? tierColor : .clear, radius: isReady ? glowRadius : 0)
-                            .scaleEffect(isReady ? pulseScale : 1.0)
-                        
-                        // Phase 8.3: Tier transition flash ring
-                        if tierTransitionFlash {
+                            .stroke(tierColor, lineWidth: 2)
+                            .frame(width: 48, height: 48)
+                            .scaleEffect(1.4)
+                            .opacity(0.0)
+                            .animation(.easeOut(duration: 0.5), value: tierTransitionFlash)
+                    }
+                    
+                    Image(char.icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 34, height: 34)
+                        .clipShape(Circle())
+                        .opacity(isReady ? 1.0 : 0.45)
+                        .grayscale(isReady ? 0 : 1)
+                    
+                    // 3 segment ring — çevresinde şarj göstergesi
+                    ForEach(0..<3) { i in
+                        Circle()
+                            .trim(from: segmentStart(for: i), to: segmentEnd(for: i))
+                            .stroke(ThemeColors.gridStroke.opacity(0.3), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .frame(width: 40, height: 40)
+                            .rotationEffect(.degrees(-90))
+                    }
+                    ForEach(0..<3) { i in
+                        if vm.overdriveCharge >= Double(i) {
+                            let localCharge = min(1.0, vm.overdriveCharge - Double(i))
+                            let fillEnd = segmentStart(for: i) + (CGFloat(localCharge) * (segmentEnd(for: i) - segmentStart(for: i)))
                             Circle()
-                                .stroke(tierColor, lineWidth: 3)
-                                .frame(width: 65, height: 65)
-                                .scaleEffect(1.4)
-                                .opacity(0.0)
-                                .animation(.easeOut(duration: 0.5), value: tierTransitionFlash)
-                        }
-                        
-                        Image(char.icon)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 50, height: 50)
-                            .clipShape(Circle())
-                            .opacity(isReady ? 1.0 : 0.4)
-                            .grayscale(isReady ? 0 : 1)
-                        
-                        // 3 Segment Ring logic
-                        // Draw empty segments first
-                        ForEach(0..<3) { i in
-                            Circle()
-                                .trim(from: segmentStart(for: i), to: segmentEnd(for: i))
-                                .stroke(ThemeColors.gridStroke.opacity(0.3), style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                                .frame(width: 54, height: 54)
+                                .trim(from: segmentStart(for: i), to: fillEnd)
+                                .stroke(
+                                    colorForSegment(i).shadow(.drop(color: colorForSegment(i), radius: 3)),
+                                    style: StrokeStyle(lineWidth: 3.5, lineCap: .round)
+                                )
+                                .frame(width: 40, height: 40)
                                 .rotationEffect(.degrees(-90))
-                        }
-                        
-                        // Draw filled segments based on overdrive charge
-                        ForEach(0..<3) { i in
-                            if vm.overdriveCharge >= Double(i) {
-                                let localCharge = min(1.0, vm.overdriveCharge - Double(i))
-                                let fillEnd = segmentStart(for: i) + (CGFloat(localCharge) * (segmentEnd(for: i) - segmentStart(for: i)))
-                                
-                                Circle()
-                                    .trim(from: segmentStart(for: i), to: fillEnd)
-                                    .stroke(
-                                        colorForSegment(i).shadow(.drop(color: colorForSegment(i), radius: 4)),
-                                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
-                                    )
-                                    .frame(width: 54, height: 54)
-                                    .rotationEffect(.degrees(-90))
-                                    .animation(.spring(response: 0.3), value: vm.overdriveCharge)
-                            }
+                                .animation(.spring(response: 0.3), value: vm.overdriveCharge)
                         }
                     }
-                        .gesture(
-                        DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                            .onChanged { value in
-                                if char.id == "architect" || char.id == "block_e" {
-                                    if !vm.isTargetingOverdrive && isReady {
-                                        HapticManager.shared.play(.selection)
-                                        vm.activateOverdrive()
-                                    }
-                                    if vm.isTargetingOverdrive {
-                                        vm.dragLocation = value.location
-                                        onDragChanged?(value.location)
-                                    }
-                                } else {
-                                    guard isReady else { return }
+                }
+                .frame(width: 42, height: 42)
+                .gesture(
+                    DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                        .onChanged { value in
+                            if char.id == "architect" || char.id == "block_e" {
+                                if !vm.isTargetingOverdrive && isReady {
+                                    HapticManager.shared.play(.selection)
+                                    vm.activateOverdrive()
+                                }
+                                if vm.isTargetingOverdrive {
                                     vm.dragLocation = value.location
                                     onDragChanged?(value.location)
                                 }
+                            } else {
+                                guard isReady else { return }
+                                vm.dragLocation = value.location
+                                onDragChanged?(value.location)
                             }
-                            .onEnded { value in
-                                if char.id == "architect" || char.id == "block_e" {
-                                    if vm.isTargetingOverdrive {
-                                        vm.dragLocation = value.location
-                                        onDragChanged?(value.location)
-                                        vm.handleOverdriveDrop()
-                                    }
-                                } else {
-                                    guard isReady else { return }
-                                    vm.activateOverdrive()
+                        }
+                        .onEnded { value in
+                            if char.id == "architect" || char.id == "block_e" {
+                                if vm.isTargetingOverdrive {
+                                    vm.dragLocation = value.location
+                                    onDragChanged?(value.location)
+                                    vm.handleOverdriveDrop()
                                 }
+                            } else {
+                                guard isReady else { return }
+                                vm.activateOverdrive()
                             }
-                    )
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("OVERDRIVE: TIER \(vm.currentOverdriveTier.rawValue)")
-                            .font(.setCustomFont(name: .InterBlack, size: 12))
-                            .foregroundStyle(isReady ? tierColor : ThemeColors.textSecondary)
+                        }
+                )
+                
+                // Metin + progress
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("OVERDRIVE")
+                            .font(.setCustomFont(name: .InterBlack, size: 10))
+                            .foregroundStyle(isReady ? tierColor : ThemeColors.neonPurple)
+                            .tracking(1.2)
                         
-                        Text(isReady ? "HAZIR (%.0f%%)".replacingOccurrences(of: "%.0f", with: String(Int((vm.overdriveCharge / 3.0) * 100))) : "\(Int((vm.overdriveCharge / 3.0) * 100))% ŞARJ")
-                            .font(.setCustomFont(name: .InterMedium, size: 10))
-                            .foregroundStyle(ThemeColors.textMuted)
+                        if isReady {
+                            Text("TIER \(vm.currentOverdriveTier.rawValue)")
+                                .font(.setCustomFont(name: .InterBlack, size: 9))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(
+                                    Capsule().fill(tierColor.opacity(0.22))
+                                )
+                                .overlay(
+                                    Capsule().stroke(tierColor.opacity(0.5), lineWidth: 0.8)
+                                )
+                        }
                     }
                     
-                    Spacer()
+                    Text(isReady
+                         ? OverdriveEngine.tierDescription(charId: char.id, tier: vm.currentOverdriveTier)
+                         : "Hamleler şarj eder")
+                        .font(.setCustomFont(name: .InterMedium, size: 9))
+                        .foregroundStyle(ThemeColors.textMuted)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(height: 11)
+                    
+                    // Yatay progress bar
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(ThemeColors.surfaceDark)
+                            Capsule()
+                                .fill(isReady ? tierColor : ThemeColors.neonPurple)
+                                .frame(width: max(0, geo.size.width * chargePct))
+                                .animation(.spring(response: 0.3), value: chargePct)
+                        }
+                    }
+                    .frame(height: 3)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(isReady ? tierColor.opacity(0.5) : ThemeColors.gridStroke.opacity(0.3), lineWidth: 1))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // Yüzde
+                Text("\(Int(chargePct * 100))%")
+                    .font(.setCustomFont(name: .InterBlack, size: 12))
+                    .foregroundStyle(isReady ? tierColor : ThemeColors.neonPurple)
+                    .frame(minWidth: 36, alignment: .trailing)
+                    .monospacedDigit()
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(height: GameLayout.overdriveHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(ThemeColors.cardBg)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(isReady ? tierColor.opacity(0.5) : ThemeColors.neonPurple.opacity(0.3), lineWidth: 1)
+                    )
+            )
             .onChange(of: vm.currentOverdriveTier) { oldValue, newTier in
                 if newTier != .none {
-                    // Phase 8.3: Tier ready pulse
                     withAnimation(Animation.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
                         pulseScale = 1.07
                         pulseOpacity = 0.6
                         glowRadius = 14
                     }
-                    // Flash ring burst on tier unlock
                     tierTransitionFlash = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         tierTransitionFlash = false

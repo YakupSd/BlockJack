@@ -8,22 +8,22 @@ import Foundation
 // MARK: - Flush Type
 enum FlushType {
     case none        // Karışık renk
-    case half        // >%50 aynı renk → ×2
-    case full        // %100 aynı renk → ×5
+    case half        // >%50 aynı renk → ×2.5
+    case full        // %100 aynı renk → ×7
 
     var multiplier: Double {
         switch self {
         case .none: return 1.0
-        case .half: return 2.0
-        case .full: return 5.0
+        case .half: return 2.5
+        case .full: return 7.0
         }
     }
 
     var label: String? {
         switch self {
         case .none: return nil
-        case .half: return "COLOR BONUS ×2"
-        case .full: return "FLUSH! ×5"
+        case .half: return "COLOR BONUS ×2.5"
+        case .full: return "FLUSH! ×7"
         }
     }
 }
@@ -39,23 +39,23 @@ enum ClearCombo {
     
     var multiplierBonus: Double {
         switch self {
-        case .single: return 1.0
-        case .double: return 2.5
-        case .triple: return 5.0
-        case .cross:  return 3.5
-        case .zoneBlast: return 4.0
-        case .megaZone: return 7.5
+        case .single:    return 1.0
+        case .double:    return 3.5
+        case .triple:    return 8.0
+        case .cross:     return 5.0
+        case .zoneBlast: return 6.0
+        case .megaZone:  return 12.0
         }
     }
     
     var label: String? {
         switch self {
         case .single: return nil
-        case .double: return "DOUBLE CLEAR! ×2.5"
-        case .triple: return "MEGA CLEAR! ×5"
-        case .cross:  return "CROSS CLEAR! ×3.5"
-        case .zoneBlast: return "ZONE BLAST! ×4.0"
-        case .megaZone: return "OMEGA BLAST! ×7.5"
+        case .double: return "DOUBLE CLEAR! ×3.5"
+        case .triple: return "MEGA CLEAR! ×8"
+        case .cross:  return "CROSS CLEAR! ×5"
+        case .zoneBlast: return "ZONE BLAST! ×6"
+        case .megaZone: return "OMEGA BLAST! ×12"
         }
     }
 }
@@ -93,9 +93,16 @@ struct ScoreEngine {
 
     // MARK: - Ana hesaplama
     // Sadece satır, sütun veya zone temizlendiğinde puan kazanılır.
-    //  • Satır temizliği: +150 puan/satır
-    //  • Zone temizliği (4x4/5x5): +1000 puan/zone (Çok daha zor olduğu için yüksek ödül)
-    //  • Çarpanlar: combo türü + flush + streak + joker
+    //
+    // SCORING v2 — "Juice Pass":
+    //  • Her temizlenen hücre: 40 puan (eski 15)
+    //  • Satır/sütun başına: +350 puan (eski 150)
+    //  • Zone (4x4/5x5) başına: +2500 puan (eski 1000)
+    //  • Combo/flush/streak çarpanları da belirgin büyütüldü — böylece
+    //    küçük temizlikler bile "anlamlı sayı" hissi veriyor, büyük
+    //    combo'lar ekranda patlama gibi duruyor (Balatro tarzı ödül).
+    //  • RoundData.makeTarget buna göre ~2x yükseltildi; dengeye değil,
+    //    algıya odaklı — skor hızlı ve tatmin edici artsın.
     static func calculate(
         clearedCells: [GameCell],
         blockCellCount: Int = 4,   // Chip değeri için artık ikincil önemde
@@ -107,10 +114,9 @@ struct ScoreEngine {
     ) -> ScoreResult {
 
         // --- BASE SCORE ---
-        // Sadece temizlenen hücreler üzerinden hesaplanır. Chip puanı artik sadece temizlik bonusunun bir parçası.
-        let cellPoints = clearedCells.count * 15 // Her temizlenen hücre 15 puan
-        let lineClearBonus = (clearedRows + clearedCols) * 150
-        let zoneClearBonus = clearedZones * 1000 // 4x4 veya 5x5 alan temizleme ödülü
+        let cellPoints = clearedCells.count * 40      // Her temizlenen hücre 40 puan
+        let lineClearBonus = (clearedRows + clearedCols) * 350
+        let zoneClearBonus = clearedZones * 2500      // 4x4/5x5 alan: ciddi ödül
         
         let baseScore = cellPoints + lineClearBonus + zoneClearBonus
         
@@ -136,8 +142,8 @@ struct ScoreEngine {
         // Flush detection (Renk uyumu)
         let flush = detectFlush(cells: clearedCells)
         
-        // Streak bonus: her 2 combo +0.5 mult, max +5.0 (Daha agresif streak)
-        let streakBonus = min(Double(streak / 2) * 0.5, 5.0)
+        // Streak bonus: her 2 combo +0.75 mult, max +8.0 (daha gurur verici streak)
+        let streakBonus = min(Double(streak / 2) * 0.75, 8.0)
         
         // Final multiplier
         let hasAnyClear = totalLines > 0 || clearedZones > 0
@@ -198,10 +204,13 @@ struct ScoreEngine {
     }
 
     // MARK: - Altın kazancı
+    /// Skor 2-3x büyüdüğü için divisor 300 → 650'ye çıkarıldı.
+    /// Net etki: altın kazancı yaklaşık %25 buff'lı kalır; big combo/flush
+    /// bonusları ise ekstra 2 → 4 / 3 → 5 olarak güçlendirildi.
     static func goldEarned(for result: ScoreResult, hasGoldEye: Bool = false) -> Int {
-        var gold = result.totalScore / 300  // Her 300 puan = 1 altın
-        if result.isFlush { gold += 3 }
-        if result.isBigCombo { gold += 2 }
+        var gold = result.totalScore / 650  // Her 650 puan = 1 altın
+        if result.isFlush { gold += 5 }
+        if result.isBigCombo { gold += 4 }
         
         // Meta-Upgrade: Gold Eye (+10%)
         if hasGoldEye {

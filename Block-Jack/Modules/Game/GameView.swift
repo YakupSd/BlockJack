@@ -27,87 +27,126 @@ struct GameView: View {
 
     var body: some View {
         ZStack {
-            // Fix Background Scaling (Task 2)
-            // Fix Background Scaling (Task 2)
-            GeometryReader { geo in
-                Image("cyber_battle_arena")
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .clipped()
+            // Performans: Arkaplan katmanları tek `drawingGroup(opaque: true)`
+            // altında cache'leniyor. Eskiden her oyun frame'inde blur(5) + Canvas
+            // grid çizimi yeniden yapılıyordu → fps kaynağı.
+            //
+            // `.drawingGroup` static içeriği (image + darken + canvas grid)
+            // tek off-screen bitmap'e render eder, sonra onu ekrana blit eder.
+            ZStack {
+                GeometryReader { geo in
+                    Image("cyber_battle_arena")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                        .blur(radius: 5)
+                }
+                Color.black.opacity(0.6)
+                backgroundGrid
             }
             .ignoresSafeArea()
-            .blur(radius: 5)
-            
-            Color.black.opacity(0.6).ignoresSafeArea() // Görünürlük için karartma
+            .drawingGroup(opaque: true)
+            .allowsHitTesting(false)
 
-            // Synthwave grid pattern (dekoratif)
-            backgroundGrid
+            // MARK: - MAIN LAYOUT (UI REVIZE)
+            // Dikey bütçe (doc): HUD 44 + barLine 12 + score 32 + enemy 44 + grid ≥220 + overdrive 48 + tray 80
+            // ScrollView yok — her şey ekrana sığmalı.
+            VStack(spacing: GameLayout.sectionSpacing) {
+                // 1) TEK ŞERİT HUD — karakter | bölüm | süre
+                TopHUDBar(vm: vm)
 
-            VStack(spacing: 0) {
-                // 1. Timer & Controls Bar
-                timerSection
+                // 2) CAN + ZAMAN BARI — tek ince şerit
+                LifeAndTimerStrip(vm: vm)
 
+                // Boss header (sadece boss round'larda) — kompakt şerit
                 if vm.run.round.isBossRound {
                     bossHeaderView
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                // 2. Score HUD
-                ScoreHUDView(vm: vm)
+                // 3) SKOR SATIRI — kompakt (içinde ilerleme çubuğu da)
+                VStack(spacing: 4) {
+                    ScoreHUDView(vm: vm)
+                    progressBar
+                        .padding(.horizontal, GameLayout.horizontalPadding)
+                }
 
-                // 3. Progress bar (hedefe doğru)
-                progressBar
+                // AAA: Boss Intent (varsa)
+                if let intent = vm.bossIntent {
+                    BossIntentPill(text: intent)
+                        .padding(.top, 2)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
-                Spacer()
+                // 4) DÜŞMAN BANNER — kompakt, 44pt (sadece aktif atak varken)
+                if vm.enemy.currentAttack != nil {
+                    EnemyHUDView(vm: vm)
+                        .padding(.horizontal, GameLayout.horizontalPadding)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
 
-                // 4. Grid + Partikül Overlay
+                // 5) AKTİF PERKLER — yatay tek şerit
+                PassivePerkHUDView(vm: vm)
+
+                // Consumable inventory (item varsa)
+                inventoryTray
+
+                Spacer(minLength: 0)
+
+                // 6) GRID + Partikül
+                // Kart dekoru dış wrapper — grid'in kendi boyutuna dokunmuyor,
+                // drag koordinatları doğru kalıyor.
                 ZStack(alignment: .topLeading) {
                     gridSection
-                        .offset(x: vm.shakeAmount * CGFloat.random(in: -1...1),
-                                y: vm.shakeAmount * CGFloat.random(in: -1...1))
+                        // Performans: body içinde CGFloat.random(...) çağrısı
+                        // her re-render'da yeni değer üretiyor, shakeAmount
+                        // spring ile 0'a dönerken sürekli body invalidate
+                        // döngüsü oluşturuyordu. Deterministic offset ile
+                        // aynı görsel shake hissi, sıfır reactive storm.
+                        .offset(x: vm.shakeAmount * 0.6,
+                                y: -vm.shakeAmount * 0.85)
                         .animation(.none, value: vm.shakeAmount)
-                    
-                    // Partikül canvas — grid'in tam üstüne taşınır
+
                     ClearParticleOverlayView(manager: particleManager)
                         .offset(x: gridOrigin.x, y: gridOrigin.y)
                         .allowsHitTesting(false)
                 }
-
-                Spacer()
-                
-                // 5. Overdrive & Perks & Block Tray
-                VStack(spacing: 12) {
-                    PassivePerkHUDView(vm: vm)
-                    
-                    inventoryTray
-                    
-                    // Düşman HUD — mevcut saldırı tipi
-                    EnemyHUDView(vm: vm)
-                        .padding(.horizontal, 16)
-                    
-                    OverdriveHUDView(vm: vm, onDragChanged: { newLocation in
-                        dragPosition = newLocation
-                    })
-                        .padding(.horizontal, 32)
-                    
-                    // Tepsi — kilit varsa kart kırmızı kenarlayarak göster
-                    BlockTrayView(vm: vm, onDragChanged: { newLocation in
-                        // Sadece overlay için @State güncelle — vm.objectWillChange tetiklenmez
-                        dragPosition = newLocation
-                    })
-                        .padding(.horizontal, 16)
+                .padding(6)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(ThemeColors.cellEmpty.opacity(0.5))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(
-                                    vm.enemy.isTrayLocked ? ThemeColors.electricYellow : Color.clear,
-                                    lineWidth: 2
-                                )
-                                .padding(.horizontal, 16)
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(ThemeColors.cardBorder, lineWidth: 1)
                         )
-                }
-                .padding(.bottom, 32)
+                )
+                .padding(.horizontal, GameLayout.horizontalPadding)
+
+                Spacer(minLength: 0)
+
+                // 7) OVERDRIVE — kompakt kart
+                OverdriveHUDView(vm: vm, onDragChanged: { newLocation in
+                    dragPosition = newLocation
+                })
+                .padding(.horizontal, GameLayout.horizontalPadding)
+
+                // 8) BLOK TEPSİSİ — overflow fix (GeometryReader içinde)
+                BlockTrayView(vm: vm, onDragChanged: { newLocation in
+                    dragPosition = newLocation
+                })
+                .padding(.horizontal, GameLayout.horizontalPadding)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(
+                            vm.enemy.isTrayLocked ? ThemeColors.electricYellow : Color.clear,
+                            lineWidth: 2
+                        )
+                        .padding(.horizontal, GameLayout.horizontalPadding)
+                        .allowsHitTesting(false)
+                )
             }
+            .padding(.bottom, 10)
 
             // Score popupları
             ForEach(vm.scorePopups) { popup in
@@ -248,181 +287,46 @@ struct GameView: View {
         .navigationBarHidden(true)
     }
 
-    // MARK: - Timer Section (with Home & Pause)
-    private var timerSection: some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 12) {
-                // Home Butonu
-                Button {
-                    HapticManager.shared.play(.buttonTap)
-                    vm.saveGameState()
-                    MainViewsRouter.shared.popToDashboard()
-                } label: {
-                    Image("ui_home")
-                        .resizable()
-                        .frame(width: 36, height: 36)
-                        .background(ThemeColors.surfaceDark)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(ThemeColors.gridStroke, lineWidth: 1))
-                }
-
-                // Can (Lives) Göstergesi
-                HStack(spacing: 3) {
-                    ForEach(1...vm.run.maxLives, id: \.self) { i in
-                        Image(systemName: i <= vm.run.lives ? "heart.fill" : "heart")
-                            .font(.system(size: 10))
-                            .foregroundStyle(i <= vm.run.lives ? ThemeColors.neonPink : ThemeColors.gridStroke)
-                            .scaleEffect(i == vm.run.lives && vm.run.lives < 3 ? 1.2 : 1.0)
-                            .animation(.spring(response: 0.3), value: vm.run.lives)
-                    }
-                }
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                        .font(.system(size: 11))
-                        .foregroundStyle(vm.timer.ratio < 0.15 ? ThemeColors.neonPink : ThemeColors.textSecondary)
-                    Text(String(format: "%.1f", vm.timer.timeRemaining))
-                        .font(.setCustomFont(name: .InterBold, size: 14))
-                        .foregroundStyle(ThemeColors.timerColor(ratio: vm.timer.ratio))
-                        .contentTransition(.numericText())
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(vm.timer.ratio < 0.15 ? ThemeColors.neonPink.opacity(0.15) : Color.clear)
-                )
-                .overlay(
-                    Capsule().stroke(vm.timer.ratio < 0.15 ? ThemeColors.neonPink.opacity(0.4) : Color.clear, lineWidth: 1)
-                )
-                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: vm.timer.ratio < 0.15)
-                
-                Spacer()
-
-                // Pause butonu
-                Button {
-                    vm.pauseGame()
-                    HapticManager.shared.play(.buttonTap)
-                } label: {
-                    Image("ui_pause")
-                        .resizable()
-                        .frame(width: 36, height: 36)
-                        .background(ThemeColors.surfaceDark)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(ThemeColors.gridStroke, lineWidth: 1))
-                }
-            }
-            .padding(.horizontal, 20)
-
-            TimerBarView(
-                ratio: vm.timer.ratio,
-                isFogMode: vm.run.round.modifier == .fog
-            )
-            .padding(.horizontal, 20)
-            
-            // AAA: BOSS INTENT WARNING
-            if let intent = vm.bossIntent {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(ThemeColors.neonPink)
-                    
-                    Text(intent)
-                        .font(.setCustomFont(name: .InterBlack, size: 10))
-                        .foregroundStyle(.white)
-                        .tracking(1)
-                    
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(ThemeColors.neonPink)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(ThemeColors.neonPink.opacity(0.15))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(ThemeColors.neonPink.opacity(0.4), lineWidth: 1))
-                .phaseAnimator([0.6, 1.0]) { content, opacity in
-                    content.opacity(opacity)
-                } animation: { _ in
-                    .easeInOut(duration: 0.5).repeatForever(autoreverses: true)
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .padding(.top, 4)
-            }
-        }
-        .padding(.top, 8)
-    }
-
-    // MARK: - Progress Bar
+    // MARK: - Progress Bar (hedef puan ilerlemesi)
+    /// Top HUD altında ince bir progress bar — kullanıcı hedefe yaklaştıkça dolan cyan bar.
     private var progressBar: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(ThemeColors.gridDark)
-                    .frame(height: 6)
-                
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(ThemeColors.neonCyanGradient)
-                        .frame(width: geo.size.width * vm.run.scoreProgress, height: 6)
-                    
-                    // Data Flow animation
-                    FlowOverlay(color: .white.opacity(0.3))
-                        .frame(width: geo.size.width * vm.run.scoreProgress, height: 6)
-                        .clipShape(Capsule())
-                }
-                .animation(.spring(response: 0.4), value: vm.run.scoreProgress)
+                    .frame(height: 4)
+
+                Capsule()
+                    .fill(ThemeColors.neonCyanGradient)
+                    .frame(width: geo.size.width * vm.run.scoreProgress, height: 4)
+                    .animation(.spring(response: 0.4), value: vm.run.scoreProgress)
             }
         }
-        .frame(height: 6)
-        .padding(.horizontal, 20)
-        .padding(.top, 6)
-    }
-
-    struct FlowOverlay: View {
-        let color: Color
-        @State private var phase: CGFloat = 0
-
-        var body: some View {
-            GeometryReader { geo in
-                ZStack {
-                    ForEach(0..<10) { i in
-                        Rectangle()
-                            .fill(color)
-                            .frame(width: 2, height: 10)
-                            .rotationEffect(.degrees(30))
-                            .offset(x: -geo.size.width + (CGFloat(i) * (geo.size.width / 5)) + phase)
-                    }
-                }
-                .onAppear {
-                    withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                        phase = geo.size.width / 5
-                    }
-                }
-            }
-        }
+        .frame(height: 4)
     }
 
     // MARK: - Grid Section
+    /// NOT: GridView'e PADDING UYGULANMAMALI — gridOrigin kayarsa drag/ghost/overdrive
+    /// targeting yanlış hücreye düşer. Kart dekoru dış wrapper'da.
     private var gridSection: some View {
-        ZStack {
-            GridView(
-                board: vm.board,
-                cellSize: cellSize,
-                isPhantomMode: vm.run.round.modifier == .phantom,
-                isPhantomVisible: vm.isPhantomVisible,
-                flashPositions: vm.clearFlashPositions
-            )
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.onAppear {
-                            gridOrigin = geo.frame(in: .global).origin
-                        }
-                    }
-                )
-                .contentShape(Rectangle())
-        }
-        .padding(.horizontal, 12)
+        GridView(
+            board: vm.board,
+            cellSize: cellSize,
+            isPhantomMode: vm.run.round.modifier == .phantom,
+            isPhantomVisible: vm.isPhantomVisible,
+            flashPositions: vm.clearFlashPositions
+        )
+        .background(
+            GeometryReader { geo in
+                Color.clear.onAppear {
+                    gridOrigin = geo.frame(in: .global).origin
+                }
+                .onChange(of: geo.frame(in: .global).origin) { _, newOrigin in
+                    gridOrigin = newOrigin
+                }
+            }
+        )
+        .contentShape(Rectangle())
     }
 
     // MARK: - Background grid pattern (dekoratif)
@@ -487,80 +391,82 @@ struct GameView: View {
         return GridPosition(row: row, col: col)
     }
     
-    // MARK: - Boss Header
+    // MARK: - Boss Header (UI Revize — kompakt 44pt boss şeridi)
     private var bossHeaderView: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Image(vm.currentBoss.imageName)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 44, height: 44)
+                .frame(width: 34, height: 34)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(ThemeColors.neonPink, lineWidth: 1))
-                .shadow(color: ThemeColors.neonPink.opacity(0.5), radius: 5)
+                .shadow(color: ThemeColors.neonPink.opacity(0.5), radius: 4)
             
-            VStack(alignment: .leading, spacing: 2) {
-                Text("BÖLÜM PATRONU")
-                    .font(.setCustomFont(name: .InterBlack, size: 10))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(userEnv.localizedString("BÖLÜM PATRONU", "CHAPTER BOSS"))
+                    .font(.setCustomFont(name: .InterBlack, size: 9))
                     .foregroundStyle(ThemeColors.neonPink)
-                    .tracking(2)
+                    .tracking(1.8)
                 
                 Text(vm.currentBoss.name)
-                    .font(.setCustomFont(name: .InterExtraBold, size: 18))
+                    .font(.setCustomFont(name: .InterExtraBold, size: 14))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
             }
             
-            Spacer()
+            Spacer(minLength: 6)
             
-            // Phase indicator or static "FIGHT"
             Text("DUEL")
-                .font(.setCustomFont(name: .InterBlack, size: 12))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+                .font(.setCustomFont(name: .InterBlack, size: 10))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
                 .background(ThemeColors.neonPink.opacity(0.2))
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(ThemeColors.neonPink, lineWidth: 1))
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.horizontal, GameLayout.horizontalPadding)
+        .padding(.vertical, 6)
         .background(
-            LinearGradient(colors: [ThemeColors.neonPink.opacity(0.15), .clear], startPoint: .top, endPoint: .bottom)
+            LinearGradient(
+                colors: [ThemeColors.neonPink.opacity(0.18), .clear],
+                startPoint: .top, endPoint: .bottom
+            )
         )
     }
 
-    // MARK: - Inventory Tray
+    // MARK: - Inventory Tray (consumable item'lar — yeni UI dili)
+    @ViewBuilder
     private var inventoryTray: some View {
-        Group {
-            if !vm.run.inventory.isEmpty {
-                HStack(spacing: 12) {
-                    ForEach(vm.run.inventory) { item in
-                        Button(action: {
-                            withAnimation(.spring()) {
-                                vm.useItem(item)
-                            }
-                        }) {
-                            VStack(spacing: 2) {
-                                Text(item.icon)
-                                    .font(.title3)
-                                Text(item.name)
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.white.opacity(0.8))
-                            }
-                            .frame(width: 50, height: 50)
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(10)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                            .shadow(color: .black.opacity(0.3), radius: 3)
+        if !vm.run.inventory.isEmpty {
+            HStack(spacing: 6) {
+                ForEach(vm.run.inventory) { item in
+                    Button {
+                        withAnimation(.spring()) {
+                            vm.useItem(item)
                         }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(item.icon)
+                                .font(.system(size: 16))
+                            Text(item.name)
+                                .font(.setCustomFont(name: .InterBold, size: 9))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule().fill(ThemeColors.cardBg)
+                        )
+                        .overlay(
+                            Capsule().stroke(ThemeColors.cardBorder, lineWidth: 1)
+                        )
                     }
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
-                .background(Color.black.opacity(0.3))
-                .cornerRadius(15)
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-            } else {
-                EmptyView()
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, GameLayout.horizontalPadding)
+            .transition(.move(edge: .trailing).combined(with: .opacity))
         }
     }
 }

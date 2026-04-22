@@ -50,10 +50,10 @@ struct GameOverOverlay: View {
                 .padding(.horizontal, 32)
                 
                 if isRunOver {
-                    // Tüm canlar bitti → sadece çıkış
+                    // Tüm canlar bitti → sadece çıkış (Slot Hub'a dön)
                     Button {
                         HapticManager.shared.play(.buttonTap)
-                        MainViewsRouter.shared.popToDashboard()
+                        MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
                     } label: {
                         Text(userEnv.localizedString("ANA MENÜYE DÖN", "BACK TO MENU"))
                             .font(.setCustomFont(name: .InterExtraBold, size: 20))
@@ -81,7 +81,7 @@ struct GameOverOverlay: View {
                     
                     Button {
                         HapticManager.shared.play(.buttonTap)
-                        MainViewsRouter.shared.popToDashboard()
+                        MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
                     } label: {
                         Text(userEnv.localizedString("PES ET", "GIVE UP"))
                             .font(.setCustomFont(name: .InterBold, size: 16))
@@ -185,7 +185,7 @@ struct PauseOverlay: View {
                 Button {
                     HapticManager.shared.play(.buttonTap)
                     vm.saveGameState()
-                    MainViewsRouter.shared.popToDashboard()
+                    MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
                 } label: {
                     Text(userEnv.localizedString("KAYDET VE ÇIK", "SAVE & QUIT"))
                         .font(.setCustomFont(name: .InterExtraBold, size: 20))

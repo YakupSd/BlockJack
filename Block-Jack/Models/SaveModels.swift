@@ -66,45 +66,68 @@ struct GameCharacter: Codable, Identifiable, Hashable {
     let unlockCondition: UnlockCondition
     
     static let roster: [GameCharacter] = [
-        GameCharacter(id: "block_e", name: "BLOCK-E", icon: "port_block_e", passiveDesc: "Her 10 saniyede bir sahadaki bir bloğu siler (max 3/maç)", activeDesc: "Kombo çarpan artışı 5 saniye boyunca ×5 olur", isPremium: false, cost: 0,
+        GameCharacter(id: "block_e", name: "BLOCK-E", icon: "port_block_e",
+                      passiveDesc: "Her 10sn sahadaki bir hücreyi temizler (max 3/tur)",
+                      activeDesc: "Hedefli temizlik: T1 satır, T2 çapraz, T3 3×3 bomba",
+                      isPremium: false, cost: 0,
                       loreTR: "İlk üretilen temizlik asistanı. Yıllarca fabrikada çalıştıktan sonra yapay zekası limitleri aştı.",
                       loreEN: "The first generation cleaning assistant. Its AI broke bounds after years in the factory.",
                       favoriteBlockType: .I, strongMode: "Satır Temizliği", difficulty: .beginner, unlockCondition: .free),
-        
-        GameCharacter(id: "architect", name: "THE ARCHITECT", icon: "port_architect", passiveDesc: "Kare (O) bloklara +%20 puan verir", activeDesc: "3×3 alanı anında temizler", isPremium: true, cost: 500,
+
+        GameCharacter(id: "architect", name: "THE ARCHITECT", icon: "port_architect",
+                      passiveDesc: "Kare (O) bloklarla temizlikte +%30 çarpan",
+                      activeDesc: "Alan yıkımı: T1 3×3, T2 5×5, T3 7×7 +1500 puan",
+                      isPremium: true, cost: 500,
                       loreTR: "Gridin yaratıcısı. Sistemin her bir köşesini kendi elleriyle kodladı.",
                       loreEN: "Creator of the Grid. Coded every edge of the system manually.",
                       favoriteBlockType: .O, strongMode: "Büyük Kombinasyonlar", difficulty: .advanced, unlockCondition: .gold(500)),
-        
-        GameCharacter(id: "timebender", name: "TIME BENDER", icon: "port_timebender", passiveDesc: "Kombo süresi %50 yavaş düşer", activeDesc: "Zamanı ve çarpanı 3 hamle boyunca dondurur", isPremium: true, cost: 800,
+
+        GameCharacter(id: "timebender", name: "TIME BENDER", icon: "port_timebender",
+                      passiveDesc: "Temizlikte +%50 süre, streak yavaş düşer",
+                      activeDesc: "Zaman kontrolü: T1 5sn dur, T2 8sn+tepsi, T3 3 hamle freeze",
+                      isPremium: true, cost: 800,
                       loreTR: "Zaman algısını bükmeyi başardı. O oynarken saniyeler uzar, dakikalar kaybolur.",
                       loreEN: "Mastered twisting the perception of time. Seconds stretch as he plays.",
                       favoriteBlockType: .T, strongMode: "Zaman Yönetimi", difficulty: .advanced, unlockCondition: .gold(800)),
-        
-        GameCharacter(id: "gambler", name: "THE GAMBLER", icon: "port_gambler", passiveDesc: "%7 ihtimalle o hamlenin puanı ×10 olur", activeDesc: "Mevcut ve sahadaki 3 bloğu rastgele yeniler", isPremium: true, cost: 1200,
+
+        GameCharacter(id: "gambler", name: "THE GAMBLER", icon: "port_gambler",
+                      passiveDesc: "%7 şansla o hamlede +9 çarpan (≈×10 combo)",
+                      activeDesc: "Şans tepsi: T1 1 blok, T2 tüm tepsi, T3 tepsi +2000 puan",
+                      isPremium: true, cost: 1200,
                       loreTR: "Sisteme her girişinde hayatını ortaya koyuyor. Şansı yaver giderse yıkılamaz.",
                       loreEN: "Puts his life on the line on every login. Invincible if lucky.",
-                      favoriteBlockType: .lMirror, strongMode: "Yüksek Risk, Yüksek Ödül", difficulty: .expert, unlockCondition: .gold(1200)),
-        
-        GameCharacter(id: "neonwraith", name: "NEON WRAITH", icon: "port_neonwraith", passiveDesc: "Süre <%10 ise tüm puanlar ×3 olur", activeDesc: "Dolu karenin üzerine blok koyup alttakileri siler", isPremium: true, cost: 3000,
+                      favoriteBlockType: .J, strongMode: "Yüksek Risk, Yüksek Ödül", difficulty: .expert, unlockCondition: .gold(1200)),
+
+        GameCharacter(id: "neonwraith", name: "NEON WRAITH", icon: "port_neonwraith",
+                      passiveDesc: "Süre <%20 iken +2.5 çarpan (Wraith Fury)",
+                      activeDesc: "T1 +15sn, T2 +25sn & satır temizle, T3 sonraki 3 clear +2×",
+                      isPremium: true, cost: 3000,
                       loreTR: "Sokakların hayaleti. Kimse yüzünü görmedi. Sadece hızıyla ve ardında bıraktığı yıkımla bilinir.",
                       loreEN: "Ghost of the streets. Known only for its speed and destruction left behind.",
                       favoriteBlockType: .Z, strongMode: "Panik Kontrolü", difficulty: .expert, unlockCondition: .goldAndLevel(amount: 3000, level: 5)),
-        
-        // Bu karakterler hem Altın hem de belirli bir Seviye gerektirecek şekilde güncellendi
-        GameCharacter(id: "ghost", name: "GHOST", icon: "port_ghost", passiveDesc: "Stealth oyuncusu, gizli hamleler sağlar", activeDesc: "Phantom yerleştirme, görünmez blok", isPremium: true, cost: 2000,
+
+        GameCharacter(id: "ghost", name: "GHOST", icon: "port_ghost",
+                      passiveDesc: "Her 10sn +3sn whisper zaman bonusu",
+                      activeDesc: "Phantom overwrite: T1 yer, T2 +%50 clear, T3 +%100 +10sn",
+                      isPremium: true, cost: 2000,
                       overdriveThresholds: [0.33, 0.66, 1.0],
                       loreTR: "Sistemin arka kapısı. O varken bloklar sessizce kaybolur.",
                       loreEN: "Backdoor of the system. Blocks vanish quietly when it's around.",
                       favoriteBlockType: .single, strongMode: "Gizlilik ve Sabır", difficulty: .expert, unlockCondition: .goldAndLevel(amount: 2000, level: 10)),
-        
-        GameCharacter(id: "alchemist", name: "ALCHEMIST", icon: "port_alchemist", passiveDesc: "Dönüşüm temalı yetenekler", activeDesc: "Blok rengini değiştirir", isPremium: true, cost: 2500,
+
+        GameCharacter(id: "alchemist", name: "ALCHEMIST", icon: "port_alchemist",
+                      passiveDesc: "Tek-renk temizlikte +1.0 çarpan (Resonance)",
+                      activeDesc: "T1 tepsi yenile, T2 tek-renk tepsi, T3 3 hamle ×2 puan",
+                      isPremium: true, cost: 2500,
                       overdriveThresholds: [0.4, 0.7, 1.0],
                       loreTR: "Veri tiplerini altına çevirir. Kuralları esnetir ve yeniden yazar.",
                       loreEN: "Turns data types into gold. Bends and rewrites the rules.",
                       favoriteBlockType: .L, strongMode: "Dönüşüm Zincirleri", difficulty: .advanced, unlockCondition: .goldAndLevel(amount: 2500, level: 15)),
-        
-        GameCharacter(id: "titan", name: "TITAN", icon: "port_titan", passiveDesc: "Dev bloklar ile ağır ve yıkıcı hamleler", activeDesc: "Büyük 4x4 blok yerleştirme", isPremium: true, cost: 4000,
+
+        GameCharacter(id: "titan", name: "TITAN", icon: "port_titan",
+                      passiveDesc: "Heavy hücre temizlikte +0.5× (her heavy başına)",
+                      activeDesc: "T1 dev blok, T2 2× dev +500 overkill, T3 Earthquake +2500",
+                      isPremium: true, cost: 4000,
                       overdriveThresholds: [0.5, 0.8, 1.2],
                       loreTR: "Son teknoloji savaş makinesi modifikasyonu. O düştüğünde grid titrer.",
                       loreEN: "High-tech war machine mod. The grid shakes when it drops.",
@@ -162,22 +185,26 @@ struct StartingPerk: Codable, Identifiable, Hashable {
 }
 
 // MARK: - Synergy System
-enum SynergyEffect: Codable {
-    case tensionThresholdReduce(Int)
-    case overkillConvertsToTime
-    case wideLoadFreeRotate
-    case colorComboMult(Double)
-    case goldOnFlush(Int)
-    case trayRefillChance(Double)
-    case unknown
+/// Sinerji mekaniği `synergyName` karşılaştırması üzerinden çalışıyor; dışarıdan
+/// büyüsel string kullanımını önlemek için tüm isimler `SynergyID` altında
+/// toplandı. Yeni bir sinerji eklendiğinde önce buraya id sabitini ekleyin,
+/// ardından `GameViewModel`'deki tüketim noktalarında `SynergyID.x` kullanın.
+enum SynergyID {
+    static let timeLapse       = "TIME LAPSE"
+    static let undyingRage     = "UNDYING RAGE"
+    static let masterBuilder   = "MASTER BUILDER"
+    static let endlessReserves = "ENDLESS RESERVES"
+    static let rainbowDosage   = "RAINBOW DOSAGE"
+    static let goldenFever     = "GOLDEN FEVER"
+    static let eternalCycle    = "ETERNAL CYCLE"
+    static let staticShock     = "STATIC SHOCK"
 }
 
-struct PerkSynergy: Codable, Identifiable {
+struct PerkSynergy: Codable, Identifiable, Equatable {
     var id: String { requiredPerkIds.joined(separator: "_") }
     let requiredPerkIds: [String]
     let synergyName: String
     let synergyDesc: String
-    let effect: SynergyEffect
 }
 
 // MARK: - Passive Perks (In-Run)

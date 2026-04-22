@@ -9,6 +9,14 @@ struct UpgradesView: View {
     @EnvironmentObject var userEnv: UserEnvironment
     @State private var selectedTab: Int = 0 // 0 = Elmas, 1 = Altın
 
+    /// Slot Hub'dan açıldığında hangi slot için alışveriş yapıldığını
+    /// başlıkta göstermek için tutulur. nil ise "hesap seviyesi" kabul
+    /// edilir (eski erişim yolu). Satın alma hesap-global olduğu için
+    /// aslında yalnızca UI göstergesi.
+    let slotId: Int?
+
+    init(slotId: Int? = nil) { self.slotId = slotId }
+
     var body: some View {
         ZStack {
             ThemeColors.backgroundGradient.ignoresSafeArea()
@@ -30,13 +38,25 @@ struct UpgradesView: View {
                     
                     Spacer()
                     
-                    Text(userEnv.localizedString("MARKET", "UPGRADES"))
-                        .font(.setCustomFont(name: .InterBlack, size: 24))
-                        .foregroundStyle(ThemeColors.electricYellow)
-                        .tracking(2)
-                    
+                    VStack(spacing: 2) {
+                        Text(userEnv.localizedString("MARKET", "UPGRADES"))
+                            .font(.setCustomFont(name: .InterBlack, size: 24))
+                            .foregroundStyle(ThemeColors.electricYellow)
+                            .tracking(2)
+                        if let slotId = slotId {
+                            Text(userEnv.localizedString("SLOT \(slotId)", "SLOT \(slotId)"))
+                                .font(.setCustomFont(name: .InterBold, size: 10))
+                                .tracking(2)
+                                .foregroundStyle(ThemeColors.textMuted)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(ThemeColors.electricYellow.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                    }
+
                     Spacer()
-                    
+
                     Color.clear.frame(width: 44, height: 44)
                 }
                 .padding(.horizontal, 24)

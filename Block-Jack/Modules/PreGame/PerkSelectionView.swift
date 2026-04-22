@@ -139,7 +139,7 @@ struct PerkSelectionView: View {
                        let partnerName = PerkEngine.perkPool.first(where: { $0.id == partnerId })?.name {
                         HStack(spacing: 4) {
                             Image(systemName: "link")
-                            Text("Sinerji: \(partnerName)")
+                            Text(userEnv.localizedString("Sinerji: \(partnerName)", "Synergy: \(partnerName)"))
                         }
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(ThemeColors.neonPurple)

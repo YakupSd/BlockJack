@@ -8,13 +8,19 @@ import SwiftUI
 struct SaveSlotSelectionView: View {
     @EnvironmentObject var userEnv: UserEnvironment
     @StateObject private var saveManager = SaveManager.shared
-    
+
     @State private var showingDeleteAlert = false
     @State private var slotToDelete: Int? = nil
-    
-    // Yönlendirme tipleri (Yeni oyun ise karakter seçimine, devam ise direkt oyuna)
+
+    // Mode geriye uyumluluk için korunuyor ancak yeni Slot Hub akışında
+    // tek bir "BAŞLA" davranışı mevcut: boş slot → ilk kurulum, dolu
+    // slot → Hub. Mode parametresi artık yalnızca başlık rengi/metni
+    // etkiler; eski çağıran yerler kırılmasın diye default'u olan bir
+    // init sunuyoruz.
     enum Mode { case newGame, continueGame }
     let mode: Mode
+
+    init(mode: Mode = .newGame) { self.mode = mode }
     
     var body: some View {
         ZStack {
@@ -37,9 +43,9 @@ struct SaveSlotSelectionView: View {
                     
                     Spacer()
                     
-                    Text(mode == .newGame ? userEnv.localizedString("YENİ OYUN", "NEW GAME") : userEnv.localizedString("KAYITLI OYUN", "CONTINUE"))
+                    Text(userEnv.localizedString("SLOT SEÇ", "SELECT SLOT"))
                         .font(.setCustomFont(name: .InterBlack, size: 20))
-                        .foregroundStyle(mode == .newGame ? ThemeColors.neonCyan : ThemeColors.electricYellow)
+                        .foregroundStyle(ThemeColors.neonCyan)
                         .tracking(2)
                     
                     Spacer()
@@ -106,26 +112,59 @@ struct SaveSlotSelectionView: View {
                 // Details Area
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Slot \(slot.id)")
-                        .font(.setCustomFont(name: .InterBold, size: 14))
+                        .font(.setCustomFont(name: .InterBold, size: 12))
                         .foregroundStyle(ThemeColors.textSecondary)
+                        .tracking(1.5)
                     
                     if slot.isEmpty {
                         Text(userEnv.localizedString("Boş Kayıt", "Empty Slot"))
                             .font(.setCustomFont(name: .InterBold, size: 18))
                             .foregroundStyle(.white)
                     } else {
-                        HStack {
-                            Text("Round \(slot.currentRound)")
+                        // Karakter adı (varsa)
+                        if let characterName = slot.character?.name {
+                            Text(characterName)
                                 .font(.setCustomFont(name: .InterExtraBold, size: 16))
-                                .foregroundStyle(ThemeColors.neonCyan)
-                            
-                            Text("·")
-                                .foregroundStyle(ThemeColors.textMuted)
-                            
-                            Text("\(slot.currentScore) pts")
-                                .font(.setCustomFont(name: .InterBold, size: 16))
-                                .foregroundStyle(ThemeColors.electricYellow)
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
                         }
+
+                        // Bölüm · Tur · Skor — tek satır
+                        HStack(spacing: 6) {
+                            Text(userEnv.localizedString(
+                                "Bölüm \(slot.unlockedWorldLevel)",
+                                "Chapter \(slot.unlockedWorldLevel)"
+                            ))
+                                .font(.setCustomFont(name: .InterBold, size: 12))
+                                .foregroundStyle(ThemeColors.neonPurple)
+
+                            Text("·")
+                                .font(.setCustomFont(name: .InterBold, size: 12))
+                                .foregroundStyle(ThemeColors.textMuted)
+
+                            Text(userEnv.localizedString(
+                                "Tur \(slot.currentRound)",
+                                "Round \(slot.currentRound)"
+                            ))
+                                .font(.setCustomFont(name: .InterBold, size: 12))
+                                .foregroundStyle(ThemeColors.neonCyan)
+                        }
+
+                        // Skor + altın rozetleri
+                        HStack(spacing: 8) {
+                            statBadge(
+                                iconName: "trophy.fill",
+                                value: "\(slot.currentScore)",
+                                color: ThemeColors.electricYellow
+                            )
+                            statBadge(
+                                iconName: "bitcoinsign.circle.fill",
+                                value: "\(slot.gold)",
+                                color: ThemeColors.success
+                            )
+                        }
+                        .padding(.top, 2)
                     }
                 }
                 
@@ -153,9 +192,8 @@ struct SaveSlotSelectionView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(
-                    slot.isEmpty && mode == .newGame ? ThemeColors.neonCyan :
-                    !slot.isEmpty && mode == .continueGame ? ThemeColors.electricYellow :
-                    ThemeColors.gridStroke.opacity(0.3),
+                    slot.isEmpty ? ThemeColors.neonCyan.opacity(0.45)
+                                 : ThemeColors.electricYellow.opacity(0.55),
                     lineWidth: 1
                 )
         )
@@ -164,27 +202,41 @@ struct SaveSlotSelectionView: View {
         .buttonStyle(.plain)
     }
     
+    // MARK: - Stat Badge
+
+    @ViewBuilder
+    private func statBadge(iconName: String, value: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: iconName)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(color)
+            Text(value)
+                .font(.setCustomFont(name: .InterBold, size: 11))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(color.opacity(0.12))
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(color.opacity(0.35), lineWidth: 0.8))
+    }
+
     // MARK: - Actions
     
     private func handleSlotTap(_ slot: SaveSlot) {
         HapticManager.shared.play(.buttonTap)
-        
-        // Slot verilerini UserEnvironment'a yükle (Geliştirmeler ve İlerleme)
-        if !slot.isEmpty {
-            userEnv.loadFromSlot(slot)
-        }
-        
-        if mode == .newGame {
-            guard slot.isEmpty else {
-                slotToDelete = slot.id
-                showingDeleteAlert = true
-                return
-            }
-            MainViewsRouter.shared.pushToCharacterSelection(slotId: slot.id)
+
+        // Yeni Slot Hub akışı:
+        //  - Boş slot → ilk kurulum: Karakter seç → Perk seç → Map
+        //  - Dolu slot → Hub ekranı (devam etme / market / karakter / galeri)
+        // Not: loadFromSlot Hub içinde tekrar çağrılıyor, ama burada da
+        // çağırıyoruz ki Hub açılmadan önce userEnv.gold gibi bağlamlar
+        // güncel olsun (Hub'ın background/header okuduğu değerler için).
+        if slot.isEmpty {
+            MainViewsRouter.shared.pushToCharacterSelection(slotId: slot.id, mode: .firstSetup)
         } else {
-            guard !slot.isEmpty else { return }
-            // Kayıtlı oyunda direkt Dünya Haritasına (Campaign) gidilir
-            MainViewsRouter.shared.pushToWorldMap(slotId: slot.id)
+            userEnv.loadFromSlot(slot)
+            MainViewsRouter.shared.pushToSlotHub(slotId: slot.id)
         }
     }
 }

@@ -1,6 +1,12 @@
 //
-//  RestView.swift
+//  RestSiteView.swift
 //  Block-Jack
+//
+//  Dinlenme node overlay'ı. Can onarımı veya altın seçimi.
+//  Safe House perk'i varsa otomatik +100 altın ve kullanıcıya görsel bildirim.
+//
+//  Layout: AdaptiveOverlay kullanılıyor → SE gibi küçük ekranlarda ScrollView
+//  içinde gezinir, başlık/metin minimumScaleFactor ile kırpılmadan sığar.
 //
 
 import SwiftUI
@@ -8,97 +14,85 @@ import SwiftUI
 struct RestSiteView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var userEnv: UserEnvironment
-    
+
     let slotId: Int
     @State private var hasActed = false
     @State private var showMessage = false
     @State private var message = ""
-    
-    // Check if player has Safe House perk
-    var hasSafeHouse: Bool {
-        guard let slot = SaveManager.shared.slots.first(where: { $0.id == slotId }) else { return false }
+    @State private var safeHouseToastVisible = false
+
+    /// Oyuncu "safe_house" perkine sahip mi?
+    private var hasSafeHouse: Bool {
+        guard let slot = SaveManager.shared.slots.first(where: { $0.id == slotId }) else {
+            return false
+        }
         return slot.activePassivePerks.contains { $0.id == "safe_house" }
     }
-    
+
     var body: some View {
         ZStack {
-            // Background Image
+            backgroundLayer
+
+            AdaptiveOverlay(
+                header: {
+                    OverlayTitleBlock(
+                        "GÜVENLİ BÖLGE",
+                        subtitle: "Sistemlerini optimize et ve dinlen.",
+                        color: ThemeColors.neonCyan
+                    )
+                },
+                content: {
+                    if showMessage {
+                        messageCard
+                            .transition(.scale.combined(with: .opacity))
+                    } else {
+                        actionButtons
+                    }
+                },
+                footer: {
+                    Button(action: { dismiss() }) {
+                        Text(hasActed ? "AYRIL" : "ŞİMDİLİK DEĞİL")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.white.opacity(0.1))
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+            )
+
+            safeHouseToast
+                .animation(.spring(duration: 0.35), value: safeHouseToastVisible)
+        }
+        .onAppear { checkSafeHouseBonus() }
+    }
+
+    // MARK: - Background
+
+    private var backgroundLayer: some View {
+        ZStack {
             Image("cyber_rest_station")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .ignoresSafeArea()
-            
-            Color.black.opacity(0.7).ignoresSafeArea()
-            
-            // Neon Glow
+
+            Color.black.opacity(0.72).ignoresSafeArea()
+
             RadialGradient(
-                colors: [ThemeColors.neonCyan.opacity(0.2), .clear],
+                colors: [ThemeColors.neonCyan.opacity(0.22), .clear],
                 center: .center,
                 startRadius: 0,
                 endRadius: 600
-            ).ignoresSafeArea()
-            
-            VStack(spacing: 30) {
-                // Header
-                VStack(spacing: 8) {
-                    Text("GÜVENLİ BÖLGE")
-                        .font(.custom("Outfit-Bold", size: 36, relativeTo: .largeTitle))
-                        .foregroundColor(ThemeColors.neonCyan)
-                        .shadow(color: ThemeColors.neonCyan, radius: 10)
-                    
-                    Text("Sistemlerini optimize et ve dinlen.")
-                        .font(.headline)
-                        .foregroundColor(.white.opacity(0.7))
-                }
-                .padding(.top, 40)
-                
-                Spacer()
-                
-                if showMessage {
-                    VStack(spacing: 16) {
-                        Image(systemName: "checkmark.shield.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(ThemeColors.success)
-                        
-                        Text(message)
-                            .font(.title3)
-                            .bold()
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
-                            .padding()
-                            .background(ThemeColors.success.opacity(0.1))
-                            .cornerRadius(12)
-                    }
-                    .transition(.scale.combined(with: .opacity))
-                } else {
-                    actionButtons
-                }
-                
-                Spacer()
-                
-                // Footer
-                Button(action: {
-                    dismiss()
-                }) {
-                    Text(hasActed ? "AYRIL" : "ŞİMDİLİK DEĞİL")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.white.opacity(0.1))
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                }
-                .padding()
-            }
-        }
-        .onAppear {
-            checkSafeHouseBonus()
+            )
+            .ignoresSafeArea()
         }
     }
-    
+
+    // MARK: - Seçim kartları
+
     private var actionButtons: some View {
-        VStack(spacing: 20) {
-            // 1. Repair Systems (Heal)
+        VStack(spacing: 16) {
             restButton(
                 title: "SİSTEM ONARIMI",
                 icon: "heart.fill",
@@ -108,8 +102,7 @@ struct RestSiteView: View {
                 SaveManager.shared.updateLives(slotId: slotId, amount: 1)
                 completeAction("Sistemler onarıldı. +1 Can eklendi.")
             }
-            
-            // 2. Scavenge (Gold)
+
             restButton(
                 title: "VERİ MADENCİLİĞİ",
                 icon: "cpu.fill",
@@ -120,52 +113,132 @@ struct RestSiteView: View {
                 completeAction("Veriler toplandı. +50 Altın kazanıldı.")
             }
         }
-        .padding(.horizontal)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
     }
-    
+
     @ViewBuilder
-    private func restButton(title: String, icon: String, desc: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func restButton(
+        title: String,
+        icon: String,
+        desc: String,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            HStack(spacing: 20) {
+            HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .font(.title)
+                    .font(.title2)
                     .foregroundColor(color)
-                    .frame(width: 60, height: 60)
-                    .background(color.opacity(0.1))
+                    .frame(width: 48, height: 48)
+                    .background(color.opacity(0.12))
                     .clipShape(Circle())
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.custom("Outfit-Bold", size: 18))
+                        .font(.custom("Outfit-Bold", size: 16))
                         .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     Text(desc)
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                
-                Spacer()
-                
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 Image(systemName: "chevron.right")
-                    .foregroundColor(.white.opacity(0.3))
+                    .font(.footnote)
+                    .foregroundColor(.white.opacity(0.4))
             }
-            .padding()
-            .background(Color.white.opacity(0.05))
-            .cornerRadius(16)
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(color.opacity(0.3), lineWidth: 1))
+            .padding(12)
+            .frame(maxWidth: .infinity)
+            .background(Color.white.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(color.opacity(0.35), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Onay mesajı
+
+    private var messageCard: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "checkmark.shield.fill")
+                .font(.system(size: 52))
+                .foregroundColor(ThemeColors.success)
+                .shadow(color: ThemeColors.success.opacity(0.8), radius: 8)
+
+            Text(message)
+                .font(.title3.weight(.semibold))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(ThemeColors.success.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+    }
+
+    // MARK: - Safe House bildirimi
+
+    private var safeHouseToast: some View {
+        VStack {
+            if safeHouseToastVisible {
+                HStack(spacing: 10) {
+                    Image(systemName: "shield.lefthalf.filled")
+                        .foregroundColor(ThemeColors.electricYellow)
+                    Text(userEnv.localizedString("SAFE HOUSE bonusu: +100 Altın", "SAFE HOUSE bonus: +100 Gold"))
+                        .font(.footnote.weight(.bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.black.opacity(0.8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(ThemeColors.electricYellow.opacity(0.6), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.top, 70)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            Spacer()
         }
     }
-    
+
+    // MARK: - Safe House bonusu
+
     private func checkSafeHouseBonus() {
-        if hasSafeHouse {
-            let bonusGold = 100 // Safe House Perk gives 100 gold in rest areas
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                HapticManager.shared.play(.success)
-                SaveManager.shared.updateGold(slotId: slotId, amount: bonusGold)
-                // We could show a specific toast or just add it.
+        guard hasSafeHouse else { return }
+        // Gecikmeli olarak uygula, kullanıcı ekranı tanısın
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            HapticManager.shared.play(.success)
+            SaveManager.shared.updateGold(slotId: slotId, amount: 100)
+            withAnimation { safeHouseToastVisible = true }
+
+            // 2.2s sonra toast'u kapat
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                withAnimation { safeHouseToastVisible = false }
             }
         }
     }
-    
+
+    // MARK: - Helpers
+
     private func completeAction(_ msg: String) {
         HapticManager.shared.play(.success)
         withAnimation(.spring()) {

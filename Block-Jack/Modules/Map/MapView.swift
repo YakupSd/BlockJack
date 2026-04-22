@@ -82,15 +82,22 @@ struct MapView: View {
                 Spacer()
                 HStack {
                     Button(action: {
-                        viewModel.saveAndReturnToDashboard()
-                        MainViewsRouter.shared.popToDashboard()
+                        viewModel.handleExitPressed()
                     }) {
                         HStack {
-                            Image(systemName: "chevron.left")
-                            Text("ANA MENÜ")
+                            Image(systemName: viewModel.isChapterCleared ? "map.fill" : "chevron.left")
+                            Text(
+                                viewModel.isChapterCleared
+                                ? userEnv.localizedString("DÜNYA HARİTASI", "WORLD MAP")
+                                : userEnv.localizedString("ANA MENÜ", "MAIN MENU")
+                            )
                         }
                         .font(.setCustomFont(name: .ManropeBold, size: 14))
-                        .foregroundColor(ThemeColors.luminescentPrimary)
+                        .foregroundColor(
+                            viewModel.isChapterCleared
+                            ? ThemeColors.electricYellow
+                            : ThemeColors.luminescentPrimary
+                        )
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(ThemeColors.surfaceContainerLowest)
@@ -115,11 +122,11 @@ struct MapView: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("GÖREV SEKTÖRÜ")
+                    Text(userEnv.localizedString("GÖREV SEKTÖRÜ", "MISSION SECTOR"))
                         .font(.luminescentHeader(size: 10))
                         .luminescentTracking()
                         .foregroundStyle(ThemeColors.luminescentPrimary)
-                    Text("BÖLÜM \(viewModel.currentMap.chapterIndex)")
+                    Text(userEnv.localizedString("BÖLÜM \(viewModel.currentMap.chapterIndex)", "CHAPTER \(viewModel.currentMap.chapterIndex)"))
                         .font(.luminescentHeader(size: 22))
                         .foregroundStyle(Color.black.opacity(0.8))
                 }
@@ -233,12 +240,18 @@ struct MapView: View {
                         Text(titleForNodeType(node.type))
                             .font(.setCustomFont(name: .ManropeExtraBold, size: 18))
                             .foregroundColor(Color.black.opacity(0.8))
-                        
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+
                         Text(descForNodeType(node.type))
                             .font(.setCustomFont(name: .InterRegular, size: 14))
                             .foregroundColor(Color.black.opacity(0.5))
+                            .lineLimit(3)
+                            .minimumScaleFactor(0.85)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 
                 Button(action: {

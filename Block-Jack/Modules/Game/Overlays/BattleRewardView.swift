@@ -2,17 +2,21 @@
 //  BattleRewardView.swift
 //  Block-Jack
 //
+//  Tur sonu ödül ekranı. 2-3 kart arasından seç.
+//  Layout AdaptiveOverlay ile SE/14 dahil tüm boyutlara uyumlu.
+//
 
 import SwiftUI
 
 struct BattleRewardView: View {
     let slotId: Int
     let onClaim: () -> Void
-    
+
+    @EnvironmentObject var userEnv: UserEnvironment
     @State private var rewards: [RewardOption] = []
     @State private var selectedIndex: Int? = nil
     @State private var hasClaimed = false
-    
+
     struct RewardOption: Identifiable {
         let id = UUID()
         let title: String
@@ -21,71 +25,76 @@ struct BattleRewardView: View {
         let color: Color
         let action: (Int) -> Void
     }
-    
+
     var body: some View {
         ZStack {
             Rectangle()
                 .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
-            
-            VStack(spacing: 30) {
-                VStack(spacing: 8) {
-                    Text("TUR TAMAMLANDI!")
-                        .font(.custom("Outfit-Bold", size: 36, relativeTo: .largeTitle))
-                        .foregroundColor(ThemeColors.electricYellow)
-                    
-                    Text("Ganimeti topla ve güçlen.")
-                        .font(.headline)
-                        .foregroundColor(.white.opacity(0.8))
-                }
-                .padding(.top, 40)
-                
-                Spacer()
-                
-                if rewards.isEmpty {
-                    ProgressView()
-                } else {
-                    VStack(spacing: 16) {
-                        ForEach(0..<rewards.count, id: \.self) { index in
-                            RewardCard(
-                                reward: rewards[index],
-                                isSelected: selectedIndex == index,
-                                disabled: hasClaimed
-                            ) {
-                                selectedIndex = index
-                                claimReward(rewards[index])
-                            }
+
+            AdaptiveOverlay(
+                header: {
+                    OverlayTitleBlock(
+                        userEnv.localizedString("TUR TAMAMLANDI!", "ROUND COMPLETE!"),
+                        subtitle: userEnv.localizedString("Ganimeti topla ve güçlen.", "Claim your loot and power up."),
+                        color: ThemeColors.electricYellow
+                    )
+                },
+                content: {
+                    if rewards.isEmpty {
+                        ProgressView()
+                            .tint(ThemeColors.electricYellow)
+                            .padding(.vertical, 30)
+                    } else {
+                        rewardList
+                    }
+                },
+                footer: {
+                    if hasClaimed {
+                        Button(action: onClaim) {
+                            Text(userEnv.localizedString("DEVAM ET", "CONTINUE"))
+                                .font(.custom("Outfit-Bold", size: 18))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(ThemeColors.electricYellow)
+                                .foregroundColor(.black)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
+                        .buttonStyle(.plain)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else {
+                        // Footer slot'u boş ama yer tutsun — layout sıçramasın
+                        Color.clear.frame(height: 44)
                     }
-                    .padding(.horizontal)
                 }
-                
-                Spacer()
-                
-                if hasClaimed {
-                    Button(action: onClaim) {
-                        Text("DEVAM ET")
-                            .font(.custom("Outfit-Bold", size: 20))
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(ThemeColors.electricYellow)
-                            .foregroundColor(.black)
-                            .cornerRadius(12)
-                    }
-                    .padding()
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            )
+        }
+        .onAppear { generateRewards() }
+    }
+
+    // MARK: - Ödül listesi
+
+    private var rewardList: some View {
+        VStack(spacing: 14) {
+            ForEach(Array(rewards.enumerated()), id: \.element.id) { index, reward in
+                RewardCard(
+                    reward: reward,
+                    isSelected: selectedIndex == index,
+                    disabled: hasClaimed
+                ) {
+                    selectedIndex = index
+                    claimReward(reward)
                 }
             }
         }
-        .onAppear {
-            generateRewards()
-        }
+        .padding(.horizontal, 20)
     }
-    
+
+    // MARK: - Ödül üretimi
+
     private func generateRewards() {
         var options: [RewardOption] = []
-        
-        // 1. Gold Reward
+
         let goldAmount = Int.random(in: 100...250)
         options.append(RewardOption(
             title: "Veri Önbelleği",
@@ -96,8 +105,7 @@ struct BattleRewardView: View {
                 SaveManager.shared.updateGold(slotId: id, amount: goldAmount)
             }
         ))
-        
-        // 2. Consumable Reward
+
         if let randomPotion = ConsumableItem.shopPool.randomElement() {
             options.append(RewardOption(
                 title: randomPotion.name,
@@ -109,8 +117,7 @@ struct BattleRewardView: View {
                 }
             ))
         }
-        
-        // 3. Random Weak Perk or Life
+
         let rand = Double.random(in: 0...1)
         if rand < 0.3 {
             options.append(RewardOption(
@@ -123,16 +130,17 @@ struct BattleRewardView: View {
                 }
             ))
         } else {
-            // Random perk pick
             if let perk = PerkEngine.perkPool.randomElement() {
                 let slot = SaveManager.shared.slots.first(where: { $0.id == slotId })
                 let isOwned = slot?.activePassivePerks.contains { $0.id == perk.id } ?? false
                 let tier = slot?.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 1
-                
+
                 options.append(RewardOption(
                     title: isOwned ? "LEVEL UP: \(perk.name)" : perk.name,
                     icon: perk.icon,
-                    desc: isOwned ? "Mevcut perki L\(tier + 1) seviyesine yükselt." : "YENİ PERK: \(perk.desc)",
+                    desc: isOwned
+                        ? "Mevcut perki L\(tier + 1) seviyesine yükselt."
+                        : "YENİ PERK: \(perk.desc)",
                     color: isOwned ? ThemeColors.neonCyan : ThemeColors.neonPurple,
                     action: { id in
                         SaveManager.shared.addPassivePerk(slotId: id, perk: perk)
@@ -140,60 +148,69 @@ struct BattleRewardView: View {
                 ))
             }
         }
-        
+
         self.rewards = options.shuffled()
     }
-    
+
     private func claimReward(_ reward: RewardOption) {
         reward.action(slotId)
-        withAnimation(.spring()) {
-            hasClaimed = true
-        }
+        withAnimation(.spring()) { hasClaimed = true }
         HapticManager.shared.play(.success)
     }
 }
+
+// MARK: - Reward Card
 
 struct RewardCard: View {
     let reward: BattleRewardView.RewardOption
     let isSelected: Bool
     let disabled: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 20) {
+            HStack(spacing: 16) {
                 Text(reward.icon)
-                    .font(.system(size: 40))
-                    .frame(width: 80, height: 80)
-                    .background(reward.color.opacity(0.1))
-                    .cornerRadius(15)
-                
+                    .font(.system(size: 36))
+                    .frame(width: 68, height: 68)
+                    .background(reward.color.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(reward.title)
-                        .font(.custom("Outfit-Bold", size: 20))
+                        .font(.custom("Outfit-Bold", size: 17))
                         .foregroundColor(.white)
-                    Text(reward.desc)
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.6))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
                         .multilineTextAlignment(.leading)
+                    Text(reward.desc)
+                        .font(.footnote)
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.85)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                
-                Spacer()
-                
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(reward.color)
-                        .font(.title)
+                        .font(.title2)
                 }
             }
-            .padding()
+            .padding(14)
             .background(isSelected ? reward.color.opacity(0.15) : Color.white.opacity(0.05))
-            .cornerRadius(20)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(isSelected ? reward.color : Color.white.opacity(0.1), lineWidth: 2)
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(
+                        isSelected ? reward.color : Color.white.opacity(0.1),
+                        lineWidth: 2
+                    )
             )
         }
         .disabled(disabled)
+        .buttonStyle(.plain)
     }
 }

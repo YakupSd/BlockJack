@@ -101,79 +101,92 @@ struct EnemyAttackWarningOverlay: View {
     }
 }
 
-// MARK: - Düşman HUD (Oyun sırasında alt köşede gösterilir)
-
+// MARK: - Düşman HUD (UI Revize — Kompakt 44pt banner)
+/// Tek yatay satır, maksimum 44pt yükseklik.
+/// Layout: [icon]  Düşman: <isim> — <açıklama>                 DÜŞMAN
 struct EnemyHUDView: View {
     @ObservedObject var vm: GameViewModel
+    @EnvironmentObject var userEnv: UserEnvironment
     @State private var pulseIcon: Bool = false
     
     var body: some View {
         guard let attack = vm.enemy.currentAttack else { return AnyView(EmptyView()) }
         
+        let borderColor: Color = vm.enemy.isTrayLocked
+            ? ThemeColors.electricYellow.opacity(0.6)
+            : ThemeColors.danger.opacity(0.35)
+        
         return AnyView(
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 // Düşman ikonu
                 ZStack {
                     Circle()
-                        .fill(attack.warningColor.opacity(0.2))
-                        .frame(width: 36, height: 36)
-                        .overlay(Circle().stroke(attack.warningColor.opacity(0.4), lineWidth: 1))
-                        .scaleEffect(pulseIcon ? 1.1 : 1.0)
+                        .fill(attack.warningColor.opacity(0.18))
+                        .frame(width: 28, height: 28)
+                        .overlay(Circle().stroke(attack.warningColor.opacity(0.5), lineWidth: 1))
+                        .scaleEffect(pulseIcon ? 1.08 : 1.0)
                     
                     Text(attack.icon)
-                        .font(.system(size: 18))
+                        .font(.system(size: 15))
                 }
                 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("DÜŞMAN: " + attack.name)
-                        .font(.setCustomFont(name: .InterBlack, size: 9))
-                        .foregroundStyle(attack.warningColor)
-                        .tracking(1)
+                    Text(userEnv.localizedString("Düşman: ", "Enemy: ") + attack.name)
+                        .font(.setCustomFont(name: .InterBlack, size: 10))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
                     
-                    // Kilit süre göstergesi (sadece lockdown için)
                     if vm.enemy.isTrayLocked {
                         HStack(spacing: 4) {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 8))
                                 .foregroundStyle(ThemeColors.electricYellow)
-                            Text("KİLİT: \(Int(vm.enemy.trayLockRemainingTime))sn")
+                            Text(userEnv.localizedString("Kilit: \(Int(vm.enemy.trayLockRemainingTime))sn",
+                                                        "Lock: \(Int(vm.enemy.trayLockRemainingTime))s"))
                                 .font(.setCustomFont(name: .InterBold, size: 9))
                                 .foregroundStyle(ThemeColors.electricYellow)
                         }
                     } else {
                         Text(attack.description)
-                            .font(.setCustomFont(name: .InterMedium, size: 8))
+                            .font(.setCustomFont(name: .InterMedium, size: 9))
                             .foregroundStyle(ThemeColors.textMuted)
                             .lineLimit(1)
                     }
                 }
                 
-                Spacer()
+                Spacer(minLength: 4)
+                
+                // Sağ: DÜŞMAN etiketi
+                Text(userEnv.localizedString("DÜŞMAN", "ENEMY"))
+                    .font(.setCustomFont(name: .InterBlack, size: 9))
+                    .foregroundStyle(attack.warningColor)
+                    .tracking(2)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule().fill(attack.warningColor.opacity(0.12))
+                    )
+                    .overlay(
+                        Capsule().stroke(attack.warningColor.opacity(0.4), lineWidth: 1)
+                    )
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .frame(height: GameLayout.enemyBannerHeight)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(ThemeColors.surfaceDark.opacity(0.9))
+                    .fill(ThemeColors.enemyBg)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(
-                                vm.enemy.isTrayLocked
-                                    ? ThemeColors.electricYellow.opacity(0.6)
-                                    : attack.warningColor.opacity(0.25),
-                                lineWidth: 1
-                            )
+                            .stroke(borderColor, lineWidth: 1)
                     )
             )
-            // Kilit varken sarı titreşim
-            .shadow(color: vm.enemy.isTrayLocked ? ThemeColors.electricYellow.opacity(0.4) : .clear, radius: 6)
+            .shadow(color: vm.enemy.isTrayLocked ? ThemeColors.electricYellow.opacity(0.35) : .clear, radius: 6)
             .onAppear {
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                     pulseIcon = true
                 }
             }
             .onChange(of: vm.enemy.currentAttack?.rawValue) { _ in
-                // Yeni atak türü: icon nabzı yeniden başlat
                 pulseIcon = false
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                     pulseIcon = true

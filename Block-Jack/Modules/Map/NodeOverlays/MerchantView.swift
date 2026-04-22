@@ -49,11 +49,14 @@ struct MerchantView: View {
                             
                             // Dialogue Bubble
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("TÜCCAR KAIRO")
+                                Text(userEnv.localizedString("TÜCCAR KAIRO", "MERCHANT KAIRO"))
                                     .font(.custom("Outfit-Bold", size: 14))
                                     .foregroundColor(ThemeColors.electricYellow)
                                 
-                                Text("\"Veri akışında nadir parçalar keşfettim. Elindeki altınlar burada değerli.\"")
+                                Text(userEnv.localizedString(
+                                    "\"Veri akışında nadir parçalar keşfettim. Elindeki altınlar burada değerli.\"",
+                                    "\"I've scavenged rare data fragments. Your gold buys well here.\""
+                                ))
                                     .font(.custom("Outfit-Medium", size: 14))
                                     .foregroundColor(.white)
                                     .padding(12)
@@ -85,10 +88,13 @@ struct MerchantView: View {
     private var merchantHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("TÜCCAR")
+                Text(userEnv.localizedString("TÜCCAR", "MERCHANT"))
                     .font(.custom("Outfit-Bold", size: 32, relativeTo: .largeTitle))
                     .foregroundColor(ThemeColors.electricYellow)
-                Text("\"Karanlıkta parlayan her şey altın değildir... ama bunlar öyle.\"")
+                Text(userEnv.localizedString(
+                    "\"Karanlıkta parlayan her şey altın değildir... ama bunlar öyle.\"",
+                    "\"Not all that glitters in the dark is gold... but these are.\""
+                ))
                     .font(.caption)
                     .italic()
                     .foregroundColor(ThemeColors.textSecondary)
@@ -114,7 +120,7 @@ struct MerchantView: View {
     
     private var shopSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("TEKLİFLER")
+            Text(userEnv.localizedString("TEKLİFLER", "OFFERS"))
                 .font(.headline)
                 .foregroundColor(ThemeColors.textSecondary)
                 .padding(.horizontal)
@@ -137,18 +143,21 @@ struct MerchantView: View {
     private var forgeSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("PERK DEMİRCİSİ")
+                Text(userEnv.localizedString("PERK DEMİRCİSİ", "PERK FORGE"))
                     .font(.headline)
                     .foregroundColor(ThemeColors.textSecondary)
                 Spacer()
-                Text("2 Seç: 1 Yeni")
+                Text(userEnv.localizedString("2 Seç: 1 Yeni", "Pick 2: Get 1"))
                     .font(.caption)
                     .foregroundColor(ThemeColors.neonPurple)
             }
             .padding(.horizontal)
             
             VStack(spacing: 20) {
-                Text("İki perk'i feda ederek çok daha güçlü veya rastgele bir perk elde et.")
+                Text(userEnv.localizedString(
+                    "İki perk'i feda ederek çok daha güçlü veya rastgele bir perk elde et.",
+                    "Sacrifice two perks to forge a stronger or random new one."
+                ))
                     .font(.caption)
                     .foregroundColor(ThemeColors.textMuted)
                     .multilineTextAlignment(.center)
@@ -178,7 +187,7 @@ struct MerchantView: View {
                 }) {
                     HStack {
                         Image(systemName: "hammer.fill")
-                        Text("BİRLEŞTİR (FORGE)")
+                        Text(userEnv.localizedString("BİRLEŞTİR (FORGE)", "FORGE"))
                             .bold()
                     }
                     .frame(maxWidth: .infinity)
@@ -259,7 +268,7 @@ struct MerchantItemView: View {
                     
                     if item.isSold {
                         Color.black.opacity(0.6).cornerRadius(15)
-                        Text("SATILDI")
+                        Text(userEnv.localizedString("SATILDI", "SOLD"))
                             .font(.caption2)
                             .bold()
                             .foregroundColor(.white)
@@ -268,7 +277,7 @@ struct MerchantItemView: View {
                 }
                 
                 VStack(spacing: 4) {
-                    Text(item.perk?.name ?? (item.consumableType == .lifeRestoration ? "Yaşam İksiri" : "Bilinmeyen"))
+                    Text(item.perk?.name ?? (item.consumableType == .lifeRestoration ? userEnv.localizedString("Yaşam İksiri", "Life Potion") : userEnv.localizedString("Bilinmeyen", "Unknown")))
                         .font(.subheadline)
                         .bold()
                         .foregroundColor(.white)

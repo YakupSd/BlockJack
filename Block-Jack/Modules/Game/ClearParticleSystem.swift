@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-import Combine
+import Combine // ObservableObject default ObjectWillChangePublisher için
 
 // MARK: - Partikül Modeli
 
@@ -29,30 +29,31 @@ enum BurstType {
     case overdriveBoom             // Architect 3x3 → kırmızı-turuncu şok dalgası
 }
 
-// MARK: - ParticleManager (ObservableObject + CADisplayLink benzeri timer)
+// MARK: - ParticleManager
+//
+// Performans notu:
+// Eskiden Timer.publish her 1/60 saniyede `@Published particles`'i güncelliyordu.
+// Bu SwiftUI tarafında **her frame her observer view'ı invalidate** ediyordu
+// (battle screen tüm HUD'ları yeniden çiziyordu). Artık:
+//   • `particles` @Published DEĞİL — sadece model state
+//   • Tick, view'a bağlı TimelineView üzerinden çalışır (sadece Canvas redraw eder)
+//   • Emit/clear zamanı manuel objectWillChange — nadir publish
+// Sonuç: partikül efektleri aktifken bile oyun kasma yapmaz.
 
 final class ClearParticleManager: ObservableObject {
-    @Published var particles: [ClearParticle] = []
+    // ÖNEMLİ: @Published DEĞİL — bkz. yukarıdaki not.
+    var particles: [ClearParticle] = []
     
-    private var tickTimer: AnyCancellable?
-    
-    init() {
-        // 60fps tick — yalnızca partiküller varken çalışır
-        tickTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.tick()
-            }
-    }
-    
-    private func tick() {
+    /// Bir partikül adımı hesaplar. TimelineView'in her schedule'ında çağrılır,
+    /// view invalidate tetiklemez (SwiftUI TimelineView zaten kendi redraw'ını yapar).
+    func advance() {
         guard !particles.isEmpty else { return }
         particles = particles.compactMap { p in
             var p = p
             p.x  += p.vx
             p.y  += p.vy
             p.vy += p.gravity
-            p.vx *= 0.97        // havası direnci
+            p.vx *= 0.97        // hava direnci
             p.alpha -= p.decay
             return p.alpha > 0 ? p : nil
         }
@@ -139,7 +140,7 @@ final class ClearParticleManager: ObservableObject {
         var newParticles: [ClearParticle] = []
         let boomColors: [Color] = [ThemeColors.neonPink, ThemeColors.neonOrange, .white, ThemeColors.electricYellow]
         
-        for i in 0..<80 {
+        for _ in 0..<80 {
             let angle = Double.random(in: 0...(2 * .pi))
             let speed = CGFloat.random(in: 4.0...16.0)
             let col = boomColors.randomElement()!
@@ -166,21 +167,30 @@ final class ClearParticleManager: ObservableObject {
 }
 
 // MARK: - Canvas Overlay View
+//
+// TimelineView(.animation) SwiftUI'nin render loop'una bağlanır (vsync'e yakın)
+// ve Canvas'ı her frame redraw eder — ama bu redraw sadece Canvas context'ini
+// etkiler, hiçbir observer view invalidate olmaz. ClearParticleManager
+// observer olarak view ağacına dokunmaz, sadece emit/clear'da objectWillChange
+// tetikleyebilir (nadir).
 
 struct ClearParticleOverlayView: View {
     @ObservedObject var manager: ClearParticleManager
     
     var body: some View {
-        Canvas { ctx, size in
-            for p in manager.particles {
-                ctx.opacity = p.alpha
-                let rect = CGRect(
-                    x: p.x - p.radius,
-                    y: p.y - p.radius,
-                    width: p.radius * 2,
-                    height: p.radius * 2
-                )
-                ctx.fill(Circle().path(in: rect), with: .color(p.color))
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: false)) { _ in
+            Canvas { ctx, size in
+                manager.advance()
+                for p in manager.particles {
+                    ctx.opacity = p.alpha
+                    let rect = CGRect(
+                        x: p.x - p.radius,
+                        y: p.y - p.radius,
+                        width: p.radius * 2,
+                        height: p.radius * 2
+                    )
+                    ctx.fill(Circle().path(in: rect), with: .color(p.color))
+                }
             }
         }
         .allowsHitTesting(false)

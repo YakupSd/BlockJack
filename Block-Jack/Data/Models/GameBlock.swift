@@ -43,23 +43,25 @@ enum BlockAbility: String, Codable, Equatable {
 
 // MARK: - Block Type
 enum BlockType: String, CaseIterable, Codable {
-    case I, L, J, O, T, S, Z       // Standart
-    case lMirror = "L_MIRROR"
+    case I, L, J, O, T, S, Z       // Standart tetromino'lar
     case single = "1x1"            // Nadir kurtarıcı
-    case hollow = "HOLLOW"         // 3x3 ortası boş
-    case chain = "CHAIN"           // Diğer chain ile yapışır
+    case chain = "CHAIN"           // 1x2 domino — eşlenebilir
     case plus = "PLUS"             // 3x3 +
     case uShape = "U_SHAPE"        // 3x2 U
     case stair = "STAIR"           // 3x2 basamak
-    case star5 = "STAR5"           // 3x3 X shape
+    // Yeni eklenen şekiller (Nisan 2026 revizesi):
+    case duo = "DUO"               // 1x3 düz üçlü — basit yardımcı
+    case smallL = "SMALL_L"        // 2x2 L — mini köşe
+    case bigI = "BIG_I"            // 1x5 uzun sıra — nadir kurtarıcı
+    case triangle = "TRIANGLE"     // 3x3 üçgen (hipotenüs)
+    case diagonal = "DIAGONAL"     // 2x2 çapraz — zorlayıcı, nadir
 
     var rarity: BlockRarity {
         switch self {
-        case .single:              return .rare
-        case .I, .O:               return .common
-        case .L, .J, .lMirror, .T: return .uncommon
-        case .S, .Z, .chain, .plus, .uShape, .stair: return .uncommon
-        case .hollow, .star5:              return .rare
+        case .I, .O, .duo, .smallL:                         return .common
+        case .L, .J, .T, .S, .Z,
+             .chain, .plus, .uShape, .stair, .triangle:     return .uncommon
+        case .single, .bigI, .diagonal:                     return .rare
         }
     }
     
@@ -91,11 +93,11 @@ struct GameBlock: Identifiable, Equatable, Codable {
     var pairedBlockId: UUID? = nil
     var rotationSteps: Int = 0 // 0: 0°, 1: 90°, 2: 180°, 3: 270°
     
-    var isSpecial: Bool { ability != .normal || type == .chain || type == .hollow }
+    var isSpecial: Bool { ability != .normal || type == .chain }
     
     var isRotatable: Bool {
         switch type {
-        case .O, .single, .plus, .star5, .hollow: return false
+        case .O, .single, .plus, .diagonal: return false
         default: return true
         }
     }
@@ -186,18 +188,8 @@ struct GameBlock: Identifiable, Equatable, Codable {
             [true,  true, false],
             [false, true, true]
         ],
-        .lMirror: [
-            [false, true],
-            [false, true],
-            [true,  true]
-        ],
         .single: [
             [true]
-        ],
-        .hollow: [
-            [true, true, true],
-            [true, false, true],
-            [true, true, true]
         ],
         .chain: [
             [true, true]
@@ -216,10 +208,25 @@ struct GameBlock: Identifiable, Equatable, Codable {
             [true,  true],
             [false, true]
         ],
-        .star5: [
-            [true,  false, true],
-            [false, true,  false],
-            [true,  false, true]
+        // --- Yeni şekiller (Nisan 2026) ---
+        .duo: [
+            [true, true, true]
+        ],
+        .smallL: [
+            [true, false],
+            [true, true]
+        ],
+        .bigI: [
+            [true, true, true, true, true]
+        ],
+        .triangle: [
+            [true,  false, false],
+            [true,  true,  false],
+            [true,  true,  true]
+        ],
+        .diagonal: [
+            [true,  false],
+            [false, true]
         ]
     ]
 

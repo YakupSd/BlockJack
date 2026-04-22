@@ -219,6 +219,51 @@ class UserEnvironment: ObservableObject {
         }
     }
 
+    // MARK: - Phase 8: Retention (Daily Reward / Achievements / Leaderboard)
+
+    /// Son daily reward talep anı (epoch sn). 0 = hiç talep edilmedi.
+    @Published var lastDailyClaimTimestamp: TimeInterval {
+        didSet { UserDefaults.standard.set(lastDailyClaimTimestamp, forKey: "lastDailyClaimTimestamp") }
+    }
+    /// Üst üste giriş günü. 24h içinde claim kaçırılırsa 1'e resetlenir.
+    @Published var dailyStreak: Int {
+        didSet { UserDefaults.standard.set(dailyStreak, forKey: "dailyStreak") }
+    }
+    /// Açılmış (ödülü alınmış) başarı id'leri.
+    @Published var unlockedAchievementIDs: Set<String> {
+        didSet {
+            if let data = try? JSONEncoder().encode(unlockedAchievementIDs) {
+                UserDefaults.standard.set(data, forKey: "unlockedAchievements")
+            }
+        }
+    }
+    /// Her başarı için kümülatif ilerleme sayacı.
+    @Published var achievementProgress: [String: Int] {
+        didSet {
+            if let data = try? JSONEncoder().encode(achievementProgress) {
+                UserDefaults.standard.set(data, forKey: "achievementProgress")
+            }
+        }
+    }
+    /// En iyi 5 skor — her run sonunda eklenir, sıralanıp kırpılır.
+    @Published var topScores: [LocalScoreEntry] {
+        didSet {
+            if let data = try? JSONEncoder().encode(topScores) {
+                UserDefaults.standard.set(data, forKey: "topScores")
+            }
+        }
+    }
+    /// Her karakter için oynanmış **en yüksek** chapter (bölüm) numarası.
+    /// Mastery badge ve golden glow için referans. Chapter clear edildiğinde
+    /// `recordCharacterChapterClear` ile güncellenir.
+    @Published var characterMaxChapter: [String: Int] {
+        didSet {
+            if let data = try? JSONEncoder().encode(characterMaxChapter) {
+                UserDefaults.standard.set(data, forKey: "characterMaxChapter")
+            }
+        }
+    }
+
     // MARK: - Init
     init() {
         // 1. Initialize all properties from storage
@@ -271,7 +316,35 @@ class UserEnvironment: ObservableObject {
         } else {
             self.goldUpgradeLevels = [:]
         }
-        
+
+        // Phase 8 retention state
+        self.lastDailyClaimTimestamp = UserDefaults.standard.double(forKey: "lastDailyClaimTimestamp")
+        self.dailyStreak = UserDefaults.standard.integer(forKey: "dailyStreak")
+        if let data = UserDefaults.standard.data(forKey: "unlockedAchievements"),
+           let decoded = try? JSONDecoder().decode(Set<String>.self, from: data) {
+            self.unlockedAchievementIDs = decoded
+        } else {
+            self.unlockedAchievementIDs = []
+        }
+        if let data = UserDefaults.standard.data(forKey: "achievementProgress"),
+           let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
+            self.achievementProgress = decoded
+        } else {
+            self.achievementProgress = [:]
+        }
+        if let data = UserDefaults.standard.data(forKey: "topScores"),
+           let decoded = try? JSONDecoder().decode([LocalScoreEntry].self, from: data) {
+            self.topScores = decoded
+        } else {
+            self.topScores = []
+        }
+        if let data = UserDefaults.standard.data(forKey: "characterMaxChapter"),
+           let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
+            self.characterMaxChapter = decoded
+        } else {
+            self.characterMaxChapter = [:]
+        }
+
         // 2. Perform post-init logic (Testing Boost etc.)
         if self.diamonds < 50000 {
             self.diamonds = 50000
@@ -283,19 +356,33 @@ class UserEnvironment: ObservableObject {
         if newScore > highScore { highScore = newScore }
     }
 
+    /// Gold tek kaynak hakikati aktif slot (SaveSlot.gold). Aktif slot varken
+    /// doğrudan `gold -= amount` yazarsak, slot bir sonraki yüklemede altını
+    /// geri veriyordu (shop regression). Slot varsa SaveManager üzerinden
+    /// gidiyoruz; SaveManager de `UserEnvironment.gold`'u sync'liyor.
     func spend(gold amount: Int) -> Bool {
         guard gold >= amount else { return false }
-        gold -= amount
+        if let slotId = activeSlotId {
+            SaveManager.shared.updateGold(slotId: slotId, amount: -amount)
+        } else {
+            gold -= amount
+        }
         return true
     }
-    
+
     func spend(diamonds amount: Int) -> Bool {
         guard diamonds >= amount else { return false }
         diamonds -= amount
         return true
     }
 
-    func earn(gold amount: Int) { gold += amount }
+    func earn(gold amount: Int) {
+        if let slotId = activeSlotId {
+            SaveManager.shared.updateGold(slotId: slotId, amount: amount)
+        } else {
+            gold += amount
+        }
+    }
     func earn(diamonds amount: Int) { diamonds += amount }
     
     /// Karakter satın alma mantığı
@@ -337,6 +424,7 @@ class UserEnvironment: ObservableObject {
             discoveredPerkIDs.insert(id)
             earn(diamonds: 50) // Discovery reward
             AudioManager.shared.playSFX(.perkUnlock)
+            reportAchievement("perk_collector_5", progress: discoveredPerkIDs.count)
         }
     }
     
@@ -373,9 +461,126 @@ class UserEnvironment: ObservableObject {
         self.unlockedWorldLevel = slot.unlockedWorldLevel
         self.goldUpgradeLevels = slot.goldUpgradeLevels
         self.unlockedUpgradeIDs = slot.unlockedMetaUpgradeIDs
+        self.gold = slot.gold
+        // Slot bazlı karakter: Hub ve ekranlar aktif slot'un karakterini
+        // okuyabilsin diye global `selectedCharacterID`'yi slot değerine
+        // senkron ediyoruz. Slot'ta karakter yoksa (eski kayıt) mevcut
+        // global değer korunur.
+        if let cid = slot.characterId, !cid.isEmpty {
+            self.selectedCharacterID = cid
+        }
+    }
+
+    /// Aktif slot bağlamını kapatır. Dashboard'a dönerken çağrılır; böylece
+    /// global cüzdana yapılacak `spend/earn` çağrıları yanlışlıkla yakın
+    /// zamanda kapatılmış slot'a yönlendirilmez.
+    func clearActiveSlot() {
+        self.activeSlotId = nil
     }
     
     func localizedString(_ trText: String, _ enText: String) -> String {
         language == .turkish ? trText : enText
+    }
+
+    // MARK: - Phase 8: Daily Reward API
+
+    /// 24 saat geçtiyse claim hakkı var. İlk kez girenler için de true.
+    var canClaimDaily: Bool {
+        let now = Date().timeIntervalSince1970
+        return (now - lastDailyClaimTimestamp) >= 24 * 60 * 60
+    }
+
+    /// Bir sonraki claim'e kalan saniye. 0 = hazır.
+    var secondsUntilNextDaily: TimeInterval {
+        let now = Date().timeIntervalSince1970
+        let delta = 24 * 60 * 60 - (now - lastDailyClaimTimestamp)
+        return max(0, delta)
+    }
+
+    /// Ödülü talep eder ve verilen tier'ı döner. Çağıran UI feedback üretir.
+    /// Streak mantığı: önceki claim 24-48h penceresinde ise streak++; 48h
+    /// geçtiyse streak 1'e resetlenir. İlk kez claim'de streak = 1.
+    @discardableResult
+    func claimDailyReward() -> DailyRewardTier? {
+        guard canClaimDaily else { return nil }
+        let now = Date().timeIntervalSince1970
+        let elapsed = now - lastDailyClaimTimestamp
+        if lastDailyClaimTimestamp == 0 {
+            dailyStreak = 1
+        } else if elapsed <= 48 * 60 * 60 {
+            dailyStreak += 1
+        } else {
+            dailyStreak = 1
+        }
+        let tier = DailyRewardSchedule.reward(forStreakDay: dailyStreak)
+        earn(gold: tier.gold)
+        if tier.diamonds > 0 { earn(diamonds: tier.diamonds) }
+        lastDailyClaimTimestamp = now
+        reportAchievement("streak_7", progress: dailyStreak)
+        return tier
+    }
+
+    // MARK: - Phase 8: Achievement API
+
+    /// Kümülatif delta raporla (ör. +1 boss yenildi). Progress güncellenir ve
+    /// gerekiyorsa unlock edilir. Aynı id tekrar gelirse progress artar ama
+    /// unlock tekrarı yapılmaz.
+    func reportAchievement(_ id: String, progress newValue: Int) {
+        guard let achievement = AchievementEngine.achievement(for: id) else { return }
+        // Progress düşmesin: kümülatif stat olarak tut.
+        let current = achievementProgress[id] ?? 0
+        let updated = max(current, newValue)
+        if updated != current { achievementProgress[id] = updated }
+        if updated >= achievement.goal && !unlockedAchievementIDs.contains(id) {
+            unlockedAchievementIDs.insert(id)
+            if achievement.rewardGold > 0 { earn(gold: achievement.rewardGold) }
+            if achievement.rewardDiamonds > 0 { earn(diamonds: achievement.rewardDiamonds) }
+            AudioManager.shared.playSFX(.perkUnlock)
+        }
+    }
+
+    /// Kısayol: +delta ile rapor.
+    func bumpAchievement(_ id: String, by delta: Int = 1) {
+        let current = achievementProgress[id] ?? 0
+        reportAchievement(id, progress: current + delta)
+    }
+
+    // MARK: - Character Mastery API
+
+    /// Bir karakterin bölüm clear'ını kaydet. Kümülatif max tutulur.
+    func recordCharacterChapterClear(characterId: String, chapter: Int) {
+        guard !characterId.isEmpty, chapter > 0 else { return }
+        let current = characterMaxChapter[characterId] ?? 0
+        if chapter > current {
+            characterMaxChapter[characterId] = chapter
+        }
+    }
+
+    /// Bir karakterin şu ana kadar ulaştığı en yüksek chapter.
+    func maxChapter(for characterId: String) -> Int {
+        characterMaxChapter[characterId] ?? 0
+    }
+
+    /// Karakter %100 master'lanmış mı? (Ch20 = son bölüm)
+    func isCharacterMastered(_ characterId: String) -> Bool {
+        maxChapter(for: characterId) >= 20
+    }
+
+    // MARK: - Phase 8: Leaderboard API
+
+    /// Run sonunda çağrılır. Top-5'e düşerse ekler, değilse atar.
+    func recordRun(score: Int, worldLevelReached: Int) {
+        guard score > 0 else { return }
+        let entry = LocalScoreEntry(
+            score: score,
+            characterID: selectedCharacterID,
+            worldLevelReached: worldLevelReached,
+            timestamp: Date().timeIntervalSince1970
+        )
+        var list = topScores
+        list.append(entry)
+        list.sort { $0.score > $1.score }
+        topScores = Array(list.prefix(5))
+        reportAchievement("score_10k", progress: max(score, achievementProgress["score_10k"] ?? 0))
     }
 }

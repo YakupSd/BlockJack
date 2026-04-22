@@ -7,9 +7,28 @@ import SwiftUI
 
 struct CharacterSelectionView: View {
     @EnvironmentObject var userEnv: UserEnvironment
-    
+
+    /// İlk kurulumda mecburi karakter seçimi (PerkSelection'a zincirler)
+    /// ve Hub'dan bilinçli karakter değiştirme akışını ayırt ediyoruz. Her
+    /// ikisi de aynı UI'ı kullanıyor; sadece onay davranışı değişiyor.
+    enum Mode {
+        case firstSetup       // Boş slot ilk kez oluşturuluyor → Perk seçimine geç
+        case changeInHub      // Mevcut slot için karakter değiştiriliyor → Hub'a dön
+    }
+
     let slotId: Int
+    let mode: Mode
     @State private var selectedCharId: String = "block_e"
+
+    init(slotId: Int, mode: Mode = .firstSetup) {
+        self.slotId = slotId
+        self.mode = mode
+        // Hub'dan gelindiyse aktif karakteri ön seçili başlat.
+        if mode == .changeInHub,
+           let cid = SaveManager.shared.slots.first(where: { $0.id == slotId })?.characterId {
+            _selectedCharId = State(initialValue: cid)
+        }
+    }
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -68,13 +87,17 @@ struct CharacterSelectionView: View {
                 Button {
                     HapticManager.shared.play(.buttonTap)
                     if isUnlocked {
-                        MainViewsRouter.shared.pushToPerkSelection(slotId: slotId, characterId: char.id)
+                        handleConfirm(char: char)
                     } else {
                         // Attempt buy using diamonds as base for quick unlock in selection
                         _ = userEnv.unlockCharacter(char, useDiamonds: true)
                     }
                 } label: {
-                    Text(isUnlocked ? userEnv.localizedString("SEÇ VE DEVAM ET", "SELECT & CONTINUE") : "\(char.cost) 💎 UNLOCK")
+                    Text(isUnlocked
+                         ? (mode == .changeInHub
+                            ? userEnv.localizedString("BU KARAKTERİ SEÇ", "SELECT THIS CHARACTER")
+                            : userEnv.localizedString("SEÇ VE DEVAM ET", "SELECT & CONTINUE"))
+                         : "\(char.cost) 💎 UNLOCK")
                         .font(.setCustomFont(name: .InterExtraBold, size: 18))
                         .foregroundStyle(ThemeColors.cosmicBlack)
                         .frame(maxWidth: .infinity)
@@ -101,7 +124,7 @@ struct CharacterSelectionView: View {
             HapticManager.shared.play(.selection)
             selectedCharId = char.id
         } label: {
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 Image(char.icon)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -117,20 +140,24 @@ struct CharacterSelectionView: View {
                 Text(char.name)
                     .font(.setCustomFont(name: .InterBold, size: 14))
                     .foregroundStyle(isSelected ? ThemeColors.neonCyan : ThemeColors.textSecondary)
-                
+
+                // Mastery badge (Ch X veya MASTER rozet)
+                CharacterMasteryBadge(characterId: char.id)
+
                 if !isUnlocked {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 14))
                         .foregroundStyle(ThemeColors.textMuted)
                 }
             }
-            .frame(width: 140, height: 180)
+            .frame(width: 140, height: 200)
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(isSelected ? ThemeColors.neonCyan : ThemeColors.gridStroke.opacity(0.5), lineWidth: isSelected ? 2 : 1)
             )
+            .characterMasteryFrame(characterId: char.id, cornerRadius: 20)
             .shadow(color: isSelected ? ThemeColors.neonCyan.opacity(0.3) : .clear, radius: 15)
             .scaleEffect(isSelected ? 1.05 : 1.0)
             .animation(.spring(response: 0.3), value: isSelected)
@@ -166,7 +193,7 @@ struct CharacterSelectionView: View {
                     .foregroundStyle(ThemeColors.electricYellow)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("PASİF YETENEK")
+                    Text(userEnv.localizedString("PASİF YETENEK", "PASSIVE ABILITY"))
                         .font(.setCustomFont(name: .InterBold, size: 12))
                         .foregroundStyle(ThemeColors.textMuted)
                     Text(char.passiveDesc)
@@ -188,7 +215,7 @@ struct CharacterSelectionView: View {
                     .foregroundStyle(ThemeColors.neonPink)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("AKTİF YETENEK (OVERDRIVE)")
+                    Text(userEnv.localizedString("AKTİF YETENEK (OVERDRIVE)", "ACTIVE ABILITY (OVERDRIVE)"))
                         .font(.setCustomFont(name: .InterBold, size: 12))
                         .foregroundStyle(ThemeColors.textMuted)
                     Text(char.activeDesc)
@@ -248,6 +275,19 @@ struct CharacterSelectionView: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(color.opacity(0.3), lineWidth: 1))
     }
     
+    /// Onay akışını mod'a göre yönlendiriyoruz. firstSetup'ta Perk seçimine
+    /// zincirlemeyi bozmuyoruz; Hub'dan gelindiyse sadece slot'taki karakter
+    /// ID'sini güncelleyip geri dönüyoruz (yeni bir run başlatmıyoruz).
+    private func handleConfirm(char: GameCharacter) {
+        switch mode {
+        case .firstSetup:
+            MainViewsRouter.shared.pushToPerkSelection(slotId: slotId, characterId: char.id)
+        case .changeInHub:
+            SaveManager.shared.setCharacter(slotId: slotId, characterID: char.id)
+            MainViewsRouter.shared.nav?.popViewController(animated: true)
+        }
+    }
+
     private func difficultyColor(_ difficulty: CharacterDifficulty) -> Color {
         switch difficulty {
         case .beginner: return ThemeColors.success
@@ -258,6 +298,6 @@ struct CharacterSelectionView: View {
 }
 
 #Preview {
-    CharacterSelectionView(slotId: 1)
+    CharacterSelectionView(slotId: 1, mode: .firstSetup)
         .environmentObject(UserEnvironment.shared)
 }

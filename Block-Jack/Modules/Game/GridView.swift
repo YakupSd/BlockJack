@@ -11,14 +11,6 @@ struct FlashCell: Equatable {
     let delay: Double
 }
 
-struct GridParticle: Identifiable, Equatable {
-    let id = UUID()
-    var position: CGPoint
-    var velocity: CGPoint
-    var color: Color
-    var opacity: Double = 1.0
-}
-
 struct GridView: View {
     @ObservedObject var board: BoardViewModel
     let cellSize: CGFloat
@@ -33,8 +25,6 @@ struct GridView: View {
     var flashPositions: [GridPosition] = []
     @State private var activeFlashes: Set<GridPosition> = []
     @State private var flashOpacities: [GridPosition: Double] = [GridPosition: Double]()
-    @State private var particles: [GridParticle] = []
-    @State private var streakScale: Double = 1.0
 
     var body: some View {
         VStack(spacing: 2) {
@@ -46,33 +36,22 @@ struct GridView: View {
                 }
             }
         }
+        // NOT: Buraya .padding() EKLENMEMELİ!
+        // gridOrigin hesabı GameView'de bu view'in global frame origin'ini alır,
+        // ekstra padding uygulamak drag/ghost/overdrive targeting koordinatlarını kaydırır.
+        // Kart görünümü (cornerRadius + stroke) GameView tarafında dış wrapper'da verilir.
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(ThemeColors.gridDark)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(ThemeColors.gridStroke, lineWidth: 1)
-                )
+            RoundedRectangle(cornerRadius: 6)
+                .fill(ThemeColors.cellEmpty.opacity(0.01))
         )
         .overlay(
-            ZStack {
-                // Zone Highlights
-                zoneOverlay
-            }
-            .allowsHitTesting(false)
+            zoneOverlay
+                .allowsHitTesting(false)
         )
-        .overlay(
-            ZStack {
-                ForEach(particles) { p in
-                    Rectangle()
-                        .fill(p.color)
-                        .frame(width: 4, height: 4)
-                        .position(p.position)
-                        .opacity(p.opacity)
-                }
-            }
-            .allowsHitTesting(false)
-        )
+        // Performans: GridView'in içindeki ikincil partikül loop'u kaldırıldı.
+        // Clear VFX'leri artık yalnızca ClearParticleManager üzerinden tek merkezden
+        // akıyor (GameView'de ClearParticleOverlayView). Her hücrenin ekstra
+        // particle state'i ve DispatchQueue tick'i yok → ~60fps kazanç.
     }
 
     @ViewBuilder
@@ -87,50 +66,70 @@ struct GridView: View {
         
         ZStack {
             // Hücre arka planı
+            // Performans: implicit .animation(value: isPhantomVisible) kaldırıldı.
+            // Phantom efekti artık hücre başına 169 animasyon tracker kurmuyor;
+            // sadece opacity değeri direkt değişiyor (zaten opacity değişimi
+            // GPU'da ucuz + görsel olarak phantom için yeterli).
             RoundedRectangle(cornerRadius: 3)
                 .fill(cellBackground(cell: cell, isGhost: isGhost, ghostValid: isGhostValid, row: row, col: col))
                 .frame(width: cellSize, height: cellSize)
                 .opacity(isPhantomMode && cell.isOccupied ? (isPhantomVisible ? 1.0 : 0.05) : 1.0)
-                .animation(.easeInOut(duration: 0.3), value: isPhantomVisible)
             
-            // AAA: Clear Hint Glow
+            // Patlayacak alan uyarısı — satır/sütun clear.
+            // "Kalacak iki kare var → oraya kapatırsam satır patlıyor" UX'i.
+            // Sarı-turuncu nabız: fill + stroke + hafif scale, böylece göze
+            // "burası temizlenecek" mesajı sert şekilde geliyor.
             if board.hintPositions.contains(pos) {
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(ThemeColors.electricYellow.opacity(0.35))
-                    .frame(width: cellSize, height: cellSize)
+                    .fill(ThemeColors.electricYellow.opacity(0.38))
                     .overlay(
                         RoundedRectangle(cornerRadius: 3)
-                            .stroke(ThemeColors.electricYellow, lineWidth: 1.5)
+                            .stroke(ThemeColors.electricYellow, lineWidth: 2)
                     )
-                    .phaseAnimator([0.4, 0.8]) { content, opacity in
-                        content.opacity(opacity)
+                    .shadow(color: ThemeColors.electricYellow.opacity(0.55), radius: 5)
+                    .frame(width: cellSize, height: cellSize)
+                    .phaseAnimator([0, 1]) { content, phase in
+                        content
+                            .opacity(0.55 + phase * 0.45)
+                            .scaleEffect(1.0 + phase * 0.06)
                     } animation: { _ in
-                        .easeInOut(duration: 0.4).repeatForever(autoreverses: true)
+                        .easeInOut(duration: 0.45).repeatForever(autoreverses: true)
                     }
+                    .allowsHitTesting(false)
             }
 
-            // Phase 8.4: Güçlendirilmiş dolu hücre glow
-            if case .filled(let color) = cell.state {
-                // İç parıltı
+            // Patlayacak alan uyarısı — zone clear (4x4 köşe veya 5x5 merkez).
+            // Zone clear satır/sütun'dan çok daha değerli olduğu için ayrı renk:
+            // mor/pembe — göz "aha, büyük patlama" diye ayırt ediyor.
+            if board.hintZonePositions.contains(pos) {
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(
-                        RadialGradient(
-                            gradient: Gradient(colors: [color.color.opacity(0.5), color.color.opacity(0.0)]),
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: cellSize * 0.8
-                        )
+                    .fill(ThemeColors.neonPink.opacity(0.35))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3)
+                            .stroke(ThemeColors.neonPink, lineWidth: 2.2)
                     )
+                    .shadow(color: ThemeColors.neonPink.opacity(0.65), radius: 7)
                     .frame(width: cellSize, height: cellSize)
+                    .phaseAnimator([0, 1]) { content, phase in
+                        content
+                            .opacity(0.55 + phase * 0.45)
+                            .scaleEffect(1.0 + phase * 0.08)
+                    } animation: { _ in
+                        .easeInOut(duration: 0.38).repeatForever(autoreverses: true)
+                    }
                     .allowsHitTesting(false)
-                    .opacity(isPhantomMode ? (isPhantomVisible ? 1.0 : 0.0) : 1.0)
-                    .animation(.easeInOut(duration: 0.3), value: isPhantomVisible)
-                
-                // Dış glow
+            }
+
+            // Dolu hücre iç parlaklığı — SADELEŞTİRİLDİ:
+            // Eskiden her dolu hücrede RadialGradient + stroke+blur(2) + ek
+            // implicit animation vardı. 169 hücre × 2 GPU pass'i iPhone SE'de
+            // fps'i yarıya düşürüyordu. Artık tek stroke overlay yeterli —
+            // renk zaten fill'de var, kenar vurgusu yeterli.
+            if case .filled(let color) = cell.state {
                 RoundedRectangle(cornerRadius: 3)
-                    .stroke(color.color.opacity(0.4), lineWidth: 1)
-                    .blur(radius: 2)
+                    .stroke(color.color.opacity(0.55), lineWidth: 1)
                     .frame(width: cellSize, height: cellSize)
+                    .opacity(isPhantomMode ? (isPhantomVisible ? 1.0 : 0.0) : 1.0)
                     .allowsHitTesting(false)
             }
             
@@ -165,7 +164,26 @@ struct GridView: View {
                     EmptyView() // lock.fill zaten aşağıda cellState üzerinden gösteriliyor
                 case .gravity:
                     EmptyView() // gravity visual henüz eklenmedi
+                case .staticCharge:
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: cellSize * 0.5))
+                        .foregroundStyle(ThemeColors.electricYellow)
+                        .shadow(color: ThemeColors.electricYellow, radius: 6)
+                        .symbolEffect(.pulse, isActive: true)
                 }
+            }
+            
+            // Tactical Lens: en iyi yerleşim önerisi — yumuşak yeşil iç halo.
+            // hintPositions sarı, bu set yeşil → drag sırasında karışmıyor.
+            if board.bestPlacementCells.contains(pos) && !isGhost {
+                RoundedRectangle(cornerRadius: 3)
+                    .stroke(ThemeColors.success.opacity(0.85), lineWidth: 1.6)
+                    .frame(width: cellSize, height: cellSize)
+                    .phaseAnimator([0.45, 0.9]) { content, opacity in
+                        content.opacity(opacity)
+                    } animation: { _ in
+                        .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
+                    }
             }
 
             // Kilitli hücre ikonu
@@ -183,35 +201,32 @@ struct GridView: View {
             }
             
             // --- GHOST OVERLAY STROKE ---
+            // Performans: shadow kaldırıldı. Drag sırasında 169 hücrenin bazıları
+            // her frame güncelleniyor; ghost cell'de .shadow(radius: 4) eklemek
+            // drag boyunca sürekli GPU pass'i demek. Stroke + kalınlık yeterli.
             if isGhost {
                 RoundedRectangle(cornerRadius: 3)
                     .stroke(isGhostValid ? ThemeColors.neonCyan : ThemeColors.neonPink, lineWidth: 2)
-                    .shadow(color: isGhostValid ? ThemeColors.neonCyan : ThemeColors.neonPink, radius: 4)
                     .frame(width: cellSize, height: cellSize)
             }
             
             // Phase 8.1: Cascaded Neon Flash / Line Clear Burst
+            // Performans: expanding Circle shockwave + blur(4) kaldırıldı.
+            // Clear burst'lerini ClearParticleManager zaten canlı tutuyor;
+            // burada ekstra circle+blur tamamen gereksiz overhead idi.
             if isFlashing {
-                ZStack {
-                    // Flash fill
+                Group {
                     if board.grid[row][col].isSynergySubject {
                         RoundedRectangle(cornerRadius: 3)
                             .fill(
                                 AngularGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple, .red], center: .center)
                             )
                             .opacity(flashOpacity)
-                            .blur(radius: 4)
                     } else {
                         RoundedRectangle(cornerRadius: 3)
                             .fill(Color.white)
                             .opacity(flashOpacity)
                     }
-                    
-                    // Expanding Shockwave Ring
-                    Circle()
-                        .stroke(board.grid[row][col].isSynergySubject ? .white : ThemeColors.neonCyan, lineWidth: 2)
-                        .scaleEffect(isFlashing ? 2.5 : 0.5)
-                        .opacity(flashOpacity)
                 }
                 .blendMode(.screen)
                 .allowsHitTesting(false)
@@ -219,7 +234,9 @@ struct GridView: View {
         }
         .scaleEffect(isFlashing ? 1.08 : 1.0)
         .animation(.spring(response: 0.2, dampingFraction: 0.5), value: isFlashing)
-        .animation(.easeOut(duration: 0.15), value: cell.state)
+        // Performans: .animation(value: cell.state) kaldırıldı.
+        // 169 hücrede her biri için implicit animation tracker vardı;
+        // state değişimi zaten scaleEffect animasyonuyla vurgulanıyor.
         .onChange(of: flashPositions) { oldValue, newPositions in
             // Phase 8.1: Cascade - her pozisyon index'ine göre gecikmeli tetiklenir
             if let index = newPositions.firstIndex(of: pos) {
@@ -235,55 +252,13 @@ struct GridView: View {
                             flashOpacities[pos] = 0.0
                         }
                     }
-                    // Phase 8.1: Emit particles
-                    let synergyColor = board.grid[pos.row][pos.col].isSynergySubject
-                    emitParticles(at: pos, color: synergyColor ? .clear : cellBackground(cell: cell, isGhost: false, ghostValid: true, row: pos.row, col: pos.col), isSynergy: synergyColor)
+                    // Partikül emisyonu: merkezi ClearParticleManager'da
+                    // yönetiliyor (GameView.onChange(vm.particleBurst)),
+                    // burada ikinci bir particle sistemi artık yok.
                 }
             }
         }
     }
-    
-    // MARK: - Particle System
-    
-    private func emitParticles(at pos: GridPosition, color: Color, isSynergy: Bool = false) {
-        let spacing: CGFloat = 2
-        let step = cellSize + spacing
-        let centerX = CGFloat(pos.col) * step + cellSize/2
-        let centerY = CGFloat(pos.row) * step + cellSize/2
-        let center = CGPoint(x: centerX, y: centerY)
-        
-        let wasEmpty = particles.isEmpty
-        for _ in 0..<8 { // Azaltıldı: 15 → 8 (daha az render yükü)
-            let angle = Double.random(in: 0...(2 * .pi))
-            let speed = CGFloat.random(in: 2...6)
-            let pColor = isSynergy ? [Color.red, .yellow, .green, .cyan, .purple].randomElement()! : color
-            particles.append(GridParticle(
-                position: center,
-                velocity: CGPoint(x: CGFloat(Darwin.cos(angle)) * speed, y: CGFloat(Darwin.sin(angle)) * speed),
-                color: pColor
-            ))
-        }
-        // Partiküller yeni eklendiyse ve loop durmuşsa, yeniden başlat
-        if wasEmpty { startParticleLoop() }
-    }
-    
-    private func startParticleLoop() {
-        func tick() {
-            guard !particles.isEmpty else { return } // Boşsa durur — yeniden emitParticles başlatır
-            for i in 0..<particles.count {
-                particles[i].position.x += particles[i].velocity.x
-                particles[i].position.y += particles[i].velocity.y
-                particles[i].opacity -= 0.03
-            }
-            particles.removeAll { $0.opacity <= 0 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.016) {
-                tick()
-            }
-        }
-        tick()
-    }
-
-
 
     private var zoneOverlay: some View {
         let step = cellSize + 2
@@ -303,55 +278,44 @@ struct GridView: View {
     private func zoneRect(x: CGFloat, y: CGFloat, w: Int, h: Int, step: CGFloat, label: String?, color: Color) -> some View {
         let width = CGFloat(w) * step - 2
         let height = CGFloat(h) * step - 2
-        return ZStack {
-            // Dış glow nabız animasyonu
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(color.opacity(zonePulse * 0.3), lineWidth: 4)
-                .blur(radius: 4)
-                .frame(width: width, height: height)
-            
-            // Ana ince kenarlık
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(color.opacity(zonePulse), lineWidth: 1.2)
-                .frame(width: width, height: height)
-        }
-        .position(x: x + width/2, y: y + height/2)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                zonePulse = 0.2
+        // Performans: dış glow + blur(4) kaldırıldı, pulse amplitüdü düşürüldü.
+        // Eskiden 5 zone × (blur(4) + pulse animation) = sürekli GPU pass'i vardı.
+        // Artık tek stroke + hafif opacity pulse. Görsel kimlik korundu.
+        return RoundedRectangle(cornerRadius: 8)
+            .stroke(color.opacity(zonePulse), lineWidth: 1.2)
+            .frame(width: width, height: height)
+            .position(x: x + width/2, y: y + height/2)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                    zonePulse = 0.35
+                }
             }
-        }
     }
 
     private func cellBackground(cell: GameCell, isGhost: Bool, ghostValid: Bool, row: Int, col: Int) -> Color {
         if isGhost {
             return ghostValid
-                ? ThemeColors.neonCyan.opacity(0.4)
-                : ThemeColors.neonPink.opacity(0.4)
+                ? ThemeColors.neonCyan.opacity(0.45)
+                : ThemeColors.neonPink.opacity(0.45)
         }
-        
-        // Highlight Scoring Zones (4x4 Corners, 5x5 Center)
-        let isCornerZone = (row < 4 || row >= 9) && (col < 4 || col >= 9)
-        let isCenterZone = (row >= 4 && row < 9) && (col >= 4 && col < 9)
         
         // Phase 5.3: Modifier Background overrides
         if let mod = cell.modifier, !cell.isOccupied {
             switch mod {
             case .locked: return ThemeColors.locked
-            case .bonus: return ThemeColors.electricYellow.opacity(0.15)
-            case .cursed: return ThemeColors.neonPink.opacity(0.15)
+            case .bonus: return ThemeColors.electricYellow.opacity(0.22)
+            case .cursed: return ThemeColors.neonPink.opacity(0.22)
+            case .staticCharge: return ThemeColors.electricYellow.opacity(0.18)
             default: break
             }
         }
 
         switch cell.state {
         case .empty:
-            if isCenterZone {
-                return ThemeColors.neonPurple.opacity(0.14)  // Merkez: mor
-            }
-            return isCornerZone 
-                ? ThemeColors.electricYellow.opacity(0.14)   // Köşeler: sarı
-                : ThemeColors.gridStroke.opacity(0.4)
+            // UI Revize: Zone arka plan renkleri — göz dört köşeyi ve merkezi hızlıca ayırt eder.
+            // Zone sınırları mevcut ScoreEngine mantığıyla aynı (4 köşe 4x4 + merkez 5x5),
+            // sadece görsel arka plan farklılaştırılıyor — skor mantığı etkilenmez.
+            return zoneColorForEmptyCell(row: row, col: col)
         case .filled(let color):
             return color.color
         case .locked:
@@ -359,6 +323,25 @@ struct GridView: View {
         case .heavy:
             return ThemeColors.neonOrange.opacity(0.6)
         }
+    }
+
+    /// Boş hücrenin bulunduğu zone'a göre arka plan rengi.
+    /// - Köşeler (4x4): sol-üst yeşilimsi, sağ-üst mor-mavi, sol-alt kırmızımsı, sağ-alt turkuaz.
+    /// - Merkez (5x5): mor.
+    /// - Diğerleri: koyu #111122 (cellEmpty).
+    private func zoneColorForEmptyCell(row: Int, col: Int) -> Color {
+        let isTopRow = row < 4
+        let isBottomRow = row >= 9
+        let isLeftCol = col < 4
+        let isRightCol = col >= 9
+        let isCenter = (row >= 4 && row < 9) && (col >= 4 && col < 9)
+        
+        if isTopRow && isLeftCol { return ThemeColors.zoneTL }
+        if isTopRow && isRightCol { return ThemeColors.zoneTR }
+        if isBottomRow && isLeftCol { return ThemeColors.zoneBL }
+        if isBottomRow && isRightCol { return ThemeColors.zoneBR }
+        if isCenter { return ThemeColors.zoneCenter }
+        return ThemeColors.cellEmpty
     }
 }
 

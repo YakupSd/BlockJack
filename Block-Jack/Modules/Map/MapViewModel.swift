@@ -65,25 +65,32 @@ class MapViewModel: ObservableObject {
         lastCompletedNodeId = nodeId
         saveMap()
         
-        // --- BOSS COMPLETION CHECK ---
-        if currentMap.nodes[index].type == .boss {
-            // Seviye atla
+        // --- FINALE COMPLETION CHECK ---
+        // Artık sadece .boss değil, chapter'ın finale node'u ne olursa olsun (boss veya elite)
+        // tamamlandığında world level atlanır. Bu sayede boss olmayan seviyelerde de
+        // chapter sonunda sabit bir dövüş olur ve biter.
+        //
+        // NOT: World level, node'a BAŞLAR başlamaz unlock ediliyor (klasik roguelite davranışı).
+        // Kullanıcı savaşı kaybederse de aynı chapter'ı tekrar açabilmek için save yapılır.
+        // Eskiden burada 1.5 sn sonra `popViewControllers(count: 1)` vardı — bu dövüş
+        // sırasında GameView'ı pop ederek savaşı kesiyordu. O yüzden kaldırıldı.
+        // Kullanıcı savaşı bitirince BattleRewardView dismiss ile MapView'a döner, oradan
+        // manuel olarak WorldMap'e çıkabilir.
+        if currentMap.isFinaleNode(currentMap.nodes[index]) {
             UserEnvironment.shared.unlockedWorldLevel += 1
-            
-            // Başarıyı kaydet
+
+            // Per-character mastery: aktif karakter bu bölümü bitirdi
+            UserEnvironment.shared.recordCharacterChapterClear(
+                characterId: UserEnvironment.shared.selectedCharacterID,
+                chapter: currentMap.chapterIndex
+            )
+
             SaveManager.shared.updateSlotProgression(
                 slotId: slotId,
                 worldLevel: UserEnvironment.shared.unlockedWorldLevel,
                 goldUpgrades: UserEnvironment.shared.goldUpgradeLevels,
                 metaUpgrades: UserEnvironment.shared.unlockedUpgradeIDs
             )
-            
-            // 1.5 saniye sonra Dünya Haritasına dön
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                // Not: Router'da popToWorldMap yoksa Dashboard'a dönüp oradan gitmek garanti olur 
-                // ama biz WorldMap'e pushToWorldMap yapmıştık, popFromBottom ile geri dönebiliriz.
-                MainViewsRouter.shared.popViewControllers(count: 1) // MapView'dan çık
-            }
         }
         
         // SaveManager üzerinden kalıcı olarak kaydedelim
@@ -95,6 +102,28 @@ class MapViewModel: ObservableObject {
         // En güncel durumu bir kez daha kaydedelim (Map objesini senkronize eder)
         SaveManager.shared.updateMapState(slotId: slotId, map: currentMap, completedNodes: [])
         HapticManager.shared.play(.buttonTap)
+    }
+
+    /// Chapter bitti mi? (finale node tamamlanmış)
+    var isChapterCleared: Bool {
+        currentMap.isCleared
+    }
+
+    /// ANA MENÜ / DÜNYA HARİTASI butonunun tek giriş noktası.
+    /// - Bölüm bitmişse: map'i temizle ve doğrudan WorldMapView'a geç.
+    ///   Kullanıcı aynı bitik haritaya dönmesin diye `hasActiveRun`=false
+    ///   olacak şekilde slot güncellenir.
+    /// - Bölüm bitmediyse: eski davranış — Slot Hub'a dön (run'a devam edilebilir).
+    func handleExitPressed() {
+        HapticManager.shared.play(.buttonTap)
+        if isChapterCleared {
+            // Haritayı diskten temizle → SlotHub artık "SEFERE BAŞLA" gösterir.
+            SaveManager.shared.clearChapterMap(slotId: slotId)
+            MainViewsRouter.shared.popToWorldMap(slotId: slotId)
+        } else {
+            SaveManager.shared.updateMapState(slotId: slotId, map: currentMap, completedNodes: [])
+            MainViewsRouter.shared.popToSlotHub(slotId: slotId)
+        }
     }
     
     func canReplay(_ node: MapNode) -> Bool {

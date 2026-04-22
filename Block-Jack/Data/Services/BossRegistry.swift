@@ -104,12 +104,34 @@ class BossRegistry {
         )
     ]
     
+    /// Hangi dünya seviyesinde hangi boss çıkar.
+    /// ChapterProgression.bossWorldLevels = [1,3,5,7,9,11,15,17,20] ile hizalı.
+    /// - 1,3 → Viper X (fog)
+    /// - 5,7 → Sentinel K (glitch)
+    /// - 9,11 → Ghost Mother (phantom)
+    /// - 15,17 → Juggernaut (weight)
+    /// - 20+ → Neon Overlord (glitch)
     func getBoss(for worldLevel: Int) -> BossEncounter {
-        // Seviyelere göre Boss eşleşmesi: 3->Viper, 5->Sentinel, 10->Ghost, 15->Jugg, 20->Overlord
-        if worldLevel <= 3 { return bossesSnapshot[0] }
-        if worldLevel <= 5 { return bossesSnapshot[1] }
-        if worldLevel <= 10 { return bossesSnapshot[2] }
-        if worldLevel <= 15 { return bossesSnapshot[3] }
-        return bossesSnapshot[4]
+        switch worldLevel {
+        case ...3:    return bossesSnapshot[0] // viper_x
+        case 4...7:   return bossesSnapshot[1] // sentinel_k
+        case 8...11:  return bossesSnapshot[2] // ghost_mother
+        case 12...17: return bossesSnapshot[3] // juggernaut
+        default:      return bossesSnapshot[4] // neon_overlord (18+)
+        }
+    }
+
+    /// Verilen boss id'sine karşılık gelen seviye aralığının kullanıcıya
+    /// gösterilecek kısa etiketi (Koleksiyon gibi yerlerde "Sektör 1-3"
+    /// şeklinde hint olarak gösterilir).
+    func levelRangeLabel(for bossId: String) -> String {
+        switch bossId {
+        case "viper_x":       return "SEKTÖR 1-3"
+        case "sentinel_k":    return "SEKTÖR 4-7"
+        case "ghost_mother":  return "SEKTÖR 8-11"
+        case "juggernaut":    return "SEKTÖR 12-17"
+        case "neon_overlord": return "SEKTÖR 18-20"
+        default:              return "?"
+        }
     }
 }

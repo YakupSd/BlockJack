@@ -30,6 +30,7 @@ class CustomHostingController<Content>: UIHostingController<AnyView> where Conte
         super.init(rootView: AnyView(rootView))
         self.title = navigationBarTitle
         self.shouldShowBackgroundImage = navigationBarHidden
+        self.navigationBarHidden = navigationBarHidden
         self.isShowRightButton = isShowRightButton
         self.rightImage = rightImage
         self.rightImageSize = rightImageSize
@@ -47,9 +48,19 @@ class CustomHostingController<Content>: UIHostingController<AnyView> where Conte
         super.viewWillAppear(animated)
         self.navigationController?.interactivePopGestureRecognizer?.isEnabled = false
         navigationItem.backBarButtonItem = UIBarButtonItem(title: "", style: .plain, target: nil, action: nil)
+        // Sol üstteki "<" chevron dahil tüm geri UI'sını gizle. Dashboard
+        // gibi root ekranlarda sistem back butonu kafa karıştırıcı
+        // oluyordu.
+        navigationItem.hidesBackButton = true
+        navigationItem.setHidesBackButton(true, animated: false)
         UIScrollView.appearance().bounces = false
 
         guard let nav = navigationController else { return }
+        // navigationBarHidden parametresini gerçekten uygula. Eskiden
+        // yalnızca depolanıyor ama hiç set edilmiyordu → nav bar her yerde
+        // görünür kalıyordu. Her `viewWillAppear`'da ayarlıyoruz çünkü
+        // stack içindeki diğer VC'ler bu state'i değiştiriyor olabilir.
+        nav.setNavigationBarHidden(self.navigationBarHidden, animated: animated)
 
         let backButtonAppearance = UIBarButtonItemAppearance()
         backButtonAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.clear]

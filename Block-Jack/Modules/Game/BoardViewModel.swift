@@ -14,7 +14,15 @@ final class BoardViewModel: ObservableObject {
     @Published var grid: [[GameCell]] = []
     @Published var ghostCells: Set<GridPosition> = []   // Preview için
     @Published var isGhostValid: Bool = true
-    @Published var hintPositions: Set<GridPosition> = [] // AAA: For Clear Hints
+    /// Satır / sütun clear uyarısı — sarı pulse.
+    @Published var hintPositions: Set<GridPosition> = []
+    /// Zone (4x4 köşe veya 5x5 merkez) clear uyarısı — mor/pembe pulse.
+    /// Ayrı set tuttuk ki göz satır clear ile zone clear'ı anında ayırt
+    /// edebilsin; zone temizleme çok daha değerli.
+    @Published var hintZonePositions: Set<GridPosition> = []
+    /// Tactical Lens perki aktifken seçili blok için en iyi yerleşim yerinin
+    /// kapladığı hücreler. GridView bu seti yeşilimsi bir halo ile gösterir.
+    @Published var bestPlacementCells: Set<GridPosition> = []
 
     static let size = 13
 
@@ -28,6 +36,8 @@ final class BoardViewModel: ObservableObject {
         }
         ghostCells = []
         hintPositions = []
+        hintZonePositions = []
+        bestPlacementCells = []
     }
 
     // MARK: - Placement Logic
@@ -217,10 +227,14 @@ final class BoardViewModel: ObservableObject {
         )
     }
     
-    /// Simüle ederek yerleştirildiğinde hangi hücrelerin patlayacağını söyler (HINT)
+    /// Simüle ederek yerleştirildiğinde hangi hücrelerin patlayacağını söyler (HINT).
+    /// Satır/sütun clear'ları `hintPositions` (sarı) setine, 4x4 / 5x5 zone
+    /// clear'ları `hintZonePositions` (mor) setine yazar. Zone clear görsel
+    /// olarak daha değerli olduğu için ayrı renklendirme yapılıyor.
     func detectPotentialClears(block: GameBlock, at origin: GridPosition) {
         guard canPlace(block, at: origin) else {
             if !hintPositions.isEmpty { hintPositions = [] }
+            if !hintZonePositions.isEmpty { hintZonePositions = [] }
             return
         }
         
@@ -229,35 +243,69 @@ final class BoardViewModel: ObservableObject {
         for (dr, dc) in block.cells {
             tempOccupied.insert(GridPosition(row: origin.row + dr, col: origin.col + dc))
         }
-        
-        var targets: Set<GridPosition> = []
-        
+
+        func isFilled(_ r: Int, _ c: Int) -> Bool {
+            grid[r][c].isOccupied || tempOccupied.contains(GridPosition(row: r, col: c))
+        }
+
+        var lineTargets: Set<GridPosition> = []
+        var zoneTargets: Set<GridPosition> = []
+
         // 1. Satırlar — sadece bloğun etkilediği satırları tara
         let affectedRows = Set(block.cells.map { origin.row + $0.0 }).filter { $0 >= 0 && $0 < Self.size }
         for r in affectedRows {
-            let rowFull = (0..<Self.size).allSatisfy { c in
-                grid[r][c].isOccupied || tempOccupied.contains(GridPosition(row: r, col: c))
-            }
-            if rowFull {
-                for c in 0..<Self.size { targets.insert(GridPosition(row: r, col: c)) }
+            if (0..<Self.size).allSatisfy({ isFilled(r, $0) }) {
+                for c in 0..<Self.size { lineTargets.insert(GridPosition(row: r, col: c)) }
             }
         }
-        
+
         // 2. Sütunlar — sadece bloğun etkilediği sütunları tara
         let affectedCols = Set(block.cells.map { origin.col + $0.1 }).filter { $0 >= 0 && $0 < Self.size }
         for c in affectedCols {
-            let colFull = (0..<Self.size).allSatisfy { r in
-                grid[r][c].isOccupied || tempOccupied.contains(GridPosition(row: r, col: c))
-            }
-            if colFull {
-                for r in 0..<Self.size { targets.insert(GridPosition(row: r, col: c)) }
+            if (0..<Self.size).allSatisfy({ isFilled($0, c) }) {
+                for r in 0..<Self.size { lineTargets.insert(GridPosition(row: r, col: c)) }
             }
         }
-        
-        // Gereksiz re-render'ı önle: sadece değiştiyse güncelle
-        if targets != hintPositions {
-            hintPositions = targets
+
+        // 3. Zone (4x4 köşeler + 5x5 merkez) — `clearFullLinesAndZones` içindeki
+        // aynı bölgeleri simüle ediyoruz. Yalnızca bloğun hücrelerinden biri
+        // zone içine düşüyorsa kontrol etmek yeterli; böylece her karede
+        // 5 zone × N hücre tamamını tarama maliyeti minimize oluyor.
+        let scoringZones: [(Range<Int>, Range<Int>)] = [
+            (0..<4, 0..<4),
+            (0..<4, 9..<13),
+            (9..<13, 0..<4),
+            (9..<13, 9..<13),
+            (4..<9, 4..<9)
+        ]
+        for (rows, cols) in scoringZones {
+            // Bloğun bu zone'a temas edip etmediğini hızlı kontrol et
+            let touches = block.cells.contains { (dr, dc) in
+                let r = origin.row + dr, c = origin.col + dc
+                return rows.contains(r) && cols.contains(c)
+            }
+            guard touches else { continue }
+
+            var full = true
+            outer: for r in rows {
+                for c in cols where !isFilled(r, c) {
+                    full = false
+                    break outer
+                }
+            }
+            if full {
+                for r in rows {
+                    for c in cols { zoneTargets.insert(GridPosition(row: r, col: c)) }
+                }
+            }
         }
+
+        // Aynı hücre hem satır hem zone içindeyse zone vurgusu öne alınsın —
+        // satır setinden o hücreyi çıkarıyoruz ki mor glow sarıyı ezmesin.
+        lineTargets.subtract(zoneTargets)
+
+        if lineTargets != hintPositions { hintPositions = lineTargets }
+        if zoneTargets != hintZonePositions { hintZonePositions = zoneTargets }
     }
     
     private func is3x3ZoneMatched(startRow: Int, startCol: Int) -> Bool {
@@ -312,10 +360,20 @@ final class BoardViewModel: ObservableObject {
         // Mevcut dolu kutuları heavy yap
         for r in 0..<Self.size {
             for c in 0..<Self.size {
-                if case .filled(let color) = grid[r][c].state {
+                if case .filled = grid[r][c].state {
                     grid[r][c].state = .heavy(hits: 2)
                 }
             }
+        }
+    }
+
+    /// Round başında N adet rastgele boş hücreyi heavy(2) olarak mühürler.
+    /// Weight modifier'ı bu yolla gerçek bir zorluk yaratır: Titan karakteri
+    /// bu hücreleri kırıp puan kazanır (heavy_duty perk + Titan pasifi).
+    func applyHeavy(count: Int) {
+        let positions = allEmptyPositions().shuffled().prefix(count)
+        for pos in positions {
+            grid[pos.row][pos.col].state = .heavy(hits: 2)
         }
     }
     
@@ -340,6 +398,88 @@ final class BoardViewModel: ObservableObject {
         for pos in positions {
             grid[pos.row][pos.col].modifier = .cursed
         }
+    }
+    
+    /// Static Charge perki için: boş hücrelerden `count` kadarına staticCharge
+    /// modifier'ı yerleştirir. Temizlenince overdrive barını burst doldurur.
+    func applyStaticCells(count: Int) {
+        let positions = allEmptyPositions().shuffled().prefix(count)
+        for pos in positions {
+            grid[pos.row][pos.col].modifier = .staticCharge
+        }
+    }
+    
+    // MARK: - Tactical Lens (Best Placement Hint)
+    
+    /// Verilen blok için, mevcut grid üzerinde en çok satır/sütun/zone temizleyecek
+    /// yerleştirmeyi bulur. Clear sayısı eşitse zone temizleyen tercih edilir.
+    /// Hiç valid yer yoksa nil döner.
+    func findBestPlacement(for block: GameBlock) -> GridPosition? {
+        var best: (pos: GridPosition, score: Int)? = nil
+        for r in 0..<Self.size {
+            for c in 0..<Self.size {
+                let origin = GridPosition(row: r, col: c)
+                guard canPlace(block, at: origin) else { continue }
+                let score = estimateClearValue(block: block, at: origin)
+                if score == 0 { continue } // sadece clear üretenleri vurgula
+                if let current = best {
+                    if score > current.score { best = (origin, score) }
+                } else {
+                    best = (origin, score)
+                }
+            }
+        }
+        return best?.pos
+    }
+    
+    /// Basit simülasyon: bloğu yerleştirince kaç satır/sütun/zone tamamlanır?
+    private func estimateClearValue(block: GameBlock, at origin: GridPosition) -> Int {
+        var tempOccupied: Set<GridPosition> = []
+        for (dr, dc) in block.cells {
+            tempOccupied.insert(GridPosition(row: origin.row + dr, col: origin.col + dc))
+        }
+        func isOccupied(_ r: Int, _ c: Int) -> Bool {
+            grid[r][c].isOccupied || tempOccupied.contains(GridPosition(row: r, col: c))
+        }
+        var rows = 0
+        let affectedRows = Set(block.cells.map { origin.row + $0.0 }).filter { $0 >= 0 && $0 < Self.size }
+        for r in affectedRows {
+            if (0..<Self.size).allSatisfy({ isOccupied(r, $0) }) { rows += 1 }
+        }
+        var cols = 0
+        let affectedCols = Set(block.cells.map { origin.col + $0.1 }).filter { $0 >= 0 && $0 < Self.size }
+        for c in affectedCols {
+            if (0..<Self.size).allSatisfy({ isOccupied($0, c) }) { cols += 1 }
+        }
+        // Zone kontrolü (5 zone var)
+        let scoringZones: [(Range<Int>, Range<Int>)] = [
+            (0..<4, 0..<4), (0..<4, 9..<13), (9..<13, 0..<4), (9..<13, 9..<13), (4..<9, 4..<9)
+        ]
+        var zones = 0
+        for (rows, cols) in scoringZones {
+            var isFull = true
+            for r in rows {
+                for c in cols where !isOccupied(r, c) { isFull = false; break }
+                if !isFull { break }
+            }
+            if isFull { zones += 1 }
+        }
+        // Zone > line > hiçbir şey. Zone temizleme çok değerli olduğu için ağırlığı yüksek.
+        return zones * 100 + (rows + cols) * 10
+    }
+    
+    /// Seçili/çekilen bloğa göre best placement hücrelerini günceller.
+    /// Block nil veya uygun yer yoksa seti temizler.
+    func updateBestPlacementHint(for block: GameBlock?) {
+        guard let block = block, let best = findBestPlacement(for: block) else {
+            if !bestPlacementCells.isEmpty { bestPlacementCells = [] }
+            return
+        }
+        var cells: Set<GridPosition> = []
+        for (dr, dc) in block.cells {
+            cells.insert(GridPosition(row: best.row + dr, col: best.col + dc))
+        }
+        if cells != bestPlacementCells { bestPlacementCells = cells }
     }
     
     func applyGravity() {

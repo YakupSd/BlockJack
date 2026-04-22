@@ -59,7 +59,21 @@ final class GameViewModel: ObservableObject {
     // dragLocation: @Published DEĞİL — her frame güncellenir, @Published olursa tüm view yeniden render olur (lag!)
     // GameView'da @State dragPosition ile overlay render edilir.
     var dragLocation: CGPoint = .zero
-    @Published var draggingBlock: GameBlock? = nil
+    @Published var draggingBlock: GameBlock? = nil {
+        didSet {
+            // Tactical Lens: blok çekilirken en iyi yerleşim hücrelerini vurgula.
+            // Perk yoksa hep boş bırak (gereksiz hesaplama yapma).
+            guard run.hasPerk("tactical_lens") else {
+                if !board.bestPlacementCells.isEmpty { board.bestPlacementCells = [] }
+                return
+            }
+            // No-op skip: aynı blok tekrar atanırsa O(13×13×cells) aramayı
+            // yeniden yapma — @Published didSet değer aynı olsa bile tetiklenir.
+            // Böylece drag sürecinde tray seçim değişmediyse hesap sıfır.
+            if oldValue?.id == draggingBlock?.id { return }
+            board.updateBestPlacementHint(for: draggingBlock)
+        }
+    }
     @Published var gridFrame: CGRect = .zero
 
     // VFX State
@@ -101,6 +115,13 @@ final class GameViewModel: ObservableObject {
     private var lastPlacedBlockType: BlockType? = nil // Architect passive için
     var jokerMultBonus: Double = 0.0   // Joker bonusu — OverdriveEngine erişir
     private var maxRoundScore: Int = 0 // Echoes perk için
+
+    // MARK: - Karakter Ephemeral State (startRound'da sıfırlanır)
+    private var blockEClearsThisRound: Int = 0   // BLOCK-E pasif: max 3/round cap
+    var timebenderFreezeMoves: Int = 0           // TimeBender active: timer donuk kalan hamle
+    var alchemistDoubleCountMoves: Int = 0       // Alchemist active: skoru 2× ile çıkaran hamleler
+    var ghostPhantomMultBonus: Double = 0.0      // Ghost active T2: tek atımlık handleClear bonusu
+    var neonWraithActiveBoost: Int = 0           // NeonWraith active: sonraki N clear'de ekstra +2 mult
     
     // MARK: - Enemy Attack System
     @Published var enemy: EnemyState = EnemyState()
@@ -177,11 +198,33 @@ final class GameViewModel: ObservableObject {
             self.run.gold = slot.gold
             self.run.lives = slot.lives
             
+            // PHASE 11 FIX: World level daha önce hiç set edilmiyordu → boss registry
+            // ve target scaling her zaman level 1'de sanıyordu. Bu yüzden ilerleyen
+            // bölümlerde bile hep Viper X çıkıyor ve hedef skorlar world scaling'i
+            // uygulamıyordu. Artık slot.unlockedWorldLevel'den alıyoruz.
+            self.run.worldLevel = max(1, slot.unlockedWorldLevel)
+            
+            // Cüzdan senkronizasyonu: meta UI (Dashboard/Shop) UserEnvironment.gold'u
+            // okuyor; slot aktif olduğunda iki havuzu eşitle.
+            if UserEnvironment.shared.activeSlotId == slotId {
+                UserEnvironment.shared.gold = slot.gold
+            }
+            
             // Wide Load check
             if run.activePassivePerks.contains(where: { $0.id == "wide_load" }) {
                 run.maxTraySlots = 4
             }
         }
+    }
+    
+    /// Run içinde altın kazanımlarını tek yerden geçirmek için yardımcı.
+    /// Hem run state'i hem slot.gold'u (UserEnvironment.gold ile birlikte) senkron tutar.
+    /// Gold Magnet benzeri sonradan eklenecek multiplier'ları da burada uygulayabiliriz.
+    func addRunGold(_ amount: Int) {
+        guard amount != 0 else { return }
+        run.gold = max(0, run.gold + amount)
+        UserEnvironment.shared.addGoldEarned(max(0, amount))
+        SaveManager.shared.setGold(slotId: activeSlotId, total: run.gold)
     }
 
     // MARK: - Game Control
@@ -194,18 +237,55 @@ final class GameViewModel: ObservableObject {
 
     func startRound() {
         board.resetGrid() // FORCE RESET (Reset Bug Fix)
-        
-        // Phase 9: NodeType'a göre zorluğu ayarla
+
+        // MARK: - Modifier Escalation (world level'a göre)
+        //
+        // Boşlukları doldurmak için: erken bölümler vanilya kalır, geç
+        // bölümler modifier çeşitlenmesi ile karakter seçimini anlamlı
+        // hale getirir. Her modifier bir karaktere avantaj sağlar:
+        //   fog    → Time Bender (streak & süre yönetimi)
+        //   weight → Titan (heavy cell +0.5×)
+        //   phantom→ Ghost / phantom siphon perki
+        //   glitch → Architect / Alchemist (alan temizliği)
+        //
+        // Eşikler:
+        //   W 1–4  : yalnızca boss'ta modifier (vanilya)
+        //   W 5–9  : boss + elite'te modifier
+        //   W 10–14: normal round'larda %50 modifier şansı
+        //   W 15+ : her round modifier + boss'lar için "difficulty bump"
+        let worldLevel = run.worldLevel
+
         if nodeType == .boss {
-            run.activeModifier = BossModifier.allCases.randomElement()
-            run.currentRoundTargetScore = RoundData.makeTarget(for: run.currentRound)
+            // Boss her zaman kendi modifier'ını taşır
+            run.activeModifier = currentBoss.modifier
+            run.currentRoundTargetScore = RoundData.makeTarget(for: run.currentRound, worldLevel: worldLevel)
         } else if nodeType == .elite {
-            run.activeModifier = nil
-            let baseTarget = RoundData.makeTarget(for: run.currentRound)
+            // Elite: W5+'da rastgele modifier, aksi halde nil
+            if worldLevel >= 5 {
+                run.activeModifier = BossModifier.allCases.randomElement()
+            } else {
+                run.activeModifier = nil
+            }
+            let baseTarget = RoundData.makeTarget(for: run.currentRound, worldLevel: worldLevel)
             run.currentRoundTargetScore = Int(Double(baseTarget) * 1.5) // Elite: %50 daha zor
         } else {
-            run.activeModifier = nil
-            run.currentRoundTargetScore = RoundData.makeTarget(for: run.currentRound)
+            // Normal round
+            if worldLevel >= 15 {
+                // W15+: her normal round bir modifier al (rotasyon)
+                let all = BossModifier.allCases
+                let idx = abs(run.currentRound) % all.count
+                run.activeModifier = all[idx]
+            } else if worldLevel >= 10 {
+                // W10–14: normal round'larda %50 modifier şansı
+                if Double.random(in: 0...1) < 0.5 {
+                    run.activeModifier = BossModifier.allCases.randomElement()
+                } else {
+                    run.activeModifier = nil
+                }
+            } else {
+                run.activeModifier = nil
+            }
+            run.currentRoundTargetScore = RoundData.makeTarget(for: run.currentRound, worldLevel: worldLevel)
         }
         
         // Her round başlangıcında hamle ve streak sayaçlarını sıfırla
@@ -213,6 +293,13 @@ final class GameViewModel: ObservableObject {
         run.streak = 0
         run.currentScore = 0
         run.halfBonusGiven = false
+
+        // Karakter per-round ephemeral state sıfırlama
+        blockEClearsThisRound = 0
+        timebenderFreezeMoves = 0
+        alchemistDoubleCountMoves = 0
+        ghostPhantomMultBonus = 0.0
+        neonWraithActiveBoost = 0
         
         // Timer: nodeType'a göre süre ayarla
         var initialTime = run.round.timeLimit
@@ -248,12 +335,31 @@ final class GameViewModel: ObservableObject {
         if nodeType == .boss {
             phase = .bossDialogue
             timer.pause()
+            // Boss dramatik girişi: dialogue açılmadan önce SFX ve güçlü haptic.
+            AudioManager.shared.playSFX(.bossEntry)
+            haptic.play(.heavy)
         } else {
             phase = .playing
             timer.start()
             
-            // D\u00fc\u015fman atak sistemi ba\u015flat
+            // Düşman atak sistemi başlat
             startEnemyAttackLoop()
+
+            // Non-boss round için modifier initial mechanic (W10+ çeşitlenme).
+            // Boss node'unda bu iş startBossFightAfterDialogue'da yapılıyor.
+            if let modifier = run.activeModifier {
+                addPopup(text: "\(modifier.title): \(modifier.description)", color: ThemeColors.neonPurple)
+                switch modifier {
+                case .glitch:
+                    let worldScale = max(0, run.worldLevel - 1) / 2
+                    board.applyGlitch(count: 2 + worldScale)
+                case .weight:
+                    // Non-boss için biraz daha hafif: W10:2, W15:3, W20:4
+                    let heavyCount = min(4, 2 + max(0, run.worldLevel - 10) / 4)
+                    board.applyHeavy(count: heavyCount)
+                default: break
+                }
+            }
         }
         
         // 4.2: Tutorial Check (Sadece 1. round ve eğer tamamlanmadıysa)
@@ -289,9 +395,19 @@ final class GameViewModel: ObservableObject {
         }
         
         // SYNERGY: GOLDEN FEVER (Penalty part)
-        if activeSynergies.contains(where: { $0.synergyName == "GOLDEN FEVER" }) {
+        if activeSynergies.contains(where: { $0.synergyName == SynergyID.goldenFever }) {
             run.currentRoundTargetScore = Int(Double(run.currentRoundTargetScore) * 1.2)
         }
+        
+        // Static Charge (hayalet perk bağlantısı): round başında 3 + (tier-1) boş
+        // hücreye static modifier yerleştir. Bunları temizleyince overdrive patlar.
+        if run.hasPerk("static_charge") {
+            let tier = run.perkTier("static_charge")
+            board.applyStaticCells(count: 3 + max(0, tier - 1))
+        }
+        
+        // Best placement hint sıfırla — yeni round, yeni tavsiye.
+        board.bestPlacementCells = []
     }
 
     func addPerk(_ perk: PassivePerk) {
@@ -329,16 +445,21 @@ final class GameViewModel: ObservableObject {
         var clearedByWraith: [GameCell] = []
         if isWraithActive {
             // Skill usage: Place anyway and clear what was there
+            var overwrittenCount = 0
             for (dr, dc) in block.cells {
                 let r = position.row + dr
                 let c = position.col + dc
                 if r >= 0 && r < BoardViewModel.size && c >= 0 && c < BoardViewModel.size {
+                    if board.grid[r][c].isOccupied { overwrittenCount += 1 }
                     clearedByWraith.append(board.grid[r][c])
                     board.grid[r][c].state = .empty
                 }
             }
             isWraithActive = false
             addPopup(text: "GHOST OVERWRITE!", color: ThemeColors.neonPurple)
+            if activeCharacterId == "ghost", overwrittenCount > 0 {
+                userEnv.bumpAchievement("ghost_phantom", by: overwrittenCount)
+            }
         }
 
         lastPlacedBlockType = block.type
@@ -381,6 +502,20 @@ final class GameViewModel: ObservableObject {
             // Yerleştirme başarılı
             haptic.play(.blockPlace)
             run.movesUsed += 1
+
+            // Time Bender active (T3): timer freeze'i kalan hamle sayısı kadar sürer
+            if timebenderFreezeMoves > 0 {
+                timebenderFreezeMoves -= 1
+                if timebenderFreezeMoves == 0 {
+                    timer.resume()
+                    addPopup(text: "TIME UNFROZEN", color: ThemeColors.neonCyan)
+                }
+            }
+
+            // Alchemist active (T3): double count hamle sayısını azalt
+            if alchemistDoubleCountMoves > 0 {
+                alchemistDoubleCountMoves -= 1
+            }
             
             // Phase 5.1: Process Modifiers BEFORE checking clears
             for (dr, dc) in block.cells {
@@ -392,8 +527,7 @@ final class GameViewModel: ObservableObject {
                         case .bonus(let type):
                             switch type {
                             case .gold(let amount):
-                                run.gold += amount
-                                UserEnvironment.shared.addGoldEarned(amount)
+                                addRunGold(amount)
                                 AudioManager.shared.playSFX(.coin)
                                 addPopup(text: "+\(amount) ALTIN", color: ThemeColors.electricYellow)
                             case .star:
@@ -408,6 +542,27 @@ final class GameViewModel: ObservableObject {
                             comboCount += 1 // Combo charge
                             addPopup(text: "LANET! -5s", color: ThemeColors.neonPink)
                             haptic.play(.error)
+                        case .staticCharge:
+                            // Static Charge perki aktifken round başında yerleştirilen
+                            // hücreler bunlar. Üzerine blok koyunca overdrive'a yoğun
+                            // şarj transferi olur (tier başına +0.5, max 1.5).
+                            let tier = run.perkTier("static_charge")
+                            let boost = min(1.5, 0.5 * Double(max(1, tier)))
+                            let previousTier = currentOverdriveTier
+                            overdriveCharge = min(3.0, overdriveCharge + boost)
+                            updateOverdriveTier(previous: previousTier)
+                            addPopup(text: "STATIC CHARGE! +\(Int(boost * 100))%", color: ThemeColors.electricYellow)
+                            haptic.play(.success)
+
+                            // STATIC SHOCK sinerjisi (static_charge + chain_pulse):
+                            // Static hücre tetiklendiğinde satır elektrikle patlar.
+                            // Grid mutasyonu güvenli olsun diye bir sonraki runloop'a atıyoruz.
+                            if activeSynergies.contains(where: { $0.synergyName == SynergyID.staticShock }) {
+                                let targetRow = r
+                                DispatchQueue.main.async { [weak self] in
+                                    self?.triggerStaticShock(row: targetRow)
+                                }
+                            }
                         default:
                             break // Locked is handled in canPlace
                         }
@@ -423,11 +578,30 @@ final class GameViewModel: ObservableObject {
                 overdriveCharge = min(3.0, overdriveCharge + 0.15)
                 updateOverdriveTier(previous: previousTier)
             }
+            
+            // Phantom Siphon (hayalet perk bağlantısı): Phantom modifier'lı round'da
+            // her başarılı yerleştirmede süreye tier × 2 saniye ekler. Phantom
+            // bosslarındaki görünmezliği avantaja çevirir.
+            if run.hasPerk("phantom_siphon") && run.activeModifier == .phantom {
+                let tier = run.perkTier("phantom_siphon")
+                let bonusSeconds = Double(2 * max(1, tier))
+                timer.addTime(bonusSeconds)
+                addPopup(text: "PHANTOM SIPHON +\(Int(bonusSeconds))s", color: ThemeColors.neonPurple)
+            }
 
             let cleared = result.clearedCells
             if cleared.isEmpty {
-                // Temizleme olmadı → streak sıfırla, hiç puan yok
-                run.streak = 0
+                // Temizleme olmadı → streak sıfırla (TimeBender pasifi yumuşatır)
+                // TimeBender "kombo süresi %50 yavaş düşer" → streak'i tam sıfırlamak
+                // yerine 2 azaltıyoruz; 2 temizsiz hamlede streak komple düşmüş olur.
+                if activeCharacterId == "timebender" && run.streak > 0 {
+                    run.streak = max(0, run.streak - 2)
+                    if run.streak > 0 {
+                        addPopup(text: "TIME BEND: STREAK \(run.streak)", color: ThemeColors.neonCyan)
+                    }
+                } else {
+                    run.streak = 0
+                }
                 comboCount = 0
                 
                 // Phase 4: Momentum Tracker
@@ -546,7 +720,7 @@ final class GameViewModel: ObservableObject {
             addPopup(text: "MOMENTUM LV.\(tier)! +\(Int(bonus))x", color: ThemeColors.electricYellow)
             
             // SYNERGY: TIME LAPSE (Momentum + Clockwork)
-            if activeSynergies.contains(where: { $0.synergyName == "TIME LAPSE" }) {
+            if activeSynergies.contains(where: { $0.synergyName == SynergyID.timeLapse }) {
                 timer.addTime(5.0)
                 addPopup(text: "TIME LAPSE! +5s", color: ThemeColors.neonPurple)
             }
@@ -560,27 +734,78 @@ final class GameViewModel: ObservableObject {
             addPopup(text: "GLASS CANNON LV.\(tier) ACTIVE", color: ThemeColors.neonPink)
         }
         
+        // Heavy Duty (hayalet perk bağlantısı): Temizlikte yer alan her heavy hücre
+        // çarpanı artırır. Weight modifier'lı boss savaşlarında özellikle değerli.
+        if run.hasPerk("heavy_duty") {
+            let heavyCount = clearedCells.filter {
+                if case .heavy = $0.state { return true } else { return false }
+            }.count
+            if heavyCount > 0 {
+                let tier = run.perkTier("heavy_duty")
+                // Her heavy hücre için +1.0 × tier çarpan (tier 1'de +1, tier 2'de +2, vs.)
+                let bonus = Double(heavyCount) * Double(max(1, tier))
+                characterMult += bonus
+                addPopup(text: "HEAVY DUTY! \(heavyCount)× +\(Int(bonus))x", color: ThemeColors.neonOrange)
+                haptic.play(.success)
+            }
+        }
+        
         if let charId = activeCharacterId {
             switch charId {
             case "architect":
+                // Architect: Kare (O) bloklar ×1.3 çarpan (v2: +0.2 → +0.3)
                 if lastPlacedBlockType == .O {
-                    characterMult += 0.2 // Square (O) blocks +20%
-                    addPopup(text: "ARCHITECT BONUS!", color: ThemeColors.neonCyan)
+                    characterMult += 0.3
+                    addPopup(text: "ARCHITECT: O-BLOCK +30%", color: ThemeColors.neonCyan)
+                    userEnv.bumpAchievement("architect_geometer", by: 1)
                 }
             case "gambler":
+                // Gambler: %7 (lucky dice ile %10) şansla +9.0 mult = yaklaşık ×10 combo
                 var triggerChance = 0.07
                 if userEnv.unlockedUpgradeIDs.contains(MetaUpgrade.luckyDice.rawValue) {
                     triggerChance = 0.10
                 }
                 if Double.random(in: 0...1) < triggerChance {
-                    characterMult += 9.0 
+                    characterMult += 9.0
                     addPopup(text: "JACKPOT! ×10", color: ThemeColors.electricYellow)
                     haptic.play(.success)
+                    userEnv.bumpAchievement("gambler_jackpot", by: 1)
                 }
             case "neonwraith":
-                if timer.ratio < 0.15 {
-                    characterMult += 2.0 
+                // Neon Wraith: Süre <%20 → fury +2.5 mult
+                if timer.ratio < 0.20 {
+                    characterMult += 2.5
                     addPopup(text: "WRAITH FURY!", color: ThemeColors.neonPurple)
+                    userEnv.bumpAchievement("wraith_clutch", by: 1)
+                }
+                // Neon Wraith active boost: sonraki N clear'de +2 bonus
+                if neonWraithActiveBoost > 0 {
+                    characterMult += 2.0
+                    neonWraithActiveBoost -= 1
+                    addPopup(text: "WRAITH SURGE! (\(neonWraithActiveBoost) left)", color: ThemeColors.neonPurple)
+                }
+            case "alchemist":
+                // Alchemist pasifi: Tamamı aynı renk olan temizliklerde +1.0 mult
+                let colors: [BlockDisplayColor] = clearedCells.compactMap { cell in
+                    if case .filled(let c) = cell.state { return c }
+                    return nil
+                }
+                if colors.count >= 3 && Set(colors).count == 1 {
+                    characterMult += 1.0
+                    addPopup(text: "ALCHEMY RESONANCE!", color: ThemeColors.neonPurple)
+                    haptic.play(.success)
+                    userEnv.bumpAchievement("alchemist_resonance", by: 1)
+                }
+            case "titan":
+                // Titan pasifi: Heavy (weight modifier) hücre temizlenince +0.5 her biri için
+                let heavyCount = clearedCells.filter {
+                    if case .heavy = $0.state { return true } else { return false }
+                }.count
+                if heavyCount > 0 {
+                    let bonus = Double(heavyCount) * 0.5
+                    characterMult += bonus
+                    addPopup(text: "TITAN SMASH! +\(String(format: "%.1f", bonus))x", color: ThemeColors.electricYellow)
+                    haptic.play(.success)
                 }
             default: break
             }
@@ -601,7 +826,7 @@ final class GameViewModel: ObservableObject {
         }
         
         // SYNERGY: RAINBOW DOSAGE
-        if activeSynergies.contains(where: { $0.synergyName == "RAINBOW DOSAGE" }) && blueCount > 0 && greenCount > 0 {
+        if activeSynergies.contains(where: { $0.synergyName == SynergyID.rainbowDosage }) && blueCount > 0 && greenCount > 0 {
             characterMult += 3.0
             addPopup(text: "RAINBOW DOSAGE! ×3", color: ThemeColors.neonPurple)
             haptic.play(.success)
@@ -623,9 +848,9 @@ final class GameViewModel: ObservableObject {
         )
 
         // AAA: Detect Synergy Context for VFX
-        let isGoldenFever = activeSynergies.contains(where: { $0.synergyName == "GOLDEN FEVER" }) && scoreResult.isFlush
-        let isEternalCycle = activeSynergies.contains(where: { $0.synergyName == "ETERNAL CYCLE" }) && (result.rowsCleared + result.colsCleared >= 2)
-        let isRainbowDosage = activeSynergies.contains(where: { $0.synergyName == "RAINBOW DOSAGE" }) && blueCount > 0 && greenCount > 0
+        let isGoldenFever = activeSynergies.contains(where: { $0.synergyName == SynergyID.goldenFever }) && scoreResult.isFlush
+        let isEternalCycle = activeSynergies.contains(where: { $0.synergyName == SynergyID.eternalCycle }) && (result.rowsCleared + result.colsCleared >= 2)
+        let isRainbowDosage = activeSynergies.contains(where: { $0.synergyName == SynergyID.rainbowDosage }) && blueCount > 0 && greenCount > 0
         
         if isGoldenFever || isEternalCycle || isRainbowDosage {
             isSynergyClear = true
@@ -639,7 +864,22 @@ final class GameViewModel: ObservableObject {
         }
 
         lastScoreResult = scoreResult
-        run.addScore(scoreResult.totalScore)
+        var finalScore = scoreResult.totalScore
+
+        // Alchemist active T3: doubleCount hamleleri boyunca skor ×2
+        if alchemistDoubleCountMoves > 0 {
+            finalScore *= 2
+            addPopup(text: "DOUBLE COUNT! ×2 (\(alchemistDoubleCountMoves) left)", color: ThemeColors.neonCyan)
+        }
+
+        // Ghost active T2: tek atımlık phantom bonusu (overdrive'da set edilir)
+        if ghostPhantomMultBonus > 0 {
+            finalScore = Int(Double(finalScore) * (1.0 + ghostPhantomMultBonus))
+            addPopup(text: "PHANTOM BONUS! +\(Int(ghostPhantomMultBonus * 100))%", color: ThemeColors.neonPurple)
+            ghostPhantomMultBonus = 0.0
+        }
+
+        run.addScore(finalScore)
 
         // 6. UI & Perk Effects
         if scoreResult.clearCombo != ClearCombo.single {
@@ -648,15 +888,13 @@ final class GameViewModel: ObservableObject {
             // Midas Touch
             if scoreResult.isFlush {
                 let hasMidas = run.hasPerk("midas_touch")
-                let hasFever = activeSynergies.contains(where: { $0.synergyName == "GOLDEN FEVER" })
+                let hasFever = activeSynergies.contains(where: { $0.synergyName == SynergyID.goldenFever })
                 if hasFever {
-                    run.gold += 15
-                    UserEnvironment.shared.addGoldEarned(15)
+                    addRunGold(15)
                     AudioManager.shared.playSFX(.coin)
                     addPopup(text: "GOLDEN FEVER +15G", color: ThemeColors.electricYellow)
                 } else if hasMidas {
-                    run.gold += 5
-                    UserEnvironment.shared.addGoldEarned(5)
+                    addRunGold(5)
                     AudioManager.shared.playSFX(.coin)
                     addPopup(text: "MIDAS TOUCH +5G", color: ThemeColors.electricYellow)
                 }
@@ -665,7 +903,7 @@ final class GameViewModel: ObservableObject {
             // Recycler
             if scoreResult.clearedRows + scoreResult.clearedCols >= 2 {
                 let hasRecycler = run.hasPerk("recycler")
-                let hasCycle = activeSynergies.contains(where: { $0.synergyName == "ETERNAL CYCLE" })
+                let hasCycle = activeSynergies.contains(where: { $0.synergyName == SynergyID.eternalCycle })
                 let chance = hasCycle ? 0.4 : (hasRecycler ? 0.2 : 0.0)
                 if Double.random(in: 0...1) < chance {
                     refillBlockTray()
@@ -760,8 +998,72 @@ final class GameViewModel: ObservableObject {
                 }
             }
         }
+        
+        // Chain Pulse (hayalet perk bağlantısı): Temizlik sonrası clearedPositions'ın
+        // komşularındaki dolu hücrelerden rastgele birkaçını temizler. Tier başına
+        // %15 şans ve tier sayısı kadar hedef. Static Charge ile sinerji içinde.
+        if run.hasPerk("chain_pulse") && !result.clearedPositions.isEmpty {
+            let tier = run.perkTier("chain_pulse")
+            let chance = 0.15 * Double(max(1, tier))
+            if Double.random(in: 0...1) < chance {
+                let maxTargets = max(1, tier)
+                triggerChainPulse(around: result.clearedPositions, maxTargets: maxTargets)
+            }
+        }
     }
     
+    /// Chain Pulse perk etkisi: clearedPositions'ın komşularından dolu olanları
+    /// topla, rastgele `maxTargets` kadarını "elektriklenip" temizle. Statik
+    /// charge synerjisi için görünür bir feedback sağlanır.
+    private func triggerChainPulse(around cleared: [GridPosition], maxTargets: Int) {
+        let deltas: [(Int, Int)] = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        let clearedSet = Set(cleared)
+        var candidates: Set<GridPosition> = []
+        for pos in cleared {
+            for (dr, dc) in deltas {
+                let nr = pos.row + dr
+                let nc = pos.col + dc
+                guard nr >= 0, nr < BoardViewModel.size, nc >= 0, nc < BoardViewModel.size else { continue }
+                let np = GridPosition(row: nr, col: nc)
+                if clearedSet.contains(np) { continue }
+                if board.grid[nr][nc].isOccupied {
+                    candidates.insert(np)
+                }
+            }
+        }
+        guard !candidates.isEmpty else { return }
+        let targets = Array(candidates.shuffled().prefix(maxTargets))
+        board.removeCells(at: targets)
+        clearFlashPositions = targets
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.clearFlashPositions = []
+        }
+        addPopup(text: "CHAIN PULSE! \(targets.count)×", color: ThemeColors.neonCyan)
+        haptic.play(.success)
+    }
+
+    /// STATIC SHOCK sinerjisi: static_charge hücresi tetiklendiği satırdaki
+    /// tüm dolu hücreleri elektrikle temizler. Her temizlenen hücre için küçük
+    /// bir skor bonusu verilir; komşu satırlar zincirleme tetiklenmez.
+    private func triggerStaticShock(row: Int) {
+        guard row >= 0, row < BoardViewModel.size else { return }
+        var targets: [GridPosition] = []
+        for c in 0..<BoardViewModel.size where board.grid[row][c].isOccupied {
+            targets.append(GridPosition(row: row, col: c))
+        }
+        guard !targets.isEmpty else { return }
+        board.removeCells(at: targets)
+        clearFlashPositions = targets
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.clearFlashPositions = []
+        }
+        let bonus = targets.count * 75
+        run.addScore(bonus)
+        addPopup(text: "STATIC SHOCK! +\(bonus)", color: ThemeColors.electricYellow)
+        haptic.play(.flush)
+        AudioManager.shared.playSFX(.flush)
+    }
+
     private func updateOverdriveTier(previous: OverdriveTier) {
         guard let char = SaveManager.shared.slots.first(where: { $0.id == activeSlotId })?.character else { return }
         currentOverdriveTier = OverdriveEngine.currentTier(charge: overdriveCharge, thresholds: char.overdriveThresholds)
@@ -851,7 +1153,7 @@ final class GameViewModel: ObservableObject {
             addPopup(text: "OVERKILL LV.\(tier) +\(overflow) NEXT", color: ThemeColors.neonPink)
             
             // SYNERGY: ENDLESS RESERVES (Overkill + Echoes)
-            if activeSynergies.contains(where: { $0.synergyName == "ENDLESS RESERVES" }) {
+            if activeSynergies.contains(where: { $0.synergyName == SynergyID.endlessReserves }) {
                 let timeBonus = Double(overflow) / 50.0 // Her 50 puan için 1sn
                 timer.addTime(timeBonus)
                 if timeBonus > 1 {
@@ -863,12 +1165,17 @@ final class GameViewModel: ObservableObject {
         // 3. Altın Hesabı (Meta-Upgrade: Gold Eye Bonus)
         let hasGoldEye = userEnv.unlockedUpgradeIDs.contains(MetaUpgrade.goldEye.rawValue)
         let goldAdded = ScoreEngine.goldEarned(for: result, hasGoldEye: hasGoldEye)
-        run.gold += goldAdded
-        UserEnvironment.shared.addGoldEarned(goldAdded)
+        addRunGold(goldAdded)
         if goldAdded > 0 {
             AudioManager.shared.playSFX(.coin)
         }
         UserEnvironment.shared.updateHighScore(run.currentScore)
+        // Phase 8: başarı ilerlemesi — round kazanç, skor, lines, gold.
+        UserEnvironment.shared.bumpAchievement("first_victory", by: 1)
+        UserEnvironment.shared.reportAchievement("score_10k", progress: run.currentScore)
+        UserEnvironment.shared.reportAchievement("lines_100", progress: UserEnvironment.shared.totalLinesCleared)
+        UserEnvironment.shared.reportAchievement("gold_hoarder_5k", progress: UserEnvironment.shared.totalGoldEarned)
+        UserEnvironment.shared.reportAchievement("perk_collector_5", progress: UserEnvironment.shared.discoveredPerkIDs.count)
 
         
         // Boss round kazanma = +1 can!
@@ -884,7 +1191,19 @@ final class GameViewModel: ObservableObject {
             }
         }
         
+        // Round zaferi: müzik yumuşasın, kazanım SFX'i çalsın.
+        AudioManager.shared.playSFX(.roundWin)
         phase = .roundComplete
+
+        // Skor/round'u diske persist et — Slot seçim ekranı ve Hub'ın "Round X
+        // · N pts" göstergeleri anında güncellensin. Eskiden sadece oyun çıkışı
+        // / pause save / game-over'da yazılıyordu, bu yüzden slot listesi
+        // çoğu zaman "Round 1 · 0 pts" ile bayat kalıyordu.
+        SaveManager.shared.updateSave(
+            slotId: activeSlotId,
+            score: run.currentScore,
+            round: run.currentRound
+        )
     }
 
     func proceedToNextRound() {
@@ -917,20 +1236,38 @@ final class GameViewModel: ObservableObject {
     }
     
     func startBossFightAfterDialogue() {
-        // Called from BossDialogueOverlay when dialogue ends
-        if let modifier = run.round.modifier {
+        // Called from BossDialogueOverlay when dialogue ends.
+        // IMPORTANT: startRound() is NOT called here — it was already called when we
+        // entered the boss node (which set phase = .bossDialogue). Calling it again
+        // would re-enter the dialogue phase (infinite loop) AND reset run-state that
+        // was just configured (tray, target, overkill carryover, timer, etc.).
+        // Instead we just apply the initial boss mechanics and flip to .playing.
+
+        // activeModifier is set in startRound() when nodeType == .boss, so prefer that
+        // over run.round.modifier (which is nil for non-%5 rounds like world level 1).
+        if let modifier = run.activeModifier {
             addPopup(text: "BOSS FIGHT: \(modifier.title)", color: ThemeColors.neonPink)
             
             // Apply initial boss mechanics
             switch modifier {
             case .glitch:
-                board.applyGlitch(count: 3 + (run.currentRound / 5))
+                // Scale glitch cells with world level (min 3)
+                let worldScale = max(0, run.worldLevel - 1) / 2
+                board.applyGlitch(count: 3 + worldScale)
             case .weight:
-                break
+                // Weight: N heavy hücresi seed. W5:3 → W20:8.
+                let heavyCount = min(8, 3 + max(0, run.worldLevel - 5) / 3)
+                board.applyHeavy(count: heavyCount)
             default: break
             }
         }
-        startRound()
+
+        phase = .playing
+        timer.start()
+        startEnemyAttackLoop()
+        
+        AudioManager.shared.playMusic(.boss)
+        haptic.play(.heavy)
     }
 
     // MARK: - Perk Interactions
@@ -943,7 +1280,7 @@ final class GameViewModel: ObservableObject {
         guard hasSculptor else { return }
         
         // SYNERGY: MASTER BUILDER (Wide Load + Sculptor)
-        let isMasterBuilder = activeSynergies.contains(where: { $0.synergyName == "MASTER BUILDER" })
+        let isMasterBuilder = activeSynergies.contains(where: { $0.synergyName == SynergyID.masterBuilder })
         let isFourthSlot = blockTray.firstIndex(where: { $0.id == block.id }) == 3
         
         // Kullanım Sınırı Kontrolü (Master Builder ise 4. slot ücretsiz)
@@ -983,8 +1320,7 @@ final class GameViewModel: ObservableObject {
             addPopup(text: "ENERGY MAXED!", color: ThemeColors.electricYellow)
             haptic.play(.success)
         case .goldBag:
-            run.gold += 150
-            UserEnvironment.shared.addGoldEarned(150)
+            addRunGold(150)
             AudioManager.shared.playSFX(.coin)
             addPopup(text: "+150 GOLD", color: ThemeColors.electricYellow)
             haptic.play(.success)
@@ -1029,24 +1365,34 @@ final class GameViewModel: ObservableObject {
         slot.grid = board.grid
         slot.trayBlocks = blockTray
         slot.timeLeft = timer.timeRemaining > 0 ? timer.timeRemaining : nil
+        slot.gold = run.gold
+        slot.lives = run.lives
         slot.lastSaved = Date()
         
         if let index = SaveManager.shared.slots.firstIndex(where: { $0.id == activeSlotId }) {
             SaveManager.shared.slots[index] = slot
         }
-        // Ideally trigger the internal saveToDisk inside SaveManager, handled by assigning if @Published,
-        // but we'll do an explicit update just in case.
-        // Check if boss was defeated
+        
+        // Boss discovery: kimliği artık BossRegistry üzerinden veriyoruz ki
+        // "boss_5" gibi tur bazlı takma isimler yerine gerçek boss id'si
+        // (viper_x, sentinel_k, …) kolleksiyonda açığa çıksın.
         if run.round.isBossRound && run.currentScore >= run.currentRoundTargetScore {
-            UserEnvironment.shared.discoverBoss("boss_\(run.round.roundNumber)") 
+            UserEnvironment.shared.discoverBoss(currentBoss.id)
+            // Phase 8: boss yenildi — achievement + world progression sinyali.
+            UserEnvironment.shared.reportAchievement(
+                "boss_slayer_3",
+                progress: UserEnvironment.shared.totalBossesDefeated
+            )
+            UserEnvironment.shared.reportAchievement(
+                "world_explorer_2",
+                progress: UserEnvironment.shared.unlockedWorldLevel
+            )
         }
         
-        // Save global stats
-        UserEnvironment.shared.addGoldEarned(run.gold) // In practice, you might want a delta tracking
-        
+        // Cüzdan ve slot gold tek havuza bağlı (setGold içinde UserEnvironment.gold
+        // da yazılır). Burada sadece diske yaz.
+        SaveManager.shared.setGold(slotId: activeSlotId, total: run.gold)
         SaveManager.shared.updateSave(slotId: activeSlotId, score: run.currentScore, round: run.currentRound)
-        
-        // We bypass the strictly private update but since it's published, it might trigger automatically.
     }
 
     func triggerGameOver() {
@@ -1054,7 +1400,7 @@ final class GameViewModel: ObservableObject {
         if run.undyingRageActive { return } // Do not die while immortal
 
         // 1. SYNERGY: UNDYING RAGE (One-time save with 5s immortality)
-        let hasUndyingRage = activeSynergies.contains(where: { $0.synergyName == "UNDYING RAGE" })
+        let hasUndyingRage = activeSynergies.contains(where: { $0.synergyName == SynergyID.undyingRage })
         if hasUndyingRage && run.lives == 1 && !run.lastStandUsed {
             run.lastStandUsed = true 
             run.gainLife()
@@ -1082,12 +1428,22 @@ final class GameViewModel: ObservableObject {
 
         // --- ACTUAL GAME OVER / LIFE LOSS ---
         timer.stop()
+        stopEnemyLoop()
         haptic.play(.gameOver)
+        AudioManager.shared.playSFX(.gameOver)
         
         run.loseLife()
         saveGameState()
         
         phase = .gameOver // Triggets GameOverOverlay which reads run.isGameOver
+        // Phase 8: run sonu leaderboard kaydı. Sadece gerçek game over'da tetiklenir
+        // (run.isGameOver == true); aksi halde ara ölümlerde de yazardık.
+        if run.isGameOver {
+            UserEnvironment.shared.recordRun(
+                score: run.currentScore,
+                worldLevelReached: max(1, run.worldLevel)
+            )
+        }
     }
 
     // MARK: - Block Tray
@@ -1144,6 +1500,7 @@ final class GameViewModel: ObservableObject {
         } else {
             board.clearGhost()
             board.hintPositions = []
+            board.hintZonePositions = []
         }
     }
     
@@ -1175,7 +1532,8 @@ final class GameViewModel: ObservableObject {
         draggingBlock = nil
         dragLocation = .zero
         board.clearGhost()
-        board.hintPositions = [] // AAA: Reset hints
+        board.hintPositions = []
+        board.hintZonePositions = []
     }
     
     // MARK: - Timer Binding
@@ -1224,14 +1582,24 @@ final class GameViewModel: ObservableObject {
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self = self, self.phase == .playing else { return }
-                
+
                 if let charId = self.activeCharacterId {
                     switch charId {
                     case "block_e":
-                        // BLOCK-E: Every 10s, clear 1 random occupied cell
+                        // BLOCK-E: Her 10sn, 1 rastgele hücre temizle — max 3/round
+                        if self.blockEClearsThisRound >= 3 { break }
+                        self.blockEClearsThisRound += 1
                         self.clearRandomCell(count: 1)
-                        self.addPopup(text: "BLOCK-E: SYSTEM CLEANUP", color: ThemeColors.neonCyan)
+                        self.addPopup(
+                            text: "BLOCK-E: CLEANUP (\(self.blockEClearsThisRound)/3)",
+                            color: ThemeColors.neonCyan
+                        )
                         self.haptic.play(.lineClear)
+                        self.userEnv.bumpAchievement("block_e_custodian", by: 1)
+                    case "ghost":
+                        // Ghost pasifi: Her 10sn +3sn whisper bonusu (stealth zamanı)
+                        self.timer.addTime(3.0)
+                        self.addPopup(text: "GHOST WHISPER +3s", color: ThemeColors.neonPurple)
                     default: break
                     }
                 }

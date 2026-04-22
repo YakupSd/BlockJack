@@ -120,13 +120,44 @@ class SaveManager: ObservableObject {
         slots[index].lastSaved = Date()
         saveToDisk()
     }
+
+    /// Chapter bitti → haritayı sıfırla. Slot Hub'daki "hasActiveRun" false
+    /// olur, kullanıcı "SEFERE BAŞLA" ile WorldMap'e düşer ve sonraki
+    /// bölümünü seçebilir. Eskiden map `isCleared=true` ile diskte kalıyor,
+    /// "SEFERE DEVAM" da aynı bitik haritaya dönüş loop'u yaratıyordu.
+    func clearChapterMap(slotId: Int) {
+        guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        slots[index].currentChapterMap = nil
+        slots[index].completedNodeIds = []
+        slots[index].lastSaved = Date()
+        saveToDisk()
+    }
     
     // Phase 10: Run State direct modifiers
     func updateGold(slotId: Int, amount: Int) {
         guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
-        slots[index].gold += amount
+        slots[index].gold = max(0, slots[index].gold + amount)
         slots[index].lastSaved = Date()
         saveToDisk()
+        // Tek altın havuzu: aktif slot değiştiyse kullanıcının cüzdanını da eşitle.
+        // Dashboard / Shop / Upgrades UserEnvironment.gold okur, Rest/Treasure/Mystery
+        // slot.gold yazar. Bu sync olmazsa iki havuz birbirinden koparydı (meşhur
+        // "altın görünmüyor" bug'ı).
+        if UserEnvironment.shared.activeSlotId == slotId {
+            UserEnvironment.shared.gold = slots[index].gold
+        }
+    }
+    
+    /// Slot'un mevcut altın değerini mutlak olarak yazar. Run sonunda oyun içi
+    /// biriken altını diske kalıcı hale getirmek için kullanılır.
+    func setGold(slotId: Int, total: Int) {
+        guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        slots[index].gold = max(0, total)
+        slots[index].lastSaved = Date()
+        saveToDisk()
+        if UserEnvironment.shared.activeSlotId == slotId {
+            UserEnvironment.shared.gold = slots[index].gold
+        }
     }
     
     func updateLives(slotId: Int, amount: Int) {
@@ -168,6 +199,19 @@ class SaveManager: ObservableObject {
         saveToDisk()
     }
     
+    /// Slot Hub'dan karakter değiştirme. Yeni karakter id'sini yazar ve
+    /// aktif slot ise UserEnvironment.selectedCharacterID'yi de günceller
+    /// (avatar/stat okuyan ekranlar anında yenilenir).
+    func setCharacter(slotId: Int, characterID: String) {
+        guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        slots[index].characterId = characterID
+        slots[index].lastSaved = Date()
+        saveToDisk()
+        if UserEnvironment.shared.activeSlotId == slotId {
+            UserEnvironment.shared.selectedCharacterID = characterID
+        }
+    }
+
     // MARK: - Slot Progression (Phase 11)
     func updateSlotProgression(slotId: Int, worldLevel: Int, goldUpgrades: [String: Int], metaUpgrades: [String]) {
         guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }

@@ -21,7 +21,6 @@ struct TreasureRoomView: View {
     
     var body: some View {
         ZStack {
-            // Fix Background Scaling (Task 2)
             GeometryReader { geo in
                 Image("cyber_treasure_vault")
                     .resizable()
@@ -30,43 +29,32 @@ struct TreasureRoomView: View {
                     .clipped()
             }
             .ignoresSafeArea()
-            
-            Color.black.opacity(0.5).ignoresSafeArea() // Görünürlük için karartma
-            
-            // Magic Glow
+
+            Color.black.opacity(0.55).ignoresSafeArea()
+
             RadialGradient(
-                colors: [ThemeColors.neonGreen.opacity(0.3), .clear],
+                colors: [ThemeColors.neonGreen.opacity(0.28), .clear],
                 center: .center,
                 startRadius: 0,
                 endRadius: 600
-            ).ignoresSafeArea()
-            
-            VStack(spacing: 30) {
-                // Header
-                headerSection
-                
-                Spacer()
-                
-                if !treasureOpened {
-                    closedChestSection
-                } else {
-                    if let _ = selectedPerk {
+            )
+            .ignoresSafeArea()
+
+            AdaptiveOverlay(
+                header: { headerSection },
+                content: {
+                    if !treasureOpened {
+                        closedChestSection
+                    } else if selectedPerk != nil {
                         rewardClaimedSection
                     } else {
                         perkOptionsSection
                     }
-                }
-                
-                Spacer()
-                
-                // Footer
-                footerSection
-            }
-            .padding(.top, 40)
+                },
+                footer: { footerSection }
+            )
         }
-        .onAppear {
-            generateOptions()
-        }
+        .onAppear { generateOptions() }
     }
     
     private func generateOptions() {
@@ -81,19 +69,15 @@ struct TreasureRoomView: View {
     // MARK: - Components
     
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            Text("HAZİNE ODASI")
-                .font(.custom("Outfit-Bold", size: 32, relativeTo: .largeTitle))
-                .foregroundColor(ThemeColors.neonGreen)
-            
-            Text(treasureOpened ? "Bir hediye seç!" : "Karanlık bir köşede eski bir sandık duruyor...")
-                .font(.subheadline)
-                .foregroundColor(ThemeColors.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
+        OverlayTitleBlock(
+            "HAZİNE ODASI",
+            subtitle: treasureOpened
+                ? "Bir hediye seç!"
+                : "Karanlık bir köşede eski bir sandık duruyor...",
+            color: ThemeColors.neonGreen
+        )
     }
-    
+
     private var closedChestSection: some View {
         Button(action: {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
@@ -101,20 +85,19 @@ struct TreasureRoomView: View {
             }
             HapticManager.shared.play(.success)
         }) {
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 ZStack {
                     Circle()
                         .fill(ThemeColors.neonGreen.opacity(0.1))
-                        .frame(width: 200, height: 200)
+                        .frame(width: 170, height: 170)
                         .blur(radius: 20)
-                    
+
                     Image(systemName: "gift.fill")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 120, height: 120)
+                        .frame(width: 100, height: 100)
                         .foregroundColor(ThemeColors.neonGreen)
                         .shadow(color: ThemeColors.neonGreen, radius: 20)
-                        .scaleEffect(treasureOpened ? 1.5 : 1.0)
                         .scaleEffect(animateChest ? 1.1 : 1.0)
                 }
                 .phaseAnimator([0, -10, 0]) { content, offset in
@@ -122,84 +105,94 @@ struct TreasureRoomView: View {
                 } animation: { _ in
                     .easeInOut(duration: 2).repeatForever(autoreverses: true)
                 }
-                
+
                 Text(userEnv.localizedString("SANDIĞI AÇ", "OPEN CHEST"))
-                    .font(.setCustomFont(name: .InterBlack, size: 20))
+                    .font(.setCustomFont(name: .InterBlack, size: 18))
                     .foregroundColor(ThemeColors.cosmicBlack)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 30)
+                    .padding(.vertical, 12)
                     .background(ThemeColors.neonGreen)
                     .clipShape(Capsule())
                     .shadow(color: ThemeColors.neonGreen.opacity(0.5), radius: 10)
             }
         }
+        .buttonStyle(.plain)
     }
-    
+
     private var perkOptionsSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             ForEach(options) { perk in
                 Button(action: {
                     SaveManager.shared.addPassivePerk(slotId: slotId, perk: perk)
                     withAnimation { selectedPerk = perk }
                     HapticManager.shared.play(.success)
                 }) {
-                    HStack(spacing: 16) {
+                    HStack(spacing: 14) {
                         Text(perk.icon)
-                            .font(.largeTitle)
-                            .frame(width: 70, height: 70)
+                            .font(.system(size: 34))
+                            .frame(width: 60, height: 60)
                             .background(Color.white.opacity(0.05))
-                            .cornerRadius(12)
-                        
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text(perk.name)
                                 .font(.headline)
                                 .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
                             Text(perk.desc)
                                 .font(.caption)
                                 .foregroundColor(ThemeColors.textSecondary)
-                                .lineLimit(2)
+                                .lineLimit(3)
+                                .minimumScaleFactor(0.85)
                                 .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        Spacer()
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding()
+                    .padding(12)
                     .background(.ultraThinMaterial)
-                    .cornerRadius(16)
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(ThemeColors.neonGreen.opacity(0.4), lineWidth: 1))
-                    .shadow(color: ThemeColors.neonGreen.opacity(0.2), radius: 10)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(ThemeColors.neonGreen.opacity(0.4), lineWidth: 1)
+                    )
+                    .shadow(color: ThemeColors.neonGreen.opacity(0.18), radius: 8)
                 }
+                .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 20)
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
-    
+
     private var rewardClaimedSection: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 18) {
             Text(selectedPerk?.icon ?? "🎁")
-                .font(.system(size: 100))
+                .font(.system(size: 80))
                 .shadow(color: ThemeColors.neonGreen, radius: 20)
-            
+
             Text("\(selectedPerk?.name ?? "") Elde Edildi!")
-                .font(.title2)
-                .bold()
+                .font(.title2.weight(.bold))
                 .foregroundColor(.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
         }
         .transition(.scale.combined(with: .opacity))
     }
-    
+
     private var footerSection: some View {
-        Button(action: {
-            dismiss()
-        }) {
+        Button(action: { dismiss() }) {
             Text(selectedPerk != nil ? "DEVAM ET" : "ATLA")
                 .font(.headline)
                 .frame(maxWidth: .infinity)
-                .padding()
+                .padding(.vertical, 14)
                 .background(Color.white.opacity(0.1))
                 .foregroundColor(.white)
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .padding()
+        .buttonStyle(.plain)
     }
 }

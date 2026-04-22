@@ -56,6 +56,16 @@ extension Font {
     public static func luminescentHeader(size: CGFloat = 22) -> Font {
         return setCustomFont(name: .ManropeExtraBold, size: size)
     }
+
+    /// Retro-pixel font. Önce `PressStart2P-Regular` bundle'da aranır;
+    /// yoksa system monospaced black kullanılır. Bu sayede .ttf ileride eklenirse
+    /// otomatik devreye girer, eklenmezse bugün piksel-monospace görünüm verir.
+    public static func pixel(_ size: CGFloat) -> Font {
+        if let uiFont = UIFont(name: "PressStart2P-Regular", size: size) {
+            return Font(uiFont)
+        }
+        return .system(size: size, weight: .black, design: .monospaced)
+    }
 }
 
 extension View {

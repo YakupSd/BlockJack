@@ -152,13 +152,25 @@ extension MainViewsRouter {
         pushTo(view: vc)
     }
 
-    /// Ana menüye dön (Dashboard)
+    /// Ana menüye dön (Dashboard). Nav stack'i tamamen Dashboard tek
+    /// viewcontroller'ı kalacak şekilde sıfırlar. Daha önce `push`
+    /// ediyordu, bu da [AppStartView, …, Dashboard] şeklinde birikim
+    /// yaratıyor ve sistem "geri" hareketiyle AppStartView diriliyordu
+    /// (v1.0.0 splash'te takılma bug'ı). Artık root olarak yerleştiriyoruz.
     func popToDashboard() {
-        push(
+        guard let nav = nav else { return }
+        let dashboardVC = MainNavigationView.builder.makeView(
             DashboardView().environmentObject(UserEnvironment.shared),
-            title: "",
-            navBarHidden: true
+            withNavigationTitle: "",
+            navigationBarHidden: true
         )
+        let transition = CATransition()
+        transition.duration = 0.28
+        transition.type = .push
+        transition.subtype = .fromLeft
+        transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        nav.view.layer.add(transition, forKey: kCATransition)
+        nav.setViewControllers([dashboardVC], animated: false)
     }
 
     /// Oyun ekranına git
@@ -172,7 +184,7 @@ extension MainViewsRouter {
     
     // MARK: - Pre-Game Flow Helpers
     
-    func pushToSaveSlotSelection(mode: SaveSlotSelectionView.Mode) {
+    func pushToSaveSlotSelection(mode: SaveSlotSelectionView.Mode = .newGame) {
         let view = MainNavigationView.builder.makeView(
             SaveSlotSelectionView(mode: mode).environmentObject(UserEnvironment.shared),
             withNavigationTitle: "",
@@ -181,10 +193,54 @@ extension MainViewsRouter {
         pushFromTop(view: view)
     }
     
-    func pushToCharacterSelection(slotId: Int) {
+    func pushToCharacterSelection(slotId: Int, mode: CharacterSelectionView.Mode = .firstSetup) {
         push(
-            CharacterSelectionView(slotId: slotId).environmentObject(UserEnvironment.shared)
+            CharacterSelectionView(slotId: slotId, mode: mode).environmentObject(UserEnvironment.shared)
         )
+    }
+
+    /// Slot Hub ekranına geçiş. Slot seçildikten sonra tüm Market/Karakter/
+    /// Galeri ve sefere başlama aksiyonları buradan doğar. Hub içinde her
+    /// ekran `slotId` taşır, böylece "hangi oyuncu için" sorusu ortadan
+    /// kalkar.
+    func pushToSlotHub(slotId: Int) {
+        push(
+            SlotHubView(slotId: slotId).environmentObject(UserEnvironment.shared)
+        )
+    }
+
+    /// Run içinden (Map / GameView / GameOver overlay'leri) Ana Menü
+    /// basıldığında Dashboard yerine Slot Hub'a dön. Bu sayede kullanıcı
+    /// "bu slot için oynuyorum" bağlamını kaybetmiyor; Dashboard'a dönmek
+    /// için Hub'daki "SLOT" butonunu kullanması gerekiyor (o da
+    /// `popToDashboard` çağırır). Stack'i Dashboard + Hub iki seviyeye
+    /// sıfırlıyoruz ki Hub içinden "SLOT" geri dönüşü doğru çalışsın.
+    func popToSlotHub(slotId: Int) {
+        guard let nav = nav else { return }
+        let dashboardVC = MainNavigationView.builder.makeView(
+            DashboardView().environmentObject(UserEnvironment.shared),
+            withNavigationTitle: "", navigationBarHidden: true
+        )
+        let hubVC = MainNavigationView.builder.makeView(
+            SlotHubView(slotId: slotId).environmentObject(UserEnvironment.shared),
+            withNavigationTitle: "", navigationBarHidden: true
+        )
+        let transition = CATransition()
+        transition.duration = 0.28
+        transition.type = .push
+        transition.subtype = .fromLeft
+        transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        nav.view.layer.add(transition, forKey: kCATransition)
+        nav.setViewControllers([dashboardVC, hubVC], animated: false)
+    }
+
+    /// Hub'dan ve alt ekranlardan Dashboard'a dönüş. Slot bağlamını
+    /// temizler; yanlışlıkla aktif slot açık kalırsa `UserEnvironment.spend`
+    /// hala o slot'a yönlendirir ve kullanıcı Dashboard'da para
+    /// kaybedebilir. Bu yüzden pop öncesi temizlik şart.
+    func popToDashboardFromHub() {
+        UserEnvironment.shared.clearActiveSlot()
+        popToDashboard()
     }
     
     func pushToPerkSelection(slotId: Int, characterId: String) {
@@ -206,6 +262,36 @@ extension MainViewsRouter {
         push(
             WorldMapView(vm: vm).environmentObject(UserEnvironment.shared)
         )
+    }
+
+    /// Bölüm bitiminde kullanılır — Dashboard + Hub + WorldMap olacak şekilde
+    /// stack'i sıfırlar. Böylece WorldMap'ten geri basıldığında Slot Hub'a
+    /// oradan da Dashboard'a temiz bir geri-akış oluşur. Eski `pushToWorldMap`
+    /// sadece stack'in tepesine WorldMap ekliyordu; bölüm bittikten sonra
+    /// "MapView → WorldMap" zincirinde geri dönüşte MapView'a çarpıp kafa
+    /// karıştırıyordu.
+    func popToWorldMap(slotId: Int) {
+        guard let nav = nav else { return }
+        let dashboardVC = MainNavigationView.builder.makeView(
+            DashboardView().environmentObject(UserEnvironment.shared),
+            withNavigationTitle: "", navigationBarHidden: true
+        )
+        let hubVC = MainNavigationView.builder.makeView(
+            SlotHubView(slotId: slotId).environmentObject(UserEnvironment.shared),
+            withNavigationTitle: "", navigationBarHidden: true
+        )
+        let vm = WorldMapViewModel(slotId: slotId, userEnv: UserEnvironment.shared)
+        let worldMapVC = MainNavigationView.builder.makeView(
+            WorldMapView(vm: vm).environmentObject(UserEnvironment.shared),
+            withNavigationTitle: "", navigationBarHidden: true
+        )
+        let transition = CATransition()
+        transition.duration = 0.28
+        transition.type = .push
+        transition.subtype = .fromLeft
+        transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        nav.view.layer.add(transition, forKey: kCATransition)
+        nav.setViewControllers([dashboardVC, hubVC, worldMapVC], animated: false)
     }
     
     func popToMap(slotId: Int) {

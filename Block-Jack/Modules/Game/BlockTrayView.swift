@@ -43,70 +43,100 @@ struct BlockTileView: View {
     }
 }
 
-// MARK: - BlockTrayView (alt bar)
+// MARK: - BlockTrayView (UI Revize — overflow fix)
+/// Dinamik genişlik: ekran genişliğinde kaç slot varsa eşit paylaşılır.
+/// Böylece 3 veya 4 slot da ekrana sorunsuz sığar, overflow yok.
 struct BlockTrayView: View {
     @ObservedObject var vm: GameViewModel
     /// Drag sırasında her frame çağrılır — GameView @State dragPosition günceller
     var onDragChanged: ((CGPoint) -> Void)? = nil
+    
+    /// Slotlar arası boşluk
+    private let slotSpacing: CGFloat = 8
+    /// Kart içi yatay iç padding (kart kenarından slotlara)
+    private let innerPadding: CGFloat = 10
 
     var body: some View {
-        HStack(spacing: vm.run.maxTraySlots > 3 ? 8 : 16) {
-            ForEach(vm.blockTray) { block in
-                traySlot(block: block)
-            }
+        let totalSlots = vm.run.maxTraySlots
+        
+        GeometryReader { geo in
+            let available = geo.size.width - (innerPadding * 2)
+            let totalGaps = slotSpacing * CGFloat(max(0, totalSlots - 1))
+            // Slot genişliği: mevcut alanı eşit böler. 3 slot için hesap: (W - 2*pad - 2*gap) / 3.
+            let rawSlotWidth = (available - totalGaps) / CGFloat(totalSlots)
+            // Kare slot, ancak yükseklik 72pt ile sınırlı (dikey bütçe doğru kalsın).
+            let slotSize = min(72, max(48, rawSlotWidth))
             
-            // Boş slotlar
-            ForEach(vm.blockTray.count..<vm.run.maxTraySlots, id: \.self) { _ in
-                emptySlot()
+            HStack(spacing: slotSpacing) {
+                ForEach(vm.blockTray) { block in
+                    traySlot(block: block, size: slotSize)
+                }
+                ForEach(vm.blockTray.count..<totalSlots, id: \.self) { _ in
+                    emptySlot(size: slotSize)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, innerPadding)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .frame(height: GameLayout.trayHeight)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(ThemeColors.surfaceDark)
+            RoundedRectangle(cornerRadius: 14)
+                .fill(ThemeColors.trayBg)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(ThemeColors.gridStroke, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(ThemeColors.trayBorder, lineWidth: 1)
                 )
         )
     }
     
+    // MARK: - Empty slot
     @ViewBuilder
-    private func emptySlot() -> some View {
+    private func emptySlot(size: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: 10)
-            .fill(ThemeColors.gridDark.opacity(0.4))
-            .frame(width: 80, height: 80)
+            .fill(ThemeColors.cellEmpty.opacity(0.6))
+            .frame(width: size, height: size)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(ThemeColors.gridStroke.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4]))
+                    .stroke(ThemeColors.cardBorder, style: StrokeStyle(lineWidth: 1, dash: [4]))
             )
     }
-
+    
+    // MARK: - Filled slot
     @ViewBuilder
-    private func traySlot(block: GameBlock) -> some View {
+    private func traySlot(block: GameBlock, size: CGFloat) -> some View {
+        // Mini blok preview için tile boyutu — slot genişliğine göre adaptif
+        // 4 sütunluk blok bile sığsın: tileSize = (size - 16) / max(cols).
+        // Ama block boyutu değişken, sabit 10pt-14pt arası seçelim.
+        let tileSize: CGFloat = max(9, min(14, (size - 24) / 5))
+        let isActive = vm.draggingBlock?.id == block.id
+        
         ZStack {
-            // Özel bloklar için neon glow arka plan
+            // Slot arka plan
             if block.isSpecial {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(block.ability.glowColor.opacity(0.08))
-                    .frame(width: 80, height: 80)
+                    .frame(width: size, height: size)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(block.ability.glowColor.opacity(0.5), lineWidth: 1.5)
                     )
-                    .shadow(color: block.ability.glowColor.opacity(0.3), radius: 8)
+                    .shadow(color: block.ability.glowColor.opacity(0.3), radius: 6)
             } else {
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(ThemeColors.gridDark)
-                    .frame(width: 80, height: 80)
+                    .fill(ThemeColors.cardBg)
+                    .frame(width: size, height: size)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(ThemeColors.cardBorder, lineWidth: 1)
+                    )
             }
             
-            // Eğer sürükleniyorsa yerinde gizle
-            BlockTileView(block: block, tileSize: 14)
-                .opacity(vm.draggingBlock?.id == block.id ? 0.25 : 1.0)
+            // Mini blok preview
+            BlockTileView(block: block, tileSize: tileSize)
+                .opacity(isActive ? 0.25 : 1.0)
             
-            // Özel blok adı etiketi (altta)
+            // Alt etiket
             if block.isSpecial {
                 VStack {
                     Spacer()
@@ -114,20 +144,19 @@ struct BlockTrayView: View {
                         .font(.system(size: 7, weight: .black))
                         .foregroundStyle(block.ability.glowColor)
                         .tracking(1)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 3)
                 }
             } else if block.isRotatable {
-                // Rotation Hint Icon
                 VStack {
                     Spacer()
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 8, weight: .bold))
                         .foregroundStyle(ThemeColors.textMuted)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 3)
                 }
             }
         }
-        .frame(width: 80, height: 80)
+        .frame(width: size, height: size)
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
@@ -142,9 +171,7 @@ struct BlockTrayView: View {
                         vm.isDragging = true
                         HapticManager.shared.playSelection()
                     }
-                    // dragPosition callback — GameView @State'i günceller (overlay için)
                     onDragChanged?(value.location)
-                    // Ghost/hint — vm.updateDrag throttle'lıdır, her framede render'a neden olmaz
                     vm.dragLocation = value.location
                     let gridPos = vm.gridSpaceConverter?(value.location)
                     vm.updateDrag(location: value.location, gridPosition: gridPos)
@@ -158,11 +185,13 @@ struct BlockTrayView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 10)
                 .stroke(
-                    vm.draggingBlock?.id == block.id
+                    isActive
                         ? (block.isSpecial ? block.ability.glowColor : ThemeColors.neonCyan)
                         : Color.clear,
                     lineWidth: 2
                 )
         )
+        // Aktif slot için hafif cyan glow (doc: "Aktif slot hafif cyan glowla vurgulanmış")
+        .shadow(color: isActive ? ThemeColors.neonCyan.opacity(0.5) : .clear, radius: 8)
     }
 }

@@ -41,27 +41,44 @@ struct RoundData {
     
     var isBossRound: Bool { roundNumber % 5 == 0 && roundNumber > 0 }
 
-    /// R1:500, R2:1200, R3:2100, R4:3200, R5(boss):4800... 
+    /// Scoring v2 ile eşleşen hedefler:
+    /// R1:~1500, R2:~3375, R3:~5550, R4:~8025, R5(boss):~12000, R10(boss):~30000
     /// PLUS: World Level scaling (+25% per level)
+    ///
+    /// NOT: Skor tabanı (ScoreEngine.calculate) ~2.5x büyütüldü, target'ı da
+    /// benzer oranda büyütüyoruz ki round pacing eskisiyle aynı hissetsin —
+    /// ama sayılar artık "juice'lu" (hızlı artıyor, büyük combo'da ekran
+    /// patlıyor). Oyuncu önceki R1 ~625 yerine ~1500 hedef görüyor, ama bir
+    /// tek double-clear ile ~5000 puan kazanabildiği için round çok daha
+    /// tatmin edici kapanıyor.
     static func makeTarget(for round: Int, worldLevel: Int = 1) -> Int {
-        // Taban: round başı 500, her round +700 artar, üstelişel
-        let base = 500 + (round - 1) * 700 + (round - 1) * (round - 1) * 50
-        
-        // World Level Çarpanı: 1. level = 1.0, 2. level = 1.25, 3. level = 1.50... (Lineer artış sordu user ama genelde logaritmik veya üstel daha iyi)
-        // User sormadı ama +25% per level (Lineer üzerinden gidelim kafa karıştırmasın)
-        let worldMultiplier = 1.0 + (Double(worldLevel - 1) * 0.25)
-        
-        var finalTarget = Double(base) * worldMultiplier
-        
-        if round % 5 == 0 && round > 0 {
-            let bossIndex = round / 5
-            let bump = 1.25 + Double(bossIndex) * 0.15 
+        // SCORING v2 sonrası (combo/zone/flush çok daha büyük) pacing fix:
+        // Hedefi yukarı çekiyoruz ki tek bir mega-clear çoğu zaman round'u
+        // tek atışta geçirmesin; yine de 2-4 hamlede “juice” hissi sürsün.
+        let r = max(1, round)
+        let wl = max(1, worldLevel)
+
+        // Taban eğri: lineer + kuadratik + hafif üstel (round büyüdükçe hızlanır)
+        let rr = Double(r - 1)
+        let base = 2200.0 + rr * 2600.0 + rr * rr * 220.0
+
+        // World Level çarpanı: daha agresif (W10+ modifier’larla skor da artıyor)
+        let worldMultiplier = 1.0 + Double(wl - 1) * 0.35
+
+        // Global pacing: her durumda hedefi yukarı çeker
+        var finalTarget = base * worldMultiplier
+
+        // Boss round’lar doğal olarak daha sert
+        if r % 5 == 0 && r > 0 {
+            let bossIndex = r / 5
+            let bump = 1.6 + Double(bossIndex) * 0.22
             finalTarget *= bump
         } else {
-            finalTarget *= 1.25
+            finalTarget *= 2.1
         }
-        
-        return Int(finalTarget)
+
+        // Alt sınır: round 1 bile “tek patlatma ile bitmesin”
+        return max(3500, Int(finalTarget.rounded()))
     }
 
     static func make(round: Int, worldLevel: Int = 1, modifier: BossModifier? = nil) -> RoundData {

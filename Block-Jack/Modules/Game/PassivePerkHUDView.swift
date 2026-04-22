@@ -7,31 +7,45 @@ import SwiftUI
 
 struct PassivePerkHUDView: View {
     @ObservedObject var vm: GameViewModel
+    @EnvironmentObject var userEnv: UserEnvironment
     
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                if vm.run.activePassivePerks.isEmpty {
-                    // Boş durum - belki siluetler gösterilebilir
-                    Text("AKTİF PERK YOK")
-                        .font(.custom("Outfit-Medium", size: 10))
-                        .foregroundColor(ThemeColors.textMuted)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Capsule().stroke(ThemeColors.gridStroke.opacity(0.3), lineWidth: 1))
-                } else {
-                    ForEach(vm.run.activePassivePerks) { perk in
-                        PerkHUDIcon(
-                            perk: perk,
-                            isInteractable: perk.id == "sculptor", // Şimdilik sadece sculptor etkileşimli
-                            vm: vm
-                        )
+        HStack(spacing: 8) {
+            // Sol etiket
+            Text(userEnv.localizedString("PERKLER", "PERKS"))
+                .font(.setCustomFont(name: .InterBlack, size: 9))
+                .foregroundStyle(ThemeColors.textMuted)
+                .tracking(1.3)
+            
+            // Dikey ayırıcı
+            RoundedRectangle(cornerRadius: 1)
+                .fill(ThemeColors.cardBorder)
+                .frame(width: 1, height: 16)
+            
+            // Perk listesi
+            if vm.run.activePassivePerks.isEmpty {
+                Text(userEnv.localizedString("Aktif perk yok", "No active perk"))
+                    .font(.setCustomFont(name: .InterMedium, size: 9))
+                    .foregroundColor(ThemeColors.textMuted)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(vm.run.activePassivePerks) { perk in
+                            PerkHUDIcon(
+                                perk: perk,
+                                isInteractable: perk.id == "sculptor",
+                                vm: vm
+                            )
+                        }
                     }
+                    .padding(.trailing, 4)
                 }
             }
-            .padding(.horizontal, 20)
-            .frame(height: 50)
         }
+        .padding(.horizontal, GameLayout.horizontalPadding)
+        .frame(height: GameLayout.perkStripHeight)
     }
 }
 
@@ -56,13 +70,13 @@ struct PerkHUDIcon: View {
             }
         }) {
             ZStack {
-                // Synergy Glow
                 // Synergy Glow (Breathing)
                 if hasSynergy {
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(ThemeColors.neonPurple, lineWidth: 2)
-                        .blur(radius: 4)
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(ThemeColors.neonPurple, lineWidth: 1.5)
+                        .blur(radius: 3)
                         .scaleEffect(1.1)
+                        .frame(width: 34, height: 34)
                         .phaseAnimator([0.4, 1.0]) { content, opacity in
                             content.opacity(opacity)
                         } animation: { _ in
@@ -70,44 +84,43 @@ struct PerkHUDIcon: View {
                         }
                 }
 
-                // Glow if interactable and selected block exists
                 if isInteractable && vm.selectedBlock != nil {
                     Circle()
                         .fill(ThemeColors.neonCyan.opacity(0.2))
-                        .blur(radius: 5)
+                        .blur(radius: 4)
                         .scaleEffect(isAnimating ? 1.5 : 1.0)
+                        .frame(width: 34, height: 34)
                 }
                 
                 ZStack {
-                    // TECH CHIP BACKGROUND
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(ThemeColors.surfaceMid)
-                        .frame(width: 44, height: 44)
+                    // TECH CHIP BACKGROUND (UI Revize: daha kompakt 32pt)
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(ThemeColors.perkBg)
+                        .frame(width: 32, height: 32)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: 10)
                                 .stroke(
-                                    isInteractable && vm.selectedBlock != nil ? ThemeColors.neonCyan : ThemeColors.gridStroke.opacity(0.4),
-                                    lineWidth: 1.5
+                                    isInteractable && vm.selectedBlock != nil ? ThemeColors.neonCyan : ThemeColors.cardBorder,
+                                    lineWidth: 1
                                 )
                         )
                     
-                    // Segmented Corners (Dashed overlay for tech look)
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 10)
                         .stroke(
-                            isInteractable && vm.selectedBlock != nil ? ThemeColors.neonCyan : ThemeColors.textMuted.opacity(0.3),
-                            style: StrokeStyle(lineWidth: 1, dash: [2, 10])
+                            isInteractable && vm.selectedBlock != nil ? ThemeColors.neonCyan : ThemeColors.textMuted.opacity(0.2),
+                            style: StrokeStyle(lineWidth: 1, dash: [2, 8])
                         )
-                        .frame(width: 44, height: 44)
+                        .frame(width: 32, height: 32)
 
                     if perk.icon.hasPrefix("item_") || perk.icon.hasPrefix("port_") {
                         Image(perk.icon)
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 28, height: 28)
+                            .frame(width: 20, height: 20)
                             .scaleEffect(isAnimating ? 1.2 : 1.0)
                     } else {
                         Text(perk.icon)
-                            .font(.system(size: 22))
+                            .font(.system(size: 16))
                             .scaleEffect(isAnimating ? 1.2 : 1.0)
                     }
                 }
@@ -116,25 +129,23 @@ struct PerkHUDIcon: View {
         .disabled(!isInteractable)
         .overlay(
             ZStack(alignment: .topTrailing) {
-                // Tier Indicator
                 if perk.tier > 1 {
                     Text("L\(perk.tier)")
-                        .font(.system(size: 8, weight: .black))
+                        .font(.system(size: 7, weight: .black))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
                         .background(ThemeColors.electricYellow)
-                        .cornerRadius(4)
-                        .offset(x: 10, y: -10)
+                        .cornerRadius(3)
+                        .offset(x: 6, y: -6)
                 }
                 
                 if hasSynergy {
-                    // Synergy Icon Indicator
                     Image(systemName: "bolt.horizontal.circle.fill")
-                        .font(.system(size: 10))
+                        .font(.system(size: 9))
                         .foregroundColor(ThemeColors.neonPurple)
                         .background(Color.black.clipShape(Circle()))
-                        .offset(x: -14, y: -14)
+                        .offset(x: -10, y: -10)
                 }
             }
         )

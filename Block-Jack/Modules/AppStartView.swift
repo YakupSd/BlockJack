@@ -81,10 +81,16 @@ struct AppStartView: View {
             withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
                 glowOpacity = 0.6
             }
+            // Güvenlik: Eğer init zaten tamamlanmışsa (ör. kullanıcı
+            // geri hareketiyle AppStartView'a geri döndüyse) `onChange`
+            // yeniden tetiklenmez. Kitlenmeyi önlemek için burada da
+            // kontrol ediyoruz.
+            if vm.initializationComplete {
+                MainViewsRouter.shared.popToDashboard()
+            }
         }
-        .onChange(of: vm.initializationComplete) { oldValue, complete in
+        .onChange(of: vm.initializationComplete) { _, complete in
             if complete {
-                // Navigasyon: Ana Menüye git
                 MainViewsRouter.shared.popToDashboard()
             }
         }

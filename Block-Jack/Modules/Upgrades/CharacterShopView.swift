@@ -115,7 +115,7 @@ struct CharacterShopView: View {
                                 selectedChar = char
                             }
                         } label: {
-                            VStack(spacing: 8) {
+                            VStack(spacing: 6) {
                                 ZStack(alignment: .bottomTrailing) {
                                     Image(char.icon)
                                         .resizable()
@@ -133,12 +133,27 @@ struct CharacterShopView: View {
                                             .background(Color.black.opacity(0.6))
                                             .clipShape(Circle())
                                             .offset(x: 4, y: 4)
+                                    } else if userEnv.isCharacterMastered(char.id) {
+                                        Image(systemName: "star.fill")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(Color(red: 0.15, green: 0.08, blue: 0.0))
+                                            .padding(4)
+                                            .background(
+                                                LinearGradient(colors: [ThemeColors.electricYellow, .orange],
+                                                               startPoint: .topLeading,
+                                                               endPoint: .bottomTrailing)
+                                            )
+                                            .clipShape(Circle())
+                                            .shadow(color: ThemeColors.electricYellow.opacity(0.8), radius: 4)
+                                            .offset(x: 4, y: 4)
                                     }
                                 }
                                 
                                 Text(char.name)
                                     .font(.setCustomFont(name: .InterBold, size: 10))
                                     .foregroundStyle(isSelected ? ThemeColors.neonCyan : .white)
+
+                                CharacterMasteryBadge(characterId: char.id)
                             }
                             .padding(10)
                             .background(isSelected ? AnyShapeStyle(ThemeColors.neonCyan.opacity(0.1)) : AnyShapeStyle(.ultraThinMaterial))
@@ -147,6 +162,7 @@ struct CharacterShopView: View {
                                 RoundedRectangle(cornerRadius: 16)
                                     .stroke(isSelected ? ThemeColors.neonCyan : Color.white.opacity(0.1), lineWidth: 1)
                             )
+                            .characterMasteryFrame(characterId: char.id, cornerRadius: 16)
                             .scaleEffect(isSelected ? 1.05 : 1.0)
                         }
                     }

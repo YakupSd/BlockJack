@@ -7,6 +7,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var userEnv: UserEnvironment
+    @State private var showDailyReward: Bool = false
 
     var body: some View {
         ZStack {
@@ -15,8 +16,60 @@ struct DashboardView: View {
             backgroundGrid
 
             VStack(spacing: 0) {
-                HStack {
+                HStack(spacing: 12) {
+                    // DAILY REWARD BUTONU — Phase 8 retention.
+                    // canClaim ise pulse ederek kullanıcıyı uyarıyor, değilse
+                    // geri sayım için yine tıklanabilir (overlay'de detay var).
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        showDailyReward = true
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(ThemeColors.surfaceDark)
+                                .frame(width: 44, height: 44)
+                                .overlay(Circle().stroke(ThemeColors.gridStroke, lineWidth: 1))
+                            Image(systemName: "gift.fill")
+                                .foregroundStyle(userEnv.canClaimDaily ? ThemeColors.electricYellow : ThemeColors.textMuted)
+                                .font(.system(size: 18, weight: .bold))
+                            if userEnv.canClaimDaily {
+                                Circle()
+                                    .fill(ThemeColors.neonPink)
+                                    .frame(width: 10, height: 10)
+                                    .offset(x: 14, y: -14)
+                            }
+                        }
+                    }
+                    .padding(.leading, 24)
+
                     Spacer()
+
+                    // MAĞAZA (IAP) — gerçek para ile altın/elmas alma
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        openStore()
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(ThemeColors.surfaceDark)
+                                .frame(width: 44, height: 44)
+                                .overlay(Circle().stroke(ThemeColors.neonCyan.opacity(0.5), lineWidth: 1))
+                            Image(systemName: "cart.fill")
+                                .foregroundStyle(ThemeColors.neonCyan)
+                                .font(.system(size: 18, weight: .bold))
+                            // "NEW" rozeti (ilk sürüm duyurusu)
+                            Text("NEW")
+                                .font(.setCustomFont(name: .InterBlack, size: 8))
+                                .tracking(1)
+                                .foregroundStyle(ThemeColors.cosmicBlack)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Capsule().fill(ThemeColors.neonPink))
+                                .offset(x: 14, y: -14)
+                        }
+                    }
+                    .padding(.trailing, 6)
+
                     // AYARLAR BUTONU
                     Button {
                         HapticManager.shared.play(.buttonTap)
@@ -29,9 +82,9 @@ struct DashboardView: View {
                             .clipShape(Circle())
                             .overlay(Circle().stroke(ThemeColors.gridStroke, lineWidth: 1))
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
+                    .padding(.trailing, 24)
                 }
+                .padding(.top, 16)
                 
                 Spacer()
 
@@ -74,109 +127,113 @@ struct DashboardView: View {
                 }
                 .padding(.bottom, 40)
 
-                // SEFER (Campaign) Butonu
+                // BAŞLA — tek ana aksiyon. Slot seçim ekranına götürür;
+                // orada boş slot seçilirse ilk kurulum (karakter → perk →
+                // map), dolu slot seçilirse Slot Hub açılır. Eski DEVAM ET
+                // butonu kaldırıldı çünkü iki akış tek kapıda birleşti.
                 Button {
                     HapticManager.shared.play(.buttonTap)
-                    MainViewsRouter.shared.pushToSaveSlotSelection(mode: .newGame) // Slot seçilir sonra WorldMap açılır
+                    MainViewsRouter.shared.pushToSaveSlotSelection()
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "map.fill")
-                            .font(.system(size: 18, weight: .bold))
-                        Text(userEnv.localizedString("SEFER MODU", "CAMPAIGN"))
-                            .font(.setCustomFont(name: .InterExtraBold, size: 22))
-                            .tracking(4)
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 20, weight: .black))
+                        Text(userEnv.localizedString("BAŞLA", "START"))
+                            .font(.setCustomFont(name: .InterExtraBold, size: 24))
+                            .tracking(6)
                     }
                     .foregroundStyle(ThemeColors.cosmicBlack)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
+                    .padding(.vertical, 20)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
                             .fill(ThemeColors.neonCyan)
-                            .shadow(color: ThemeColors.neonCyan, radius: 16)
+                            .shadow(color: ThemeColors.neonCyan, radius: 20)
                     )
                 }
                 .padding(.horizontal, 32)
 
-                // DEVAM ET Butonu
-                Button {
-                    HapticManager.shared.play(.buttonTap)
-                    MainViewsRouter.shared.pushToSaveSlotSelection(mode: .continueGame)
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "play.circle.fill")
-                            .font(.system(size: 18, weight: .bold))
-                        Text(userEnv.localizedString("KAYITLI OYUN", "CONTINUE"))
-                            .font(.setCustomFont(name: .InterExtraBold, size: 20))
-                            .tracking(2)
+                // Sadece GALERİ — hesap seviyesi (tüm slotlara ortak).
+                // Kahramanlar/Market artık Slot Hub'a taşındı; orada aktif
+                // slot bağlamıyla satın alma yapılır.
+                HStack {
+                    dashboardPill(
+                        icon: "books.vertical.fill",
+                        title: userEnv.localizedString("GALERİ", "GALLERY"),
+                        color: ThemeColors.neonPurple
+                    ) {
+                        MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(CollectionMainView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(ThemeColors.gridStroke.opacity(0.3), lineWidth: 1))
-                    .shadow(color: Color.black.opacity(0.2), radius: 10)
+                    .frame(maxWidth: 200)
                 }
-                .padding(.horizontal, 32)
-                .padding(.top, 16)
-                
-                // MARKET & GALERİ
-                HStack(spacing: 12) {
-                    // KAHRAMANLAR (NEW)
-                    Button {
-                        HapticManager.shared.play(.buttonTap)
-                        MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(CharacterShopView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 16))
-                            Text(userEnv.localizedString("KAHRAMANLAR", "HEROES"))
-                                .font(.setCustomFont(name: .InterBold, size: 14))
-                        }
-                        .foregroundStyle(ThemeColors.neonCyan)
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(ThemeColors.neonCyan.opacity(0.3), lineWidth: 1))
-                    }
+                .padding(.horizontal, 16)
+                .padding(.top, 20)
 
-                    // MARKET
-                    Button {
-                        HapticManager.shared.play(.buttonTap)
-                        MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(UpgradesView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "storefront.fill")
-                                .font(.system(size: 16))
-                            Text(userEnv.localizedString("MARKET", "UPGRADES"))
-                                .font(.setCustomFont(name: .InterBold, size: 14))
-                        }
-                        .foregroundStyle(ThemeColors.electricYellow)
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(ThemeColors.electricYellow.opacity(0.3), lineWidth: 1))
-                    }
-                }
-                .padding(.top, 24)
-
-                // Alt ikonlar (para gösterge)
+                // Alt ikonlar (para gösterge) — tıklanabilir, mağazaya götürür
                 HStack(spacing: 24) {
-                    currencyBadge(iconName: "icon_gold", value: userEnv.gold, color: ThemeColors.electricYellow)
-                    currencyBadge(iconName: "icon_diamond", value: userEnv.diamonds, color: ThemeColors.neonCyan)
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        openStore()
+                    } label: {
+                        currencyBadge(iconName: "icon_gold", value: userEnv.gold, color: ThemeColors.electricYellow)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        openStore()
+                    } label: {
+                        currencyBadge(iconName: "icon_diamond", value: userEnv.diamonds, color: ThemeColors.neonCyan)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.top, 24)
                 .padding(.bottom, 48)
             }
+
+            if showDailyReward {
+                DailyRewardOverlay(isPresented: $showDailyReward)
+                    .environmentObject(userEnv)
+                    .zIndex(10)
+            }
         }
         .onAppear {
             AudioManager.shared.playMusic(.menu)
+            // Dashboard'a her dönüşte slot bağlamını temizliyoruz. Aksi
+            // halde Hub'dan Settings → Dashboard şeklinde geri dönüldüğünde
+            // Market/Karakter hâlâ o slot'a yazı yazarak altın sync
+            // sorunlarına yol açardı.
+            userEnv.clearActiveSlot()
         }
     }
 
-    // MARK: - Para Göstergesi
+    // MARK: - Pill Button
+    @ViewBuilder
+    private func dashboardPill(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button {
+            HapticManager.shared.play(.buttonTap)
+            action()
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                Text(title)
+                    .font(.setCustomFont(name: .InterBold, size: 12))
+                    .tracking(1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(color)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 10)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(color.opacity(0.35), lineWidth: 1))
+        }
+    }
+    
+    // MARK: - Para Göstergesi (tap → mağaza)
     private func currencyBadge(iconName: String, value: Int, color: Color) -> some View {
         HStack(spacing: 6) {
             Image(iconName)
@@ -185,6 +242,12 @@ struct DashboardView: View {
             Text("\(value)")
                 .font(.setCustomFont(name: .InterBold, size: 16))
                 .foregroundStyle(color)
+                .contentTransition(.numericText())
+            // Eklenti "+" bir mağaza ipucu olarak görünür
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(color)
+                .opacity(0.85)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -192,6 +255,17 @@ struct DashboardView: View {
         .clipShape(Capsule())
         .overlay(Capsule().stroke(color.opacity(0.4), lineWidth: 1))
         .shadow(color: color.opacity(0.1), radius: 5)
+    }
+
+    // MARK: - Store Açma
+    private func openStore() {
+        MainViewsRouter.shared.present(
+            view: MainNavigationView.builder.makeView(
+                StoreView().environmentObject(userEnv),
+                withNavigationTitle: "",
+                navigationBarHidden: true
+            )
+        )
     }
 
     // MARK: - Decorative grid

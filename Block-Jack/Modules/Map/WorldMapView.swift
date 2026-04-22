@@ -2,262 +2,193 @@
 //  WorldMapView.swift
 //  Block-Jack
 //
+//  Sefer (kampanya) haritası. Şu anki içerik DÜNYA 1 — NEON CYBERPUNK
+//  teması. 20 sektör, zigzag snake layout, hexagonal neon node'lar.
+//
+//  Tema geçişi notu:
+//  Dünya 2+ eklendiğinde burada basit bir tema switch ile (ör. enum)
+//  piksel variant'a (WorldMapPixelBackgroundView + WorldCityNodeView)
+//  veya başka dünyaya özel view'lara yönlendirme yapılacak. Mevcut
+//  piksel dosyalar kenarda yedekte duruyor — silinmedi.
+//
+//  NOT: Sadece view katmanı. Game logic / ViewModel iş kuralları değişmiyor.
+//
 
 import SwiftUI
 
 struct WorldMapView: View {
     @StateObject var vm: WorldMapViewModel
     @EnvironmentObject var userEnv: UserEnvironment
-    @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.dismiss) private var dismiss
+    @State private var didInitialScroll = false
+
+    // Haritanın toplam dikey uzunluğu — 20 sektör için ScrollView içinde
+    // rahat görünüm (aynı zamanda SE ekranında da hissedilir uzunluk).
+    private let mapHeight: CGFloat = 1400
+
     var body: some View {
         ZStack {
-            // Arka Plan
-            ThemeColors.backgroundGradient.ignoresSafeArea()
-            
-            // Phase 11: Parallax Starfield
-            WorldMapParallaxView()
-            
-            // Neon Izgara (Derinlik hissi için)
-            Canvas { ctx, size in
-                let spacing: CGFloat = 80
-                let color = GraphicsContext.Shading.color(ThemeColors.neonCyan.opacity(0.08))
-                for x in stride(from: 0, through: size.width, by: spacing) {
-                    var p = Path(); p.move(to: CGPoint(x: x, y: 0)); p.addLine(to: CGPoint(x: x, y: size.height))
-                    ctx.stroke(p, with: color, lineWidth: 0.5)
+            // Tema-aware arka plan: aktif dünyaya göre görsel dil değişir.
+            // Dünya 1 Neon Cyber, Dünya 2 Concrete Ruins; diğer dünyalar
+            // henüz render edilmedi → fallback olarak neon görünüyor.
+            themedBackground
+
+            // Ana harita içeriği — scrollable, altta başlar.
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    mapCanvas
+                        .id("worldMapAnchor")
+                        .padding(.top, 80)      // üst HUD altı
+                        .padding(.bottom, 110)  // alt bar üstü
                 }
-                for y in stride(from: 0, through: size.height, by: spacing) {
-                    var p = Path(); p.move(to: CGPoint(x: 0, y: y)); p.addLine(to: CGPoint(x: size.width, y: y))
-                    ctx.stroke(p, with: color, lineWidth: 0.5)
+                // Oyuncunun mevcut sektörüne fokuslan. İki aşamalı scroll:
+                // - .task ilk yüklemede (layout hazır olana kadar 350ms bekle)
+                // - playerLevelId değişirse (yeni bölüm kilidi açıldıysa) tekrar
+                // Anchor id'i önce specific ("level_X") sonra generic ("playerNode")
+                // olarak dener; böylece absolute-positioned node'larda
+                // ScrollViewReader'ın kararsız davranışı üçlü fallback ile tolere
+                // edilir.
+                .task(id: vm.playerLevelId) {
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    await focusOnPlayer(proxy: proxy)
+                    // Bazı cihazlarda ilk scroll layout tamamlanmadan önce
+                    // kaybolabiliyor; ikinci bir retry ile garantileyelim.
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    await focusOnPlayer(proxy: proxy, animated: false)
+                    didInitialScroll = true
                 }
             }
-            .ignoresSafeArea()
+
+            // CRT / scan efekti — sabit overlay, tüm haritanın üstünde
+            WorldMapNeonScanline()
+                .blendMode(.multiply)
+                .opacity(0.5)
 
             VStack(spacing: 0) {
-                header
-                
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(vm.levels.reversed().enumerated()), id: \.element.id) { index, level in
-                            LevelNodeView(level: level, isLast: index == vm.levels.count - 1) {
-                                vm.startLevel(level)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 100)
-                    .padding(.horizontal, 40)
+                WorldMapHUDView(vm: vm) {
+                    HapticManager.shared.play(.buttonTap)
+                    dismiss()
                 }
+                Spacer()
+                WorldMapBottomBarView(vm: vm)
             }
         }
         .navigationBarHidden(true)
-    }
-    
-    private var header: some View {
-        HStack {
-            Button {
-                HapticManager.shared.play(.buttonTap)
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(ThemeColors.gridStroke, lineWidth: 1))
-            }
-            
-            Spacer()
-            
-            VStack(spacing: 4) {
-                Text(userEnv.localizedString("SEFER", "CAMPAIGN"))
-                    .font(.setCustomFont(name: .InterBlack, size: 24))
-                    .foregroundStyle(ThemeColors.neonCyan)
-                    .shadow(color: ThemeColors.neonCyan.opacity(0.5), radius: 10)
-                
-                Text(userEnv.localizedString("SEKTÖR ANALİZİ", "SECTOR ANALYSIS"))
-                    .font(.setCustomFont(name: .InterMedium, size: 10))
-                    .foregroundStyle(ThemeColors.textMuted)
-                    .tracking(4)
-            }
-            
-            Spacer()
-            
-            Color.clear.frame(width: 44, height: 44)
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
-        .padding(.bottom, 20)
-        .background(
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .mask(LinearGradient(colors: [.black, .black, .clear], startPoint: .top, endPoint: .bottom))
-                .ignoresSafeArea()
-        )
-    }
-}
-
-// MARK: - Parallax Background
-struct WorldMapParallaxView: View {
-    @State private var animate = false
-    
-    var body: some View {
-        ZStack {
-            ForEach(0..<20) { i in
-                Circle()
-                    .fill(ThemeColors.neonCyan.opacity(0.4))
-                    .frame(width: CGFloat.random(in: 1...3))
-                    .position(
-                        x: CGFloat.random(in: 0...400),
-                        y: CGFloat.random(in: 0...800)
-                    )
-                    .opacity(animate ? 0.2 : 0.8)
-                    .animation(
-                        Animation.easeInOut(duration: Double.random(in: 2...5))
-                            .repeatForever(autoreverses: true)
-                            .delay(Double.random(in: 0...2)),
-                        value: animate
-                    )
-            }
-        }
-        .onAppear { animate = true }
-    }
-}
-
-// MARK: - Level Node View
-struct LevelNodeView: View {
-    let level: WorldLevel
-    let isLast: Bool
-    let action: () -> Void
-    
-    @State private var pulseScale: CGFloat = 1.0
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // Seviye Düğümü
-            Button(action: action) {
-                nodeContent
-            }
-            .disabled(level.status == .locked)
-            .scaleEffect(level.status == .available ? pulseScale : 1.0)
-            
-            // Bağlantı Hattı (Neon Pipe)
-            if !isLast {
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                connectionColor.opacity(0.8),
-                                connectionColor.opacity(0.2)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 4, height: 60)
-                    .shadow(color: connectionColor.opacity(0.4), radius: 4)
-            }
-        }
-        .onAppear {
-            if level.status == .available {
-                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                    pulseScale = 1.05
+        .sheet(item: $vm.selectedLevel) { level in
+            WorldMapDetailSheet(
+                level: level,
+                onEnter: {
+                    vm.selectedLevel = nil
+                    vm.startLevel(level)
+                },
+                onDismiss: {
+                    vm.selectedLevel = nil
                 }
-            }
+            )
+            .presentationDetents([.fraction(0.6), .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color(hex: "#05060F"))
+            .environmentObject(userEnv)
         }
     }
-    
-    private var nodeContent: some View {
-        HStack(spacing: 20) {
-            // Node Icon
+
+    // MARK: - Scroll Focus
+
+    /// Oyuncunun bulunduğu sektöre ekranı scroll eder.
+    /// Önce level-specific id ("level_X") denenir; başarısız olursa generic
+    /// "playerNode" anchor'ına fallback yapar. Absolute-positioned node'larla
+    /// ScrollViewReader bazen id'i geç kaydediyor — bu iki aşamalı deneme
+    /// bunu tolere eder.
+    @MainActor
+    private func focusOnPlayer(proxy: ScrollViewProxy, animated: Bool = true) {
+        let target = "level_\(vm.playerLevelId)"
+        if animated {
+            withAnimation(.easeOut(duration: 0.5)) {
+                proxy.scrollTo(target, anchor: .center)
+                proxy.scrollTo("playerNode", anchor: .center)
+            }
+        } else {
+            proxy.scrollTo(target, anchor: .center)
+            proxy.scrollTo("playerNode", anchor: .center)
+        }
+    }
+
+    // MARK: - Themed Background
+    @ViewBuilder
+    private var themedBackground: some View {
+        switch vm.currentTheme {
+        case .concreteRuins:
+            WorldMapConcreteBackground()
+        case .neonGrid, .candyLab, .deepAbyss, .coreSingularity:
+            // Dünya 3-5 için özel arka planlar henüz yapılmadı — neon fallback.
+            WorldMapNeonBackground()
+        }
+    }
+
+    // MARK: - Map Canvas
+    private var mapCanvas: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+
             ZStack {
-                // Glow
-                if level.status != .locked {
-                    Circle()
-                        .fill(mainColor.opacity(0.2))
-                        .frame(width: 80, height: 80)
-                        .blur(radius: 20)
+                // Yol (connections) — en arkada
+                WorldNeonPathConnections(
+                    levels: vm.levels,
+                    positions: vm.nodePositions,
+                    segments: vm.connections
+                )
+                .frame(width: width, height: mapHeight)
+
+                // City node'ları — neon cyber variant
+                // Not: .id her zaman "level_<id>" verilir; player node'unu
+                // bulmak için ayrıca görünmez bir "playerNode" anchor'ı
+                // koyuyoruz (aşağıda). Bu ayrım, sheet dönüşlerinde node
+                // kimliğinin hot-swap yapması yüzünden scroll'un patlamamasını
+                // garanti eder.
+                ForEach(vm.levels) { level in
+                    if let pos = vm.nodePositions[level.id] {
+                        let x = pos.x * width
+                        let y = pos.y * mapHeight
+                        WorldCityNeonNode(
+                            level: level,
+                            isPlayerHere: level.id == vm.playerLevelId,
+                            onTap: { vm.selectLevel(level) }
+                        )
+                        .position(x: x, y: y)
+                        .id("level_\(level.id)")
+                    }
                 }
-                
-                // Outer Ring
-                Circle()
-                    .stroke(mainColor.opacity(level.status == .locked ? 0.2 : 0.6), lineWidth: 2)
-                    .frame(width: 64, height: 64)
-                
-                // Inner Glass
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .frame(width: 50, height: 50)
-                    .shadow(color: mainColor.opacity(level.status == .locked ? 0 : 0.3), radius: 10)
-                
-                if level.type == .boss {
-                    Image(systemName: "skull.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(level.status == .locked ? .gray : ThemeColors.neonPink)
-                } else if level.status == .completed {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(ThemeColors.neonCyan)
-                } else {
-                    Text("\(level.id)")
-                        .font(.setCustomFont(name: .InterBlack, size: 20))
-                        .foregroundStyle(level.status == .locked ? .gray : .white)
+
+                // Player anchor — görünmez ama ScrollViewReader için sabit
+                // "playerNode" id'li bir hedef. Böylece absolute-positioned
+                // node'lar layout değişse bile scroll hedefi değişmez.
+                if let playerPos = vm.nodePositions[vm.playerLevelId] {
+                    Color.clear
+                        .frame(width: 1, height: 1)
+                        .position(x: playerPos.x * width, y: playerPos.y * mapHeight)
+                        .id("playerNode")
+                }
+
+                // Oyuncu işaretçisi — aktif sektörün hemen üstünde hover eden
+                // neon diamond cursor
+                if let playerPos = vm.nodePositions[vm.playerLevelId] {
+                    WorldNeonPlayerCursor()
+                        .position(
+                            x: playerPos.x * width,
+                            y: playerPos.y * mapHeight - 30
+                        )
+                        .allowsHitTesting(false)
                 }
             }
-            
-            // Node Info
-            VStack(alignment: .leading, spacing: 4) {
-                Text(level.title.uppercased())
-                    .font(.setCustomFont(name: .InterBlack, size: 16))
-                    .foregroundStyle(level.status == .locked ? .gray : .white)
-                
-                Text(statusText)
-                    .font(.setCustomFont(name: .InterBold, size: 10))
-                    .foregroundStyle(statusColor)
-                    .tracking(2)
-            }
-            
-            Spacer()
+            .frame(width: width, height: mapHeight)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(level.status == .available ? mainColor.opacity(0.05) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(level.status == .available ? mainColor.opacity(0.3) : Color.clear, lineWidth: 1)
-        )
-        .opacity(level.status == .locked ? 0.6 : 1.0)
+        .frame(height: mapHeight)
     }
-    
-    private var mainColor: Color {
-        if level.type == .boss { return ThemeColors.neonPink }
-        switch level.status {
-        case .locked: return Color.gray
-        case .available: return ThemeColors.neonCyan
-        case .completed: return ThemeColors.electricYellow
-        }
-    }
-    
-    private var connectionColor: Color {
-        level.status == .completed ? ThemeColors.electricYellow : ThemeColors.gridStroke.opacity(0.3)
-    }
-    
-    private var statusText: String {
-        switch level.status {
-        case .locked: return "LOCKED"
-        case .available: return "READY TO SYNC"
-        case .completed: return "STABILIZED"
-        }
-    }
-    
-    private var statusColor: Color {
-        switch level.status {
-        case .locked: return .red.opacity(0.7)
-        case .available: return ThemeColors.neonCyan
-        case .completed: return ThemeColors.electricYellow
-        }
-    }
+}
+
+// MARK: - Preview
+#Preview {
+    WorldMapView(vm: WorldMapViewModel(slotId: 0, userEnv: UserEnvironment.shared))
+        .environmentObject(UserEnvironment.shared)
+        .preferredColorScheme(.dark)
 }

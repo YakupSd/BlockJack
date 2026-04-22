@@ -7,6 +7,7 @@ import SwiftUI
 
 struct MysteryEventView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var userEnv: UserEnvironment
     @State private var eventRevealed = false
     @State private var currentEvent: MysteryEvent?
     
@@ -22,44 +23,40 @@ struct MysteryEventView: View {
     
     var body: some View {
         ZStack {
-            // Background with premium AI image
             Image("cyber_mystery_rift")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .ignoresSafeArea()
-            
-            Color.black.opacity(0.6).ignoresSafeArea() // Görünürlük için karartma
-            
-            // Purple Glow
+
+            Color.black.opacity(0.62).ignoresSafeArea()
+
             RadialGradient(
-                colors: [ThemeColors.neonPurple.opacity(0.3), .clear],
+                colors: [ThemeColors.neonPurple.opacity(0.32), .clear],
                 center: .center,
                 startRadius: 0,
                 endRadius: 600
-            ).ignoresSafeArea()
-            
-            VStack(spacing: 30) {
-                Text("GİZEMLİ OLAY")
-                    .font(.custom("Outfit-Bold", size: 32, relativeTo: .largeTitle))
-                    .foregroundColor(ThemeColors.neonPurple)
-                
-                Spacer()
-                
-                if !eventRevealed {
-                    unknownEventSection
-                } else {
-                    revealedEventSection
-                }
-                
-                Spacer()
-                
-                footerSection
-            }
-            .padding(.top, 40)
+            )
+            .ignoresSafeArea()
+
+            AdaptiveOverlay(
+                header: {
+                    OverlayTitleBlock(
+                        "GİZEMLİ OLAY",
+                        subtitle: nil,
+                        color: ThemeColors.neonPurple
+                    )
+                },
+                content: {
+                    if !eventRevealed {
+                        unknownEventSection
+                    } else {
+                        revealedEventSection
+                    }
+                },
+                footer: { footerSection }
+            )
         }
-        .onAppear {
-            pickRandomEvent()
-        }
+        .onAppear { pickRandomEvent() }
     }
     
     private func pickRandomEvent() {
@@ -100,17 +97,17 @@ struct MysteryEventView: View {
     }
     
     private var unknownEventSection: some View {
-        VStack(spacing: 30) {
+        VStack(spacing: 22) {
             ZStack {
                 Circle()
                     .stroke(ThemeColors.neonPurple, lineWidth: 2)
-                    .frame(width: 150, height: 150)
+                    .frame(width: 130, height: 130)
                     .blur(radius: 5)
-                
+
                 Image(systemName: "questionmark.circle.fill")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 100, height: 100)
+                    .frame(width: 86, height: 86)
                     .foregroundColor(ThemeColors.neonPurple)
                     .shadow(color: ThemeColors.neonPurple, radius: 20)
             }
@@ -119,70 +116,83 @@ struct MysteryEventView: View {
             } animation: { _ in
                 .easeInOut(duration: 2).repeatForever(autoreverses: true)
             }
-            
-            Text("Önünde karanlık bir enerji süzülüyor...\nDokunmaya cesaretin var mı?")
-                .font(.headline)
+
+            Text(userEnv.localizedString(
+                "Önünde karanlık bir enerji süzülüyor...\nDokunmaya cesaretin var mı?",
+                "A dark energy swirls before you...\nDare to touch it?"
+            ))
+                .font(.subheadline.weight(.medium))
                 .foregroundColor(ThemeColors.textSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
+                .lineLimit(3)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 24)
+
             Button(action: {
                 if let event = currentEvent {
                     event.action(slotId)
-                    withAnimation(.spring()) {
-                        eventRevealed = true
-                    }
+                    withAnimation(.spring()) { eventRevealed = true }
                     HapticManager.shared.play(.success)
                 }
             }) {
-                Text("DOKUN VE GÖR")
+                Text(userEnv.localizedString("DOKUN VE GÖR", "TOUCH AND SEE"))
                     .font(.headline)
                     .foregroundColor(.white)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 14)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 12)
                     .background(ThemeColors.neonPurple.opacity(0.3))
-                    .cornerRadius(25)
+                    .clipShape(Capsule())
                     .overlay(Capsule().stroke(ThemeColors.neonPurple, lineWidth: 2))
             }
+            .buttonStyle(.plain)
         }
+        .padding(.horizontal, 20)
     }
-    
+
     private var revealedEventSection: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 18) {
             Image(systemName: "sparkles")
-                .font(.system(size: 60))
+                .font(.system(size: 52))
                 .foregroundColor(ThemeColors.neonPurple)
-            
+                .shadow(color: ThemeColors.neonPurple.opacity(0.7), radius: 10)
+
             Text(currentEvent?.title ?? "OLAY")
-                .font(.title)
-                .bold()
+                .font(.title2.weight(.bold))
                 .foregroundColor(.white)
-            
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
             Text(currentEvent?.outcomeDesc ?? "")
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(ThemeColors.neonPurple)
                 .multilineTextAlignment(.center)
-                .padding()
+                .lineLimit(4)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
                 .background(.ultraThinMaterial)
-                .cornerRadius(12)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(ThemeColors.neonPurple.opacity(0.3), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(ThemeColors.neonPurple.opacity(0.35), lineWidth: 1)
+                )
         }
-        .padding()
+        .padding(.horizontal, 20)
         .transition(.scale.combined(with: .opacity))
     }
-    
+
     private var footerSection: some View {
-        Button(action: {
-            dismiss()
-        }) {
+        Button(action: { dismiss() }) {
             Text(eventRevealed ? "KABUL ET VE DEVAM ET" : "UZAKLAŞ")
                 .font(.headline)
                 .frame(maxWidth: .infinity)
-                .padding()
+                .padding(.vertical, 14)
                 .background(Color.white.opacity(0.1))
                 .foregroundColor(.white)
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .padding()
+        .buttonStyle(.plain)
     }
 }
