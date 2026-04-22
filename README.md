@@ -8,51 +8,73 @@
 
 ## 🚀 Oyunun Ruhu
 
-Neon ışıklı bir dünyada, sadece blok yerleştirmekle kalmazsınız; her hamleniz hem anlık skorunuzu hem de uzun vadeli hayatta kalma stratejinizi belirler. Synthwave ritimleri eşliğinde joker sinerjileri ve renk yönetimini kullanarak en yüksek "Flush" çarpanlarını hedefleyin!
+Neon ışıklı siber-uzayda, sadece blok yerleştirmekle kalmazsınız; her hamleniz hem anlık skorunuzu hem de uzun vadeli hayatta kalma stratejinizi belirler. Synthwave ritimleri eşliğinde joker sinerjileri ve renk yönetimini kullanarak en yüksek "Flush" çarpanlarını hedefleyin!
 
 ---
 
 ## ✨ Ana Özellikler
 
-### 🧩 1. Derin Bulmaca Mekanikleri
-*8×8 dinamik grid* üzerinde Tetris şekillerini yerleştirin. Satır veya sütunları temizleyerek puan kazanın. Ancak dikkat! Sadece patlatmak yetmez; aynı renkleri bir araya getirerek devasa çarpanlar kazandıran **Flush!** sistemini kullanmalısınız.
+### 🗺️ 1. Dinamik World Map (Hades Tarzı)
+Yeni eklenen **World Map** sistemi ile her run benzersizdir. Şehir bölgelerinde ilerlerken yolunuzu kendiniz seçin:
+- **Battle Nodes:** Standart veri temizleme görevleri.
+- **Elite Nodes:** Daha zor düşmanlar, daha yüksek ödüller.
+- **Rest Site:** Can yenileme veya yetenek yükseltme istasyonları.
+- **Merchant:** Joker ve Item satın alabileceğiniz marketler.
+- **Treasure Room:** Ücretsiz güçlü itemlar.
+- **Mystery Node:** Şansınıza bağlı olarak iyi veya kötü sürprizler.
 
-### 🃏 2. Roguelite Sinerjiler (Balatro Ruhu)
-*   **Joker Sistemi:** Run sırasında satıcıdan alacağınız kalıcı pasif güçlendirmelerle (Blue Pill, Golden Stamp vb.) oyunun kurallarını kendi lehine çevir.
-*   **Aktif Itemlar:** Balyoz, Boya Bombası veya Vakum gibi tek kullanımlık eşyalarla sıkıştığın anlarda sahadan kurtul.
+### 👾 2. Düşman Atak Sistemi
+Düşmanlar artık pasif değil! Her 20-40 saniyede bir gelen saldırılara karşı tetikte olun:
+- **SABOTAJ:** Grid'den rastgele 5 bloğu siler.
+- **KİLİTLEME:** Tepsideki blokları 12 saniye boyunca kilitler.
+- **ZAMAN HIRSIZI:** Süre barından 20 saniye çalar!
+- **LANET YAYICISI:** Temas halinde süre azaltan lanetli hücreler bırakır.
+- **AĞIR ZIRH:** Patlaması için 2 kez temizlenmesi gereken ağır engeller.
 
-### 👥 Karakter Roster'ı ve Yetenekler
-
-Block-Jack'te her karakter, oyun tarzınızı tamamen değiştiren benzersiz bir **Pasif** ve **Overdrive (Aktif)** yeteneğe sahiptir. Karakterler, run sırasında kazandığınız elmaslarla açılır.
-
-| Karakter | Portre | Özellikler & Güçler | Kilit |
-| :--- | :---: | :--- | :---: |
-| **BLOCK-E** | <img src="docs/readme_assets/character_block_e.png" width="80"> | **Pasif (Eraser):** Her 10 saniyede bir sahadaki rastgele bir bloğu siler.<br>**Overdrive:** 5 saniye boyunca tüm kombo çarpanlarını ×5 yapar. | **Başlangıç** |
-| **THE ARCHITECT** | <img src="docs/readme_assets/character_architect.png" width="80"> | **Pasif:** Kare (O) bloklara +%20 puan bonusu verir.<br>**Overdrive:** Sahadaki 3x3'lük bir alanı anında temizler. | **500 💎** |
-| **TIME BENDER** | <img src="docs/readme_assets/character_timebender.png" width="80"> | **Pasif:** Kombo süresi %50 daha yavaş düşer.<br>**Overdrive:** Zamanı ve çarpanı 3 hamle boyunca dondurur. | **800 💎** |
-| **THE GAMBLER** | <img src="docs/readme_assets/character_gambler.png" width="80"> | **Pasif:** %7 ihtimalle yapılan hamlenin puanı ×10 olur.<br>**Overdrive:** Elindeki ve sahadaki 3 bloğu rastgele yeniler. | **1200 💎** |
-| **NEON WRAITH** | <img src="docs/readme_assets/character_neonwraith.png" width="80"> | **Pasif:** Süre <%10 kaldığında tüm puanlar ×3 olur.<br>**Overdrive:** Dolu karelerin üzerine blok koyabilir ve alttakileri siler. | **3000 💎** |
+### 🧩 3. Derin Bulmaca Mekanikleri
+*8×8 dinamik grid* üzerinde Tetris şekillerini yerleştirin. Satır veya sütunları temizleyerek puan kazanın. **Flush!** sistemini (aynı renk temizliği) kullanarak devasa çarpanlar kazanın.
 
 ---
 
-## ⚡ Gelişmiş Oyun Mekanikleri
+## 👥 Karakter Roster'ı ve Overdrive Tiers
 
-### 🧬 Çarpan (Mult) Sistemi
-Sadece satır silmek yetmez! **Balatro** tarzı çarpan sistemimizle skorunuzu katlayın:
+Block-Jack'te her karakterin 3 farklı **Overdrive Tier**'ı bulunur. Enerjinizi ne kadar çok doldurursanız, o kadar güçlü bir yetenek tetiklersiniz.
+
+| Karakter | Portre | Özellikler & Overdrive Tiers | Kilit |
+| :--- | :---: | :--- | :---: |
+| **BLOCK-E** | <img src="docs/readme_assets/character_block_e.png" width="80"> | **Pasif:** Her 10s bir blok siler.<br>**T1:** Hedefli Satır Sil.<br>**T2:** Çapraz Temizlik (Satır+Sütun).<br>**T3:** 3x3 Alan Bombası. | **Başlangıç** |
+| **THE ARCHITECT** | <img src="docs/readme_assets/character_architect.png" width="80"> | **Pasif:** Kare bloklara +%20 puan.<br>**T1:** 3x3 Yıkım.<br>**T2:** 5x5 Alan Temizliği.<br>**T3:** 7x7 Mega Yıkım +1500 Puan. | **500 💎** |
+| **TIME BENDER** | <img src="docs/readme_assets/character_timebender.png" width="80"> | **Pasif:** Kombo süresi %50 yavaş düşer.<br>**T1:** 5sn Zaman Durdurma.<br>**T2:** 8sn Durdurma + Tepsi Yenileme.<br>**T3:** 3 Hamle Boyunca Zamanı Dondur. | **800 💎** |
+| **THE GAMBLER** | <img src="docs/readme_assets/character_gambler.png" width="80"> | **Pasif:** %7 ihtimalle ×10 puan.<br>**T1:** 1 Bloğu Yenile.<br>**T2:** Tüm Tepsiyi Yenile.<br>**T3:** Jackpot! +2000 Puan + Yeni Tepsi. | **1200 💎** |
+| **NEON WRAITH** | <img src="docs/readme_assets/character_neonwraith.png" width="80"> | **Pasif:** Düşük sürede ×3 puan.<br>**T1:** +15sn Zaman.<br>**T2:** +25sn + En Dolu Satırı Sil.<br>**T3:** Wraith Fury: Sonraki 3 Temizlik +2 Mult. | **3000 💎** |
+| **ALCHEMIST** | <img src="docs/readme_assets/character_alchemist.png" width="80"> | **Pasif:** Renk değişimlerinde +50 puan.<br>**T1:** Tepsiyi Yenile.<br>**T2:** Flush Ready (Tüm tepsi tek renk).<br>**T3:** Double Count: 3 Hamle Boyunca ×2 Skor. | **2000 💎** |
+| **TITAN** | <img src="docs/readme_assets/character_titan.png" width="80"> | **Pasif:** Blok patladığında komşu hücrelere hasar.<br>**T1:** Dev 3x3 Blok.<br>**T2:** Çift Dev Blok +500 Overkill.<br>**T3:** Earthquake: Tüm Grid'i Sıfırla +2500 Puan. | **4000 💎** |
+
+---
+
+## 👾 Boss Karşılaşmaları
+
+Her sektörün sonunda sizi bekleyen devasa veri koruma protokolleri:
+
+| Boss Name | Sector | Special Modifier |
+| :--- | :---: | :--- |
+| **VIPER X** | 1 - 3 | **VERİ SİSİ:** Görüş alanını daraltır. |
+| **SENTINEL K** | 4 - 7 | **GLITCH:** Grid hücrelerini rastgele kilitler. |
+| **GHOST MOTHER** | 8 - 11 | **PHANTOM:** Hayalet bloklarla gridi doldurur. |
+| **JUGGERNAUT** | 12 - 17 | **AĞIRLIK:** Blokları ağırlaştırır, temizlemek zorlaşır. |
+| **NEON OVERLORD** | 18+ | **PROTOKOL SIFIR:** Tüm modifikatörlerin kaotik karışımı. |
+
+---
+
+## 🧬 Gelişmiş Mekanikler
+
+### 🌈 Flush & Mult Sistemi
 - **Flush!:** Satırın %100'ü aynı renk ise **×5 mult**.
 - **Double Flush:** İki satır aynı anda %100 renk ise **×25 mult!**
-- **Streak:** Üst üste başarılı hamleler çarpanı **+3.0** değerine kadar artırır.
+- **Sinerjiler:** Satın aldığınız Jokerler (Blue Pill, Prism vb.) bu çarpanları katlayarak milyonluk skorlara ulaşmanızı sağlar.
 
-### 🃏 Jokerler & İtemler
-Marketten alacağınız 3 farklı slotla stratejinizi kurun:
-- **Blue Pill 💊:** Mavi bloklar ×2 Chips verir.
-- **Prism 🔷:** Flush yapınca ekstra +0.5 Mult eklenir.
-- **Vakum 🌀:** Tablodaki tüm 1x1 boşlukları tek seferde siler.
-
-### 👾 Boss Karşılaşmaları (Her 5. Round)
-- **Glitch:** Rastgele kareleri kilitler, blok konulamaz.
-- **Fog:** Süre barını gizleyerek sizi karanlıkta bırakır.
-- **Weight:** Bloklar "ağır" olur, patlaması için 2 kez temizlenmesi gerekir.
+### 💥 Görsel Şölen (VFX)
+Yeni eklenen **Canvas-based Particle System** ile her patlama, her temizlik ve her overdrive kullanımı yüksek FPS ve akıcı animasyonlarla desteklenmiştir.
 
 ---
 
