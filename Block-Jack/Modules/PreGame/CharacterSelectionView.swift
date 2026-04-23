@@ -35,7 +35,7 @@ struct CharacterSelectionView: View {
             ThemeColors.backgroundGradient.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Header
+                // Header — safe area padding ile
                 HStack {
                     Button {
                         HapticManager.shared.play(.buttonTap)
@@ -58,9 +58,9 @@ struct CharacterSelectionView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
-                .padding(.bottom, 24)
+                .padding(.bottom, 20)
                 
-                // Character List
+                // Karakter Listesi — yatay scroll
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 20) {
                         ForEach(GameCharacter.roster) { char in
@@ -68,10 +68,12 @@ struct CharacterSelectionView: View {
                         }
                     }
                     .padding(.horizontal, 24)
+                    .padding(.top, 4)
                     .padding(.bottom, 32)
                 }
+                .frame(height: 230) // Sabit yükseklik — nav bar altına taşmayı önler
                 
-                // Character Details
+                // Karakter Detayları
                 if let char = GameCharacter.roster.first(where: { $0.id == selectedCharId }) {
                     ScrollView(.vertical, showsIndicators: false) {
                         characterDetails(char)
@@ -80,8 +82,9 @@ struct CharacterSelectionView: View {
                     Spacer()
                 }
             }
+            .safeAreaInset(edge: .top) { Color.clear.frame(height: 0) }
             
-            // Continue Button (Only if uncovered/selected)
+            // Devam Butonu
             if let char = GameCharacter.roster.first(where: { $0.id == selectedCharId }) {
                 let isUnlocked = !char.isPremium || userEnv.unlockedCharacterIDs.contains(char.id)
                 Button {
@@ -283,13 +286,30 @@ struct CharacterSelectionView: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(color.opacity(0.3), lineWidth: 1))
     }
     
-    /// Onay akışını mod'a göre yönlendiriyoruz. firstSetup'ta Perk seçimine
-    /// zincirlemeyi bozmuyoruz; Hub'dan gelindiyse sadece slot'taki karakter
-    /// ID'sini güncelleyip geri dönüyoruz (yeni bir run başlatmıyoruz).
+    /// Onay akışını mod'a göre yönlendiriyoruz.
+    /// - firstSetup: Yeni oyuncu — kayıt oluştur + direkt WorldSelection'a git
+    ///   (PerkSelection artık run içinde sunuluyor, başlamadan önce değil).
+    /// - changeInHub: Mevcut slot için karakter değiştirme — sadece
+    ///   characterId'yi güncelle, geri dön.
     private func handleConfirm(char: GameCharacter) {
         switch mode {
         case .firstSetup:
-            MainViewsRouter.shared.pushToPerkSelection(slotId: slotId, characterId: char.id)
+            // TODO 6: Starting perk seçimi kaldırıldı — perk run içinde kazanılır.
+            // Slot’u "none" perk ile hemen oluştur, WorldSelection'a gönder.
+            SaveManager.shared.createNewSave(in: slotId, characterId: char.id, perkId: "none")
+            if let newSlot = SaveManager.shared.slots.first(where: { $0.id == slotId }) {
+                userEnv.loadFromSlot(newSlot)
+            }
+            userEnv.setRunConfig(RunConfig(
+                slotId: slotId,
+                characterId: char.id,
+                startingPerkId: "none",
+                worldId: 1,
+                startingItemId: nil
+            ))
+            MainViewsRouter.shared.push(
+                WorldSelectionView(slotId: slotId).environmentObject(UserEnvironment.shared)
+            )
         case .changeInHub:
             SaveManager.shared.setCharacter(slotId: slotId, characterID: char.id)
             MainViewsRouter.shared.nav?.popViewController(animated: true)

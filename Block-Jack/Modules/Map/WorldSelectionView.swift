@@ -58,7 +58,18 @@ struct WorldSelectionView: View {
             }
             .background(ThemeColors.backgroundGradient.ignoresSafeArea())
             .navigationBarHidden(true)
-            .onAppear { didAppear = true }
+            .onAppear {
+                didAppear = true
+                // TODO 5: Sadece 1 world açıksa (yeni oyuncu) ekran gösterme,
+                // direkt o world'e git.
+                let availableWorlds = worldCards.filter { $0.state != .locked }
+                if availableWorlds.count == 1, let only = availableWorlds.first {
+                    // Kısa gecikme — UI flash'tan kaçınmak için
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        MainViewsRouter.shared.pushToWorldMap(worldId: only.worldId, slotId: slotId)
+                    }
+                }
+            }
         }
     }
 

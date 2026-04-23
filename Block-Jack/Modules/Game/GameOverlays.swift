@@ -8,13 +8,13 @@ import SwiftUI
 struct GameOverOverlay: View {
     @ObservedObject var vm: GameViewModel
     @EnvironmentObject var userEnv: UserEnvironment
-    
+
     var isRunOver: Bool { vm.run.lives <= 0 }
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.85).ignoresSafeArea()
-            
+
             VStack(spacing: 20) {
                 // Başlık
                 Text(isRunOver
@@ -23,7 +23,7 @@ struct GameOverOverlay: View {
                     .font(.setCustomFont(name: .InterBlack, size: 34))
                     .foregroundStyle(ThemeColors.neonPink)
                     .shadow(color: ThemeColors.neonPink, radius: 12)
-                
+
                 // Kalan Can Göstergesi
                 HStack(spacing: 6) {
                     ForEach(1...vm.run.maxLives, id: \.self) { i in
@@ -32,7 +32,7 @@ struct GameOverOverlay: View {
                             .foregroundStyle(i <= vm.run.lives ? ThemeColors.neonPink : ThemeColors.gridDark)
                     }
                 }
-                
+
                 VStack(spacing: 4) {
                     Text(isRunOver
                          ? userEnv.localizedString("Tüm canlarını kaybettin.", "You've lost all your lives.")
@@ -40,7 +40,7 @@ struct GameOverOverlay: View {
                         .font(.setCustomFont(name: .InterMedium, size: 14))
                         .foregroundStyle(ThemeColors.textSecondary)
                         .multilineTextAlignment(.center)
-                    
+
                     if !isRunOver {
                         Text(userEnv.localizedString("Kalan: \(vm.run.lives) can", "Lives remaining: \(vm.run.lives)"))
                             .font(.setCustomFont(name: .InterBold, size: 12))
@@ -48,14 +48,22 @@ struct GameOverOverlay: View {
                     }
                 }
                 .padding(.horizontal, 32)
-                
+
                 if isRunOver {
-                    // Tüm canlar bitti → sadece çıkış (Slot Hub'a dön)
+                    // Tüm canlar bitti → Özet ekranı göster, sonra Dashboard'a dön
                     Button {
                         HapticManager.shared.play(.buttonTap)
-                        MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
+                        if let summary = SaveManager.shared.slots
+                            .first(where: { $0.id == vm.activeSlotId })?.lastRunSummary {
+                            MainViewsRouter.shared.push(
+                                RunSummaryView(summary: summary, slotId: vm.activeSlotId)
+                                    .environmentObject(UserEnvironment.shared)
+                            )
+                        } else {
+                            MainViewsRouter.shared.popToDashboard()
+                        }
                     } label: {
-                        Text(userEnv.localizedString("ANA MENÜYE DÖN", "BACK TO MENU"))
+                        Text(userEnv.localizedString("ÖZETİ GÖR", "VIEW SUMMARY"))
                             .font(.setCustomFont(name: .InterExtraBold, size: 20))
                             .foregroundStyle(ThemeColors.cosmicBlack)
                             .padding(.vertical, 16)
@@ -78,10 +86,10 @@ struct GameOverOverlay: View {
                             .background(ThemeColors.electricYellow)
                             .clipShape(Capsule())
                     }
-                    
+
                     Button {
                         HapticManager.shared.play(.buttonTap)
-                        MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
+                        MainViewsRouter.shared.popToDashboard()
                     } label: {
                         Text(userEnv.localizedString("PES ET", "GIVE UP"))
                             .font(.setCustomFont(name: .InterBold, size: 16))

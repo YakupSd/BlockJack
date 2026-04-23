@@ -357,12 +357,16 @@ struct SlotHubView: View {
         Button {
             HapticManager.shared.play(.buttonTap)
             if hasActiveRun {
-                // Aktif chapter map'i varsa — oyuncu boss'a giden yolun ortasındaydı
+                // Aktif chapter map varsa — oyuncu boss'a giden yolun ortasındaydı
                 MainViewsRouter.shared.pushToMap(slotId: slotId)
             } else {
-                // Slot dolu ama map yok / yeni başlıyor → Run Setup (tek kaynak)
+                // Slot dolu ama aktif map yok → yeni seçim için WorldSelection'a git
+                // (karakter & perk zaten slot'ta kayıtlı, tekrar seçtirme)
+                if let s = SaveManager.shared.slots.first(where: { $0.id == slotId }) {
+                    userEnv.loadFromSlot(s)
+                }
                 MainViewsRouter.shared.push(
-                    RunSetupView(slotId: slotId).environmentObject(UserEnvironment.shared)
+                    WorldSelectionView(slotId: slotId).environmentObject(UserEnvironment.shared)
                 )
             }
         } label: {

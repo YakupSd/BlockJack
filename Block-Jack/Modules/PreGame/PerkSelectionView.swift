@@ -59,22 +59,33 @@ struct PerkSelectionView: View {
             VStack {
                 Spacer()
                 Button {
-                    HapticManager.shared.play(.heavy) // heavy for start
-                    
-                    // Veriyi kaydet ve başla
+                    HapticManager.shared.play(.heavy)
+
+                    // Yeni kayıt oluştur (ilk kurulum akışı)
                     SaveManager.shared.createNewSave(
                         in: slotId,
                         characterId: characterId,
                         perkId: selectedPerkId
                     )
-                    
+
                     // UserEnvironment'ı bu slot ile senkronize et
                     if let newSlot = SaveManager.shared.slots.first(where: { $0.id == slotId }) {
                         userEnv.loadFromSlot(newSlot)
                     }
-                    
-                    // İlk kurulum sonrası Hub'a düş (kullanıcı kampanyaya bilerek başlasın)
-                    MainViewsRouter.shared.pushToSlotHub(slotId: slotId)
+
+                    // RunConfig oluştur — WorldSelectionView slotId üzerinden devam eder
+                    userEnv.setRunConfig(RunConfig(
+                        slotId: slotId,
+                        characterId: characterId,
+                        startingPerkId: selectedPerkId,
+                        worldId: 1,
+                        startingItemId: nil
+                    ))
+
+                    // Direkt WorldSelectionView'e push (SlotHub atlanıyor)
+                    MainViewsRouter.shared.push(
+                        WorldSelectionView(slotId: slotId).environmentObject(UserEnvironment.shared)
+                    )
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "play.fill")

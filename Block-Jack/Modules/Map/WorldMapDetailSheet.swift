@@ -318,7 +318,7 @@ struct WorldSheetBossContent: View {
                 )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(userEnv.localizedString("!! BOSS SAVAŞI !!", "!! BOSS FIGHT !!"))
+                    Text(userEnv.localizedString("!! BOSS SAVAŞİ !!", "!! BOSS FIGHT !!"))
                         .font(.pixel(7))
                         .foregroundColor(ThemeColors.nodeBoss)
                         .tracking(1)
@@ -330,7 +330,7 @@ struct WorldSheetBossContent: View {
                         .foregroundColor(.white.opacity(0.85))
                         .lineLimit(2)
                     Text(userEnv.localizedString(
-                        "Tüm canlarını ve overdrive'ını hazırla.",
+                        "Tüm canlarını ve overdrive'nı hazırla.",
                         "Bring every life and overdrive you've got."
                     ))
                     .font(.pixel(5))
@@ -346,6 +346,28 @@ struct WorldSheetBossContent: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(ThemeColors.nodeBoss.opacity(0.4), lineWidth: 1)
             )
+
+            // CONTRACT ACTIVE banner — TODO 10
+            if selectedContract == .risky {
+                HStack(spacing: 6) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(ThemeColors.neonPink)
+                    Text(userEnv.localizedString("RİSKLİ CONTRACT AKTİF — EĞer kazanırsan ekstra ödül!",
+                                                 "RISKY CONTRACT ACTIVE — Extra reward if you win!"))
+                        .font(.pixel(5))
+                        .foregroundColor(ThemeColors.neonPink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(ThemeColors.neonPink.opacity(0.10))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6)
+                    .stroke(ThemeColors.neonPink.opacity(0.35), lineWidth: 1))
+            }
 
             HStack(spacing: 8) {
                 WorldRewardPill(icon: "★",
