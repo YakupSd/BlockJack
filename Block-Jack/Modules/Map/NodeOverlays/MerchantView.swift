@@ -91,6 +91,14 @@ struct MerchantView: View {
                 Text(userEnv.localizedString("TÜCCAR", "MERCHANT"))
                     .font(.custom("Outfit-Bold", size: 32, relativeTo: .largeTitle))
                     .foregroundColor(ThemeColors.electricYellow)
+                Text(userEnv.localizedString("SLOT \(slotId)", "SLOT \(slotId)"))
+                    .font(.setCustomFont(name: .InterBold, size: 10))
+                    .tracking(2)
+                    .foregroundStyle(ThemeColors.textMuted)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(ThemeColors.electricYellow.opacity(0.15))
+                    .clipShape(Capsule())
                 Text(userEnv.localizedString(
                     "\"Karanlıkta parlayan her şey altın değildir... ama bunlar öyle.\"",
                     "\"Not all that glitters in the dark is gold... but these are.\""

@@ -53,6 +53,7 @@ struct PerkHUDIcon: View {
     let perk: PassivePerk
     let isInteractable: Bool
     @ObservedObject var vm: GameViewModel
+    @EnvironmentObject var userEnv: UserEnvironment
     
     @State private var isAnimating = false
     @State private var showDetails = false
@@ -150,6 +151,7 @@ struct PerkHUDIcon: View {
             }
         )
         .popover(isPresented: $showDetails) {
+            let display = PerkEngine.perk(for: perk.id, lang: userEnv.language, tier: perk.tier) ?? perk
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 16) {
                     ZStack {
@@ -161,7 +163,7 @@ struct PerkHUDIcon: View {
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(ThemeColors.neonCyan.opacity(0.5), lineWidth: 1))
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(perk.name)
+                        Text(display.name)
                             .font(.setCustomFont(name: .InterBlack, size: 18))
                             .foregroundStyle(.white)
                         
@@ -188,7 +190,7 @@ struct PerkHUDIcon: View {
                     Spacer()
                 }
                 
-                Text(perk.desc)
+                Text(display.desc)
                     .font(.setCustomFont(name: .InterMedium, size: 13))
                     .foregroundStyle(ThemeColors.textSecondary)
                     .lineSpacing(4)
@@ -201,7 +203,7 @@ struct PerkHUDIcon: View {
                         
                         HStack(spacing: 8) {
                             ForEach(perk.synergyPartnerIds, id: \.self) { partnerId in
-                                if let partner = PerkEngine.perkPool.first(where: { $0.id == partnerId }) {
+                                if let partner = PerkEngine.perk(for: partnerId, lang: userEnv.language, tier: 1) {
                                     HStack(spacing: 4) {
                                         Text(partner.icon)
                                         Text(partner.name)

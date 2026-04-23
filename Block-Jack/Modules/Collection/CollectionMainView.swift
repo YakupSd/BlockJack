@@ -14,6 +14,8 @@ struct CollectionMainView: View {
     enum CollectionTab: String, CaseIterable {
         case perks = "PERKLER"
         case bosses = "BOSS'LAR"
+        case quests = "GÖREV"
+        case lore = "LORE"
         case achievements = "BAŞARI"
         case leaderboard = "SKOR"
         case stats = "KAYIT"
@@ -22,6 +24,8 @@ struct CollectionMainView: View {
             switch self {
             case .perks: return "square.grid.3x3.fill"
             case .bosses: return "person.badge.shield.checkmark.fill"
+            case .quests: return "checklist"
+            case .lore: return "book.fill"
             case .achievements: return "trophy.fill"
             case .leaderboard: return "list.number"
             case .stats: return "chart.bar.xaxis"
@@ -32,6 +36,8 @@ struct CollectionMainView: View {
             switch self {
             case .perks:        return lang == .turkish ? "PERKLER"    : "PERKS"
             case .bosses:       return lang == .turkish ? "BOSS'LAR"   : "BOSSES"
+            case .quests:       return lang == .turkish ? "GÖREV"      : "QUESTS"
+            case .lore:         return lang == .turkish ? "LORE"       : "LORE"
             case .achievements: return lang == .turkish ? "BAŞARI"     : "AWARDS"
             case .leaderboard:  return lang == .turkish ? "SKOR"       : "SCORES"
             case .stats:        return lang == .turkish ? "KAYIT"      : "STATS"
@@ -56,6 +62,10 @@ struct CollectionMainView: View {
                             perksTab
                         case .bosses:
                             bossesTab
+                        case .quests:
+                            questsTab
+                        case .lore:
+                            loreTab
                         case .achievements:
                             achievementsTab
                         case .leaderboard:
@@ -157,6 +167,7 @@ struct CollectionMainView: View {
         return LazyVGrid(columns: columns, spacing: 20) {
             ForEach(allPerks) { perk in
                 let isDiscovered = userEnv.discoveredPerkIDs.contains(perk.id)
+                let display = PerkEngine.perk(for: perk.id, lang: userEnv.language, tier: 1) ?? perk
                 
                 VStack(spacing: 12) {
                     ZStack {
@@ -186,7 +197,7 @@ struct CollectionMainView: View {
                     }
                     .shadow(color: isDiscovered ? ThemeColors.neonCyan.opacity(0.2) : .clear, radius: 10)
                     
-                    Text(isDiscovered ? perk.name : "???")
+                    Text(isDiscovered ? display.name : "???")
                         .font(.setCustomFont(name: .InterBold, size: 11))
                         .foregroundStyle(isDiscovered ? .white : ThemeColors.textMuted)
                         .lineLimit(1)
@@ -260,6 +271,114 @@ struct CollectionMainView: View {
             }
         }
     }
+
+    // MARK: - Lore Tab
+
+    private var loreTab: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            loreSectionTitle(
+                titleTR: "DÜNYA KAYITLARI",
+                titleEN: "WORLD LOGS",
+                subtitleTR: "Dünyaların kısa giriş metinleri.",
+                subtitleEN: "Short introductions for each world."
+            )
+
+            ForEach(1...5, id: \.self) { world in
+                if let w = LoreEngine.worldLore(for: world) {
+                    loreCard(
+                        titleTR: w.titleTR,
+                        titleEN: w.titleEN,
+                        bodyTR: w.bodyTR,
+                        bodyEN: w.bodyEN,
+                        isUnlocked: userEnv.unlockedWorldLevel >= (world - 1) * 20 + 1,
+                        lockHintTR: "Bu dünya henüz kilitli.",
+                        lockHintEN: "This world is still locked."
+                    )
+                }
+            }
+
+            loreSectionTitle(
+                titleTR: "BOSS DOSYALARI",
+                titleEN: "BOSS FILES",
+                subtitleTR: "Keşfettikçe biyografiler açılır (spoiler yok).",
+                subtitleEN: "Bios unlock as you discover them (spoiler-free)."
+            )
+
+            ForEach(BossRegistry.shared.bossesSnapshot) { boss in
+                let unlocked = userEnv.discoveredBossIDs.contains(boss.id)
+                let lore = LoreEngine.bossLore(for: boss.id)
+                loreCard(
+                    titleTR: lore?.titleTR ?? "GİZLİ DOSYA",
+                    titleEN: lore?.titleEN ?? "REDACTED FILE",
+                    bodyTR: lore?.bodyTR ?? "Bu boss ile karşılaşınca dosya açılacak.",
+                    bodyEN: lore?.bodyEN ?? "Defeat this boss to unlock the file.",
+                    isUnlocked: unlocked,
+                    lockHintTR: BossRegistry.shared.levelRangeLabel(for: boss.id),
+                    lockHintEN: BossRegistry.shared.levelRangeLabel(for: boss.id)
+                )
+            }
+        }
+    }
+
+    private func loreSectionTitle(titleTR: String, titleEN: String, subtitleTR: String, subtitleEN: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(userEnv.localizedString(titleTR, titleEN))
+                .font(.setCustomFont(name: .InterBlack, size: 16))
+                .foregroundStyle(.white)
+            Text(userEnv.localizedString(subtitleTR, subtitleEN))
+                .font(.setCustomFont(name: .InterMedium, size: 12))
+                .foregroundStyle(ThemeColors.textSecondary)
+        }
+    }
+
+    private func loreCard(
+        titleTR: String,
+        titleEN: String,
+        bodyTR: String,
+        bodyEN: String,
+        isUnlocked: Bool,
+        lockHintTR: String,
+        lockHintEN: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(userEnv.localizedString(titleTR, titleEN))
+                    .font(.setCustomFont(name: .InterBlack, size: 14))
+                    .foregroundStyle(isUnlocked ? ThemeColors.electricYellow : ThemeColors.textMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer()
+                if isUnlocked {
+                    Image(systemName: "lock.open.fill")
+                        .foregroundStyle(ThemeColors.neonCyan)
+                } else {
+                    Text(userEnv.localizedString(lockHintTR, lockHintEN))
+                        .font(.setCustomFont(name: .InterBold, size: 10))
+                        .foregroundStyle(ThemeColors.textMuted)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(Capsule())
+                }
+            }
+
+            Text(userEnv.localizedString(
+                isUnlocked ? bodyTR : "???",
+                isUnlocked ? bodyEN : "???"
+            ))
+            .font(.setCustomFont(name: .InterMedium, size: 12))
+            .foregroundStyle(isUnlocked ? ThemeColors.textSecondary : ThemeColors.textMuted)
+            .lineLimit(nil)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .background(Color.white.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(isUnlocked ? ThemeColors.electricYellow.opacity(0.25) : ThemeColors.gridStroke.opacity(0.4), lineWidth: 1)
+        )
+    }
     
     private var statsTab: some View {
         VStack(spacing: 16) {
@@ -270,6 +389,116 @@ struct CollectionMainView: View {
             StatRow(title: userEnv.localizedString("Keşfedilen Perkler", "Perks Discovered"), value: "\(userEnv.discoveredPerkIDs.count) / \(PerkEngine.perkPool.count)", icon: "sparkles", color: ThemeColors.neonPurple)
             StatRow(title: userEnv.localizedString("Giriş Serisi", "Login Streak"), value: "\(userEnv.dailyStreak) \(userEnv.localizedString("gün", "days"))", icon: "calendar.badge.checkmark", color: ThemeColors.neonCyan)
         }
+    }
+
+    // MARK: - Questline Tab
+
+    private var questsTab: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(userEnv.localizedString("KARAKTER GÖREVLERİ", "CHARACTER QUESTS"))
+                    .font(.setCustomFont(name: .InterBlack, size: 18))
+                    .foregroundStyle(.white)
+                Text(userEnv.localizedString("Her karakter için 7 günlük zincir. Her karakter günde 1 adım ilerler.", "A 7-day chain per character. Each character advances 1 step per day."))
+                    .font(.setCustomFont(name: .InterMedium, size: 12))
+                    .foregroundStyle(ThemeColors.textSecondary)
+            }
+
+            ForEach(GameCharacter.roster) { char in
+                questCard(for: char)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func questCard(for char: GameCharacter) -> some View {
+        let day = userEnv.questDay(for: char.id)
+        let progress = userEnv.questProgress(for: char.id)
+        let isLocked = userEnv.isQuestLockedToday(for: char.id)
+        let quest = CharacterQuestEngine.currentQuest(for: char.id, day: day)
+
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: quest?.icon ?? "checklist")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(ThemeColors.electricYellow)
+                    .frame(width: 40, height: 40)
+                    .background(ThemeColors.surfaceDark)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(char.name)
+                        .font(.setCustomFont(name: .InterBlack, size: 14))
+                        .foregroundStyle(.white)
+                    Text(userEnv.localizedString("GÜN \(day)/7", "DAY \(day)/7"))
+                        .font(.setCustomFont(name: .InterBold, size: 10))
+                        .foregroundStyle(ThemeColors.neonCyan)
+                        .tracking(1.2)
+                }
+
+                Spacer()
+
+                if isLocked {
+                    Text(userEnv.localizedString("YARIN", "TOMORROW"))
+                        .font(.setCustomFont(name: .InterBlack, size: 10))
+                        .foregroundStyle(ThemeColors.cosmicBlack)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(ThemeColors.electricYellow)
+                        .clipShape(Capsule())
+                }
+            }
+
+            if let quest {
+                Text(userEnv.localizedString(quest.titleTR, quest.titleEN))
+                    .font(.setCustomFont(name: .InterExtraBold, size: 14))
+                    .foregroundStyle(.white)
+
+                Text(userEnv.localizedString(quest.descTR, quest.descEN))
+                    .font(.setCustomFont(name: .InterMedium, size: 12))
+                    .foregroundStyle(ThemeColors.textSecondary)
+
+                let ratio = quest.goal > 0 ? min(1.0, Double(progress) / Double(quest.goal)) : 0.0
+
+                VStack(spacing: 6) {
+                    HStack {
+                        Text("\(progress)/\(quest.goal)")
+                            .font(.setCustomFont(name: .InterBold, size: 11))
+                            .foregroundStyle(ThemeColors.neonCyan)
+                        Spacer()
+                        Text(userEnv.localizedString("ÖDÜL", "REWARD"))
+                            .font(.setCustomFont(name: .InterBold, size: 10))
+                            .foregroundStyle(ThemeColors.textMuted)
+                        Text("\(quest.rewardGold)🪙  \(quest.rewardDiamonds)💎")
+                            .font(.setCustomFont(name: .InterBlack, size: 11))
+                            .foregroundStyle(ThemeColors.electricYellow)
+                    }
+
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.white.opacity(0.08))
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(ThemeColors.neonCyan)
+                                .frame(width: geo.size.width * ratio)
+                        }
+                    }
+                    .frame(height: 10)
+                }
+                .opacity(isLocked ? 0.55 : 1.0)
+            } else {
+                Text(userEnv.localizedString("Görev bulunamadı.", "Quest not found."))
+                    .font(.setCustomFont(name: .InterMedium, size: 12))
+                    .foregroundStyle(ThemeColors.textSecondary)
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(isLocked ? ThemeColors.electricYellow.opacity(0.35) : Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 
     // MARK: - Phase 8: Achievements Tab

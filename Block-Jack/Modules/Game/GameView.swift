@@ -59,6 +59,12 @@ struct GameView: View {
                 // 2) CAN + ZAMAN BARI — tek ince şerit
                 LifeAndTimerStrip(vm: vm)
 
+                // Modifier counter-tip (aktifse)
+                if vm.run.activeModifier != nil {
+                    ModifierCounterTipPill(vm: vm)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 // Boss header (sadece boss round'larda) — kompakt şerit
                 if vm.run.round.isBossRound {
                     bossHeaderView
@@ -203,10 +209,41 @@ struct GameView: View {
                 }
             }
 
+            // Targeted Overdrive Cancel (Architect / BLOCK-E)
+            if vm.isTargetingOverdrive {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            HapticManager.shared.play(.buttonTap)
+                            vm.cancelTargetedOverdrive()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "xmark.circle.fill")
+                                Text(userEnv.localizedString("İPTAL", "CANCEL"))
+                            }
+                            .font(.setCustomFont(name: .InterBold, size: 12))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(ThemeColors.gridDark.opacity(0.85))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(ThemeColors.neonPink.opacity(0.5), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 16)
+                        .padding(.top, 12)
+                    }
+                    Spacer()
+                }
+                .zIndex(120)
+            }
+
             // Overlay'ler
             if vm.phase == .roundComplete {
-                BattleRewardView(slotId: vm.activeSlotId) {
-                    dismiss()
+                BattleRewardView(slotId: vm.activeSlotId, isChallenge: vm.currentNodeType == .challenge || vm.isContractChallenge) {
+                    // Post-run standard: ödül sonrası her zaman Stage Map'e dön.
+                    MainViewsRouter.shared.popToMap(slotId: vm.activeSlotId)
                 }
             }
             if vm.phase == .bossIntro {

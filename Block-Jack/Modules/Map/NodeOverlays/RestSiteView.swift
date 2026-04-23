@@ -72,10 +72,17 @@ struct RestSiteView: View {
 
     private var backgroundLayer: some View {
         ZStack {
-            Image("cyber_rest_station")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .ignoresSafeArea()
+            GeometryReader { geo in
+                // .fill kırptığı için küçük ekranlarda yazılar görünmüyordu.
+                // Burada arka plan “tam sığsın” (fit) + ortala.
+                Image("cyber_rest_station")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .background(Color.black)
+                    .clipped()
+            }
+            .ignoresSafeArea()
 
             Color.black.opacity(0.72).ignoresSafeArea()
 

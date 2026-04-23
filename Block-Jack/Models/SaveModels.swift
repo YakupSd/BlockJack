@@ -138,46 +138,79 @@ struct GameCharacter: Codable, Identifiable, Hashable {
 // MARK: - Selected Perk / Starting Item
 struct StartingPerk: Codable, Identifiable, Hashable {
     let id: String
-    let name: String
+    let nameTR: String
+    let nameEN: String
     let icon: String
-    let desc: String
+    let descTR: String
+    let descEN: String
     
     static let available: [StartingPerk] = [
-        StartingPerk(id: "none", name: "Hiçbiri", icon: "🚫", desc: "Temel başlangıç, güçlendirme yok."),
-        StartingPerk(id: "blue_pill", name: "Blue Pill", icon: "item_blue_pill", desc: "Mavi bloklar ×2 Chips verir"),
-        StartingPerk(id: "golden_stamp", name: "Golden Stamp", icon: "item_golden_stamp", desc: "Hedef skor -%15"),
-        StartingPerk(id: "lucky_clover", name: "Lucky Clover", icon: "🍀", desc: "Streak maxı +10 artırır"),
+        StartingPerk(id: "none", nameTR: "Hiçbiri", nameEN: "None", icon: "🚫",
+                    descTR: "Temel başlangıç, güçlendirme yok.", descEN: "Basic start. No bonus."),
+        StartingPerk(id: "blue_pill", nameTR: "Blue Pill", nameEN: "Blue Pill", icon: "item_blue_pill",
+                    descTR: "Mavi bloklar ×2 Chips verir", descEN: "Blue blocks grant ×2 Chips."),
+        StartingPerk(id: "golden_stamp", nameTR: "Golden Stamp", nameEN: "Golden Stamp", icon: "item_golden_stamp",
+                    descTR: "Hedef skor -%15", descEN: "Target score -15%."),
+        StartingPerk(id: "lucky_clover", nameTR: "Lucky Clover", nameEN: "Lucky Clover", icon: "🍀",
+                    descTR: "Streak maxı +10 artırır", descEN: "Streak cap +10."),
         
         // Yeni Perkler
-        StartingPerk(id: "momentum", name: "Momentum", icon: "⚡", desc: "4. seride çift puan verip komboyu sıfırlar"),
-        StartingPerk(id: "glass_cannon", name: "Glass Cannon", icon: "🔮", desc: "Can 1 iken tüm puanlar ×1.5 artar"),
-        StartingPerk(id: "overkill", name: "Overkill", icon: "💥", desc: "Kalan puanları bir sonraki tura aktarır"),
-        StartingPerk(id: "last_stand", name: "Last Stand", icon: "🛡️", desc: "Öldüğünde 1 kereliğine ücretsiz canlanma sunar"),
-        StartingPerk(id: "safe_house", name: "Safe House", icon: "🏕️", desc: "Dinlenme alanlarında otomatik +2 Altın"),
-        StartingPerk(id: "echoes", name: "Echoes", icon: "🔊", desc: "Tur sonu, en iyi hamlenin puanını tekrar ekler"),
-        StartingPerk(id: "wide_load", name: "Wide Load", icon: "📦", desc: "Blok haznesine ekstra 4. bir slot açar"),
-        StartingPerk(id: "clockwork", name: "Clockwork", icon: "🕰️", desc: "Kazanılan süre ilerledikçe bonus çarpan ekler"),
-        StartingPerk(id: "sculptor", name: "Sculptor", icon: "🔨", desc: "Turda 2 kez bloğu çevirme hakkı verir"),
+        StartingPerk(id: "momentum", nameTR: "Momentum", nameEN: "Momentum", icon: "⚡",
+                    descTR: "4. seride çift puan verip komboyu sıfırlar", descEN: "On 4th streak: double score and reset combo."),
+        StartingPerk(id: "glass_cannon", nameTR: "Glass Cannon", nameEN: "Glass Cannon", icon: "🔮",
+                    descTR: "Can 1 iken tüm puanlar ×1.5 artar", descEN: "When at 1 life: all scores ×1.5."),
+        StartingPerk(id: "overkill", nameTR: "Overkill", nameEN: "Overkill", icon: "💥",
+                    descTR: "Kalan puanları bir sonraki tura aktarır", descEN: "Carry leftover score into the next round."),
+        StartingPerk(id: "last_stand", nameTR: "Last Stand", nameEN: "Last Stand", icon: "🛡️",
+                    descTR: "Öldüğünde 1 kereliğine ücretsiz canlanma sunar", descEN: "Revive once for free when you die."),
+        StartingPerk(id: "safe_house", nameTR: "Safe House", nameEN: "Safe House", icon: "🏕️",
+                    descTR: "Dinlenme alanlarında otomatik +2 Altın", descEN: "Rest sites grant +2 Gold automatically."),
+        StartingPerk(id: "echoes", nameTR: "Echoes", nameEN: "Echoes", icon: "🔊",
+                    descTR: "Tur sonu, en iyi hamlenin puanını tekrar ekler", descEN: "End of round: repeat your best move score."),
+        StartingPerk(id: "wide_load", nameTR: "Wide Load", nameEN: "Wide Load", icon: "📦",
+                    descTR: "Blok haznesine ekstra 4. bir slot açar", descEN: "Unlock an extra 4th tray slot."),
+        StartingPerk(id: "clockwork", nameTR: "Clockwork", nameEN: "Clockwork", icon: "🕰️",
+                    descTR: "Kazanılan süre ilerledikçe bonus çarpan ekler", descEN: "Time gained gradually adds a bonus multiplier."),
+        StartingPerk(id: "sculptor", nameTR: "Sculptor", nameEN: "Sculptor", icon: "🔨",
+                    descTR: "Turda 2 kez bloğu çevirme hakkı verir", descEN: "Rotate blocks up to 2 times per round."),
         
         // --- NEW PHASE B PERKS ---
-        StartingPerk(id: "lead_pill", name: "Lead Pill", icon: "item_green_pill", desc: "Yeşil bloklar ×2 Chips verir"),
-        StartingPerk(id: "midas_touch", name: "Midas Touch", icon: "💰✨", desc: "Her Flush (Renkli Temizlik) +5 Altın verir"),
-        StartingPerk(id: "vampiric_core", name: "Vampiric Core", icon: "🧛", desc: "Her 5000 puanda bir +1 Can şansı verir"),
-        StartingPerk(id: "recycler", name: "Recycler", icon: "♻️", desc: "2+ satır silindiğinde %20 hazne yenileme şansı"),
-        StartingPerk(id: "chain_pulse", name: "Chain Pulse", icon: "📡", desc: "Temizlik sonrası komşu kareleri kontrol eder"),
-        StartingPerk(id: "heavy_duty", name: "Heavy Duty", icon: "🏗️", desc: "Ağır (Heavy) bloklar ×3 çarpan katkısı sağlar"),
-        StartingPerk(id: "phantom_siphon", name: "Phantom Siphon", icon: "👻🧪", desc: "Phantom kare yanına yerleşim +2s kazandırır"),
-        StartingPerk(id: "double_down", name: "Double Down", icon: "✖️2", desc: "Son hamlede temizlik yapılırsa +3 hamle verir"),
-        StartingPerk(id: "static_charge", name: "Static Charge", icon: "🔌", desc: "Static kareler overdrive barını hızla doldurur"),
-        StartingPerk(id: "tactical_lens", name: "Tactical Lens", icon: "🔍", desc: "En iyi yerleşimi 10sn aralıkla vurgular")
+        StartingPerk(id: "lead_pill", nameTR: "Lead Pill", nameEN: "Lead Pill", icon: "item_green_pill",
+                    descTR: "Yeşil bloklar ×2 Chips verir", descEN: "Green blocks grant ×2 Chips."),
+        StartingPerk(id: "midas_touch", nameTR: "Midas Touch", nameEN: "Midas Touch", icon: "💰✨",
+                    descTR: "Her Flush (Renkli Temizlik) +5 Altın verir", descEN: "Each Flush grants +5 Gold."),
+        StartingPerk(id: "vampiric_core", nameTR: "Vampiric Core", nameEN: "Vampiric Core", icon: "🧛",
+                    descTR: "Her 5000 puanda bir +1 Can şansı verir", descEN: "Every 5000 score: chance to gain +1 Life."),
+        StartingPerk(id: "recycler", nameTR: "Recycler", nameEN: "Recycler", icon: "♻️",
+                    descTR: "2+ satır silindiğinde %20 hazne yenileme şansı", descEN: "On 2+ line clear: 20% chance to refresh tray."),
+        StartingPerk(id: "chain_pulse", nameTR: "Chain Pulse", nameEN: "Chain Pulse", icon: "📡",
+                    descTR: "Temizlik sonrası komşu kareleri kontrol eder", descEN: "After a clear: checks adjacent squares."),
+        StartingPerk(id: "heavy_duty", nameTR: "Heavy Duty", nameEN: "Heavy Duty", icon: "🏗️",
+                    descTR: "Ağır (Heavy) bloklar ×3 çarpan katkısı sağlar", descEN: "Heavy cells contribute ×3 to multiplier."),
+        StartingPerk(id: "phantom_siphon", nameTR: "Phantom Siphon", nameEN: "Phantom Siphon", icon: "👻🧪",
+                    descTR: "Phantom kare yanına yerleşim +2s kazandırır", descEN: "Placing next to Phantom cell grants +2s."),
+        StartingPerk(id: "double_down", nameTR: "Double Down", nameEN: "Double Down", icon: "✖️2",
+                    descTR: "Son hamlede temizlik yapılırsa +3 hamle verir", descEN: "If you clear on your last move: +3 moves."),
+        StartingPerk(id: "static_charge", nameTR: "Static Charge", nameEN: "Static Charge", icon: "🔌",
+                    descTR: "Static kareler overdrive barını hızla doldurur", descEN: "Static cells rapidly charge overdrive."),
+        StartingPerk(id: "tactical_lens", nameTR: "Tactical Lens", nameEN: "Tactical Lens", icon: "🔍",
+                    descTR: "En iyi yerleşimi 10sn aralıkla vurgular", descEN: "Highlights best placement every 10s.")
     ]
     
-    func toPassivePerk() -> PassivePerk {
+    func displayName(lang: AppLanguage) -> String {
+        lang == .turkish ? nameTR : nameEN
+    }
+
+    func displayDesc(lang: AppLanguage) -> String {
+        lang == .turkish ? descTR : descEN
+    }
+
+    func toPassivePerk(lang: AppLanguage) -> PassivePerk {
         return PassivePerk(
             id: self.id,
-            name: self.name,
+            name: displayName(lang: lang),
             icon: self.icon,
-            desc: self.desc,
+            desc: displayDesc(lang: lang),
             tier: 1,
             synergyPartnerIds: []
         )
@@ -252,6 +285,33 @@ struct ConsumableItem: Codable, Identifiable, Hashable {
     ]
 }
 
+// MARK: - Slot Run History
+struct SlotRunEntry: Codable, Identifiable, Hashable {
+    let id: UUID
+    let score: Int
+    let worldLevelReached: Int
+    let characterId: String
+    let timestamp: TimeInterval
+
+    init(id: UUID = UUID(), score: Int, worldLevelReached: Int, characterId: String, timestamp: TimeInterval = Date().timeIntervalSince1970) {
+        self.id = id
+        self.score = score
+        self.worldLevelReached = worldLevelReached
+        self.characterId = characterId
+        self.timestamp = timestamp
+    }
+}
+
+struct LastRunSummary: Codable, Hashable {
+    let score: Int
+    let worldLevelReached: Int
+    let characterId: String
+    let goldTotal: Int
+    let perksCount: Int
+    let wasTrial: Bool
+    let timestamp: TimeInterval
+}
+
 
 // MARK: - Save Slot
 struct SaveSlot: Codable, Identifiable {
@@ -280,6 +340,15 @@ struct SaveSlot: Codable, Identifiable {
     var unlockedWorldLevel: Int = 1
     var goldUpgradeLevels: [String: Int] = [:]
     var unlockedMetaUpgradeIDs: [String] = []
+
+    // Boss Contract (tek seferlik risk seçimi — WorldMap boss sheet'ten)
+    var activeBossContractId: String? = nil
+
+    // Phase 12: Slot bazlı run history / best
+    var bestScore: Int = 0
+    var bestWorldLevel: Int = 1
+    var recentRuns: [SlotRunEntry] = []
+    var lastRunSummary: LastRunSummary? = nil
     
     var character: GameCharacter? {
         GameCharacter.roster.first(where: { $0.id == characterId })

@@ -138,6 +138,12 @@ final class MainViewsRouter: Router {
 // MARK: - Convenience pushTo helpers
 extension MainViewsRouter {
 
+    private func defaultWorldIdForCurrentProgress() -> Int {
+        // unlockedWorldLevel: 1...100 → world 1...5
+        let wl = max(1, UserEnvironment.shared.unlockedWorldLevel)
+        return ChapterProgression.world(for: wl)
+    }
+
     /// SwiftUI view'ı direkt push et
     func push<V: View>(
         _ view: V,
@@ -258,7 +264,14 @@ extension MainViewsRouter {
     }
     
     func pushToWorldMap(slotId: Int) {
-        let vm = WorldMapViewModel(slotId: slotId, userEnv: UserEnvironment.shared)
+        let vm = WorldMapViewModel(slotId: slotId, worldId: defaultWorldIdForCurrentProgress(), userEnv: UserEnvironment.shared)
+        push(
+            WorldMapView(vm: vm).environmentObject(UserEnvironment.shared)
+        )
+    }
+
+    func pushToWorldMap(worldId: Int, slotId: Int) {
+        let vm = WorldMapViewModel(slotId: slotId, worldId: worldId, userEnv: UserEnvironment.shared)
         push(
             WorldMapView(vm: vm).environmentObject(UserEnvironment.shared)
         )
@@ -280,7 +293,7 @@ extension MainViewsRouter {
             SlotHubView(slotId: slotId).environmentObject(UserEnvironment.shared),
             withNavigationTitle: "", navigationBarHidden: true
         )
-        let vm = WorldMapViewModel(slotId: slotId, userEnv: UserEnvironment.shared)
+        let vm = WorldMapViewModel(slotId: slotId, worldId: defaultWorldIdForCurrentProgress(), userEnv: UserEnvironment.shared)
         let worldMapVC = MainNavigationView.builder.makeView(
             WorldMapView(vm: vm).environmentObject(UserEnvironment.shared),
             withNavigationTitle: "", navigationBarHidden: true

@@ -69,13 +69,23 @@ struct TreasureRoomView: View {
     // MARK: - Components
     
     private var headerSection: some View {
-        OverlayTitleBlock(
-            "HAZİNE ODASI",
-            subtitle: treasureOpened
-                ? "Bir hediye seç!"
-                : "Karanlık bir köşede eski bir sandık duruyor...",
-            color: ThemeColors.neonGreen
-        )
+        VStack(spacing: 10) {
+            OverlayTitleBlock(
+                "HAZİNE ODASI",
+                subtitle: treasureOpened
+                    ? "Bir hediye seç!"
+                    : "Karanlık bir köşede eski bir sandık duruyor...",
+                color: ThemeColors.neonGreen
+            )
+            Text(userEnv.localizedString("SLOT \(slotId)", "SLOT \(slotId)"))
+                .font(.setCustomFont(name: .InterBold, size: 10))
+                .tracking(2)
+                .foregroundStyle(ThemeColors.textMuted)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 3)
+                .background(ThemeColors.neonGreen.opacity(0.14))
+                .clipShape(Capsule())
+        }
     }
 
     private var closedChestSection: some View {

@@ -239,6 +239,38 @@ struct LifeAndTimerStrip: View {
     }
 }
 
+// MARK: - Modifier Counter Tip
+/// Aktif modifier varsa kısa öneri pill'i.
+struct ModifierCounterTipPill: View {
+    @ObservedObject var vm: GameViewModel
+    @EnvironmentObject var userEnv: UserEnvironment
+
+    var body: some View {
+        guard let mod = vm.run.activeModifier else { return AnyView(EmptyView()) }
+        let recId = mod.recommendedCharacterId
+        let recName = GameCharacter.roster.first(where: { $0.id == recId })?.name ?? "?"
+        let text = userEnv.localizedString(mod.counterTipTR(recommendedName: recName), mod.counterTipEN(recommendedName: recName))
+
+        return AnyView(
+            HStack(spacing: 8) {
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(ThemeColors.electricYellow)
+                Text(text)
+                    .font(.setCustomFont(name: .InterBold, size: 10))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(ThemeColors.hudBg))
+            .overlay(Capsule().stroke(ThemeColors.electricYellow.opacity(0.35), lineWidth: 1))
+            .padding(.horizontal, GameLayout.horizontalPadding)
+        )
+    }
+}
+
 // MARK: - Boss Intent Pill
 /// Boss savaşlarında tetiklenen "saldırı uyarısı" pill'i.
 struct BossIntentPill: View {

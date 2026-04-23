@@ -11,6 +11,7 @@ class WorldMapViewModel: ObservableObject {
     @Published var selectedLevel: WorldLevel?
 
     let slotId: Int
+    let worldId: Int
     private let userEnv: UserEnvironment
 
     // Pixel map yerleşimi — harita logical boyutları. Gerçek render'da bu boyut
@@ -19,12 +20,13 @@ class WorldMapViewModel: ObservableObject {
     let nodePositions: [Int: CGPoint]    // level.id -> normalized (x, y) 0...1
     let connections: [WorldPathSegment]
 
-    init(slotId: Int, userEnv: UserEnvironment) {
+    init(slotId: Int, worldId: Int = 1, userEnv: UserEnvironment) {
         self.slotId = slotId
+        self.worldId = max(1, min(5, worldId))
         self.userEnv = userEnv
 
         // Pozisyonlar ve yol segmentleri bir kere hesaplanır (deterministik).
-        let built = Self.buildLayout()
+        let built = Self.buildLayout(worldId: self.worldId)
         self.nodePositions = built.positions
         self.connections = built.segments
 
@@ -36,7 +38,10 @@ class WorldMapViewModel: ObservableObject {
         var newLevels: [WorldLevel] = []
         let unlockedMax = userEnv.unlockedWorldLevel
 
-        for i in 1...20 {
+        let start = (worldId - 1) * 20 + 1
+        let end = worldId * 20
+
+        for i in start...end {
             let type: WorldLevelType = ChapterProgression.isBossLevel(i) ? .boss : .normal
             let status: WorldLevelStatus = i < unlockedMax ? .completed : (i == unlockedMax ? .available : .locked)
 
@@ -66,6 +71,11 @@ class WorldMapViewModel: ObservableObject {
 
     func startLevel(_ level: WorldLevel) {
         // Tıklanan seviyeye göre yeni bir ChapterMap oluşturup oyunu başlatır.
+        // Trial Character (günlük 1): run gerçekten başlarken tüket.
+        let cid = SaveManager.shared.slots.first(where: { $0.id == slotId })?.characterId
+            ?? userEnv.selectedCharacterID
+        userEnv.consumeTrialRunIfNeeded(selectedCharacterId: cid)
+
         let map = ChapterMapGenerator.generate(chapterIndex: level.id)
         SaveManager.shared.updateMapState(slotId: slotId, map: map, completedNodes: [])
         MainViewsRouter.shared.pushToMap(slotId: slotId)
@@ -75,7 +85,7 @@ class WorldMapViewModel: ObservableObject {
     var playerLevelId: Int {
         if let current = levels.first(where: { $0.status == .available }) { return current.id }
         if let lastDone = levels.last(where: { $0.status == .completed }) { return lastDone.id }
-        return 1
+        return (worldId - 1) * 20 + 1
     }
 
     var totalChapters: Int { 20 }
@@ -89,31 +99,34 @@ class WorldMapViewModel: ObservableObject {
     /// Şu an VM 1-20 üretiyor; unlockedWorldLevel 20'yi geçtiğinde Concrete
     /// Ruins'e kayacak. İleride VM çok-dünyalı hale gelirse bu da güncellenir.
     var currentTheme: WorldTheme {
-        ChapterProgression.theme(for: max(1, userEnv.unlockedWorldLevel))
+        let start = (worldId - 1) * 20 + 1
+        return ChapterProgression.theme(for: max(1, start))
     }
 
     // MARK: - Layout (zigzag yılan yolu, 20 sektör)
-    private static func buildLayout() -> (positions: [Int: CGPoint], segments: [WorldPathSegment]) {
+    private static func buildLayout(worldId: Int) -> (positions: [Int: CGPoint], segments: [WorldPathSegment]) {
         // 20 seviyeyi aşağıdan (y=0.95) yukarıya (y=0.05) yılan gibi sıralarız.
         // X kolonları 4 sütunlu snake: [0.22, 0.5, 0.78, 0.5] periyodu — doğal yol hissi.
         let xPattern: [CGFloat] = [0.22, 0.50, 0.78, 0.50]
         let count = 20
+        let start = (max(1, min(5, worldId)) - 1) * 20 + 1
         let top: CGFloat = 0.05
         let bottom: CGFloat = 0.95
         let step = (bottom - top) / CGFloat(count - 1)
 
         var positions: [Int: CGPoint] = [:]
-        for i in 1...count {
-            let x = xPattern[(i - 1) % xPattern.count]
+        for local in 1...count {
+            let x = xPattern[(local - 1) % xPattern.count]
             // Seviye 1 haritanın altında, seviye 20 tepede
-            let y = bottom - CGFloat(i - 1) * step
-            positions[i] = CGPoint(x: x, y: y)
+            let y = bottom - CGFloat(local - 1) * step
+            let levelId = start + (local - 1)
+            positions[levelId] = CGPoint(x: x, y: y)
         }
 
         var segments: [WorldPathSegment] = []
-        for i in 1..<count {
-            let from = i
-            let to = i + 1
+        for local in 1..<count {
+            let from = start + (local - 1)
+            let to = from + 1
             segments.append(WorldPathSegment(fromLevelId: from, toLevelId: to))
         }
         return (positions, segments)

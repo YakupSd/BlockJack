@@ -31,6 +31,22 @@ struct ThemeColors {
     static let neonGreen       = Color(hex: "#39FF14")
     static let neonOrange      = Color(hex: "#FF6B35")
 
+    // MARK: - World Selection (UI Spec)
+    static func worldCardPalette(worldId: Int) -> (cardBg: Color, accent: Color) {
+        switch max(1, min(5, worldId)) {
+        case 1:
+            return (Color(hex: "#0E1A2B"), Color(hex: "#00F5FF"))
+        case 2:
+            return (Color(hex: "#1A1512"), Color(hex: "#A0522D"))
+        case 3:
+            return (Color(hex: "#1A0D14"), Color(hex: "#FF6FA3"))
+        case 4:
+            return (Color(hex: "#071419"), Color(hex: "#00FFCC"))
+        default:
+            return (Color(hex: "#0D0A12"), Color(hex: "#9B59FF"))
+        }
+    }
+
     // MARK: - Block Colors (5 Ana Renk)
     static let blockRed        = Color(hex: "#FF3366")   // Kırmızı blok
     static let blockBlue       = Color(hex: "#00CFFF")   // Mavi blok

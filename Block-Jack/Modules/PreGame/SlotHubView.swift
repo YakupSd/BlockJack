@@ -16,6 +16,7 @@ struct SlotHubView: View {
     @EnvironmentObject var userEnv: UserEnvironment
     @StateObject private var saveManager = SaveManager.shared
     @State private var showDailyReward = false
+    @State private var showHubIntro = false
 
     let slotId: Int
 
@@ -54,7 +55,18 @@ struct SlotHubView: View {
 
                 Spacer(minLength: 16)
 
+                if let s = slot, !s.isEmpty {
+                    runHistoryCard(slot: s)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 14)
+                }
+
                 primaryActionButton
+
+                if hasActiveRun {
+                    seferSecButton
+                        .padding(.top, 10)
+                }
 
                 Spacer(minLength: 12)
 
@@ -71,6 +83,12 @@ struct SlotHubView: View {
                     .environmentObject(userEnv)
                     .zIndex(10)
             }
+
+            if showHubIntro {
+                hubIntroOverlay
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .zIndex(20)
+            }
         }
         .navigationBarHidden(true)
         .onAppear {
@@ -78,6 +96,46 @@ struct SlotHubView: View {
             if let s = slot, !s.isEmpty {
                 userEnv.loadFromSlot(s)
             }
+
+            // İlk kez Hub'a gelen oyuncuya kısa yönlendirme (tek sefer)
+            if !userEnv.hubIntroShown {
+                userEnv.hubIntroShown = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                        showHubIntro = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            showHubIntro = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var hubIntroOverlay: some View {
+        VStack {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(userEnv.localizedString("HUB İPUCU", "HUB TIP"))
+                    .font(.setCustomFont(name: .InterBlack, size: 12))
+                    .tracking(2)
+                    .foregroundStyle(ThemeColors.electricYellow)
+                Text(userEnv.localizedString(
+                    "Sefer için 'SEFERE BAŞLA'ya bas. Market, Galeri ve Karakter buradan açılır.",
+                    "Tap 'START CAMPAIGN' to begin. Market, Gallery and Character open from here."
+                ))
+                .font(.setCustomFont(name: .InterMedium, size: 12))
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+            .background(ThemeColors.hudBg.opacity(0.95))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(ThemeColors.electricYellow.opacity(0.35), lineWidth: 1))
+            .padding(.horizontal, 16)
+            .padding(.top, 70)
+            Spacer()
         }
     }
 
@@ -206,6 +264,93 @@ struct SlotHubView: View {
             .overlay(Capsule().stroke(color.opacity(0.4), lineWidth: 1))
     }
 
+    private func runHistoryCard(slot: SaveSlot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(userEnv.localizedString("RUN GEÇMİŞİ", "RUN HISTORY"))
+                    .font(.setCustomFont(name: .InterBlack, size: 12))
+                    .tracking(2)
+                    .foregroundStyle(ThemeColors.textSecondary)
+                Spacer()
+                Text(userEnv.localizedString("BEST \(slot.bestScore)", "BEST \(slot.bestScore)"))
+                    .font(.setCustomFont(name: .InterBold, size: 11))
+                    .foregroundStyle(ThemeColors.electricYellow)
+            }
+
+            if let last = slot.lastRunSummary {
+                VStack(alignment: .leading, spacing: 6) {
+                    let charName = GameCharacter.roster.first(where: { $0.id == last.characterId })?.name ?? last.characterId
+                    Text(userEnv.localizedString("SON RUN ÖZETİ", "LAST RUN SUMMARY"))
+                        .font(.setCustomFont(name: .InterBold, size: 11))
+                        .foregroundStyle(ThemeColors.textMuted)
+                        .tracking(1.5)
+                    HStack(spacing: 10) {
+                        pillTag(text: charName, color: ThemeColors.neonCyan)
+                        pillTag(text: "W\(last.worldLevelReached)", color: ThemeColors.neonPurple)
+                        pillTag(text: "\(last.score) PTS", color: ThemeColors.electricYellow)
+                    }
+                    HStack(spacing: 10) {
+                        pillTag(text: userEnv.localizedString("ALTIN \(last.goldTotal)", "GOLD \(last.goldTotal)"), color: ThemeColors.electricYellow)
+                        pillTag(text: userEnv.localizedString("PERK \(last.perksCount)", "PERK \(last.perksCount)"), color: ThemeColors.neonPurple)
+                        if last.wasTrial {
+                            pillTag(text: userEnv.localizedString("TRIAL RUN", "TRIAL RUN"), color: ThemeColors.neonPink)
+                        }
+                    }
+                }
+                .padding(.bottom, 6)
+            }
+
+            HStack(spacing: 10) {
+                pillTag(
+                    text: userEnv.localizedString("EN YÜKSEK WORLD \(slot.bestWorldLevel)", "MAX WORLD \(slot.bestWorldLevel)"),
+                    color: ThemeColors.neonPurple
+                )
+                pillTag(
+                    text: userEnv.localizedString("SON RUN \(slot.currentRound) / \(slot.currentScore)", "LAST \(slot.currentRound) / \(slot.currentScore)"),
+                    color: ThemeColors.neonCyan
+                )
+            }
+
+            if slot.recentRuns.isEmpty {
+                Text(userEnv.localizedString("Henüz run geçmişi yok.", "No run history yet."))
+                    .font(.setCustomFont(name: .InterMedium, size: 12))
+                    .foregroundStyle(ThemeColors.textMuted)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(slot.recentRuns.prefix(3)) { r in
+                        HStack(spacing: 10) {
+                            let name = GameCharacter.roster.first(where: { $0.id == r.characterId })?.name ?? r.characterId
+                            Text(name)
+                                .font(.setCustomFont(name: .InterBold, size: 11))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .frame(width: 110, alignment: .leading)
+
+                            Spacer(minLength: 0)
+
+                            Text("W\(r.worldLevelReached)")
+                                .font(.setCustomFont(name: .InterBold, size: 11))
+                                .foregroundStyle(ThemeColors.neonPurple)
+
+                            Text("\(r.score)")
+                                .font(.setCustomFont(name: .InterBlack, size: 12))
+                                .foregroundStyle(ThemeColors.electricYellow)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(ThemeColors.surfaceDark.opacity(0.75))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(ThemeColors.gridStroke.opacity(0.25), lineWidth: 1))
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(ThemeColors.surfaceDark.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(ThemeColors.gridStroke.opacity(0.35), lineWidth: 1))
+    }
+
     // MARK: - Primary Action
 
     private var primaryActionButton: some View {
@@ -215,8 +360,10 @@ struct SlotHubView: View {
                 // Aktif chapter map'i varsa — oyuncu boss'a giden yolun ortasındaydı
                 MainViewsRouter.shared.pushToMap(slotId: slotId)
             } else {
-                // Slot dolu ama map yok / yeni başlıyor → World Map
-                MainViewsRouter.shared.pushToWorldMap(slotId: slotId)
+                // Slot dolu ama map yok / yeni başlıyor → Run Setup (tek kaynak)
+                MainViewsRouter.shared.push(
+                    RunSetupView(slotId: slotId).environmentObject(UserEnvironment.shared)
+                )
             }
         } label: {
             HStack(spacing: 12) {
@@ -237,6 +384,36 @@ struct SlotHubView: View {
                     .shadow(color: ThemeColors.electricYellow.opacity(0.55), radius: 18)
             )
         }
+        .padding(.horizontal, 32)
+    }
+
+    private var seferSecButton: some View {
+        Button {
+            HapticManager.shared.play(.selection)
+            MainViewsRouter.shared.push(
+                WorldSelectionView(slotId: slotId).environmentObject(UserEnvironment.shared)
+            )
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "globe.europe.africa.fill")
+                    .font(.system(size: 16, weight: .bold))
+                Text(userEnv.localizedString("SEFER SEÇ", "SELECT CAMPAIGN"))
+                    .font(.setCustomFont(name: .InterBold, size: 14))
+                    .tracking(3)
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(ThemeColors.surfaceDark.opacity(0.9))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(ThemeColors.neonCyan.opacity(0.35), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
         .padding(.horizontal, 32)
     }
 

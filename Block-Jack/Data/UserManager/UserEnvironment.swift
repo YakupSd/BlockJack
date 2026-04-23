@@ -135,6 +135,20 @@ class UserEnvironment: ObservableObject {
         didSet { syncWithSlot() }
     }
 
+    // MARK: - Pre-run Config (tek kaynak)
+    @Published var runConfig: RunConfig? = nil
+
+    // MARK: - Trial Character (günlük 1 premium deneme)
+    @Published var trialCharacterLastDay: String {
+        didSet { UserDefaults.standard.set(trialCharacterLastDay, forKey: "trialCharacterLastDay") }
+    }
+    @Published var trialCharacterIdToday: String {
+        didSet { UserDefaults.standard.set(trialCharacterIdToday, forKey: "trialCharacterIdToday") }
+    }
+    @Published var trialRunUsedToday: Bool {
+        didSet { UserDefaults.standard.set(trialRunUsedToday, forKey: "trialRunUsedToday") }
+    }
+
     // MARK: - Settings
     @Published var isSoundEnabled: Bool {
         didSet { 
@@ -189,6 +203,9 @@ class UserEnvironment: ObservableObject {
 
     @Published var tutorialCompleted: Bool {
         didSet { UserDefaults.standard.set(tutorialCompleted, forKey: "tutorialCompleted") }
+    }
+    @Published var hubIntroShown: Bool {
+        didSet { UserDefaults.standard.set(hubIntroShown, forKey: "hubIntroShown") }
     }
     @Published var selectedCharacterID: String {
         didSet { UserDefaults.standard.set(selectedCharacterID, forKey: "selectedCharacterID") }
@@ -245,6 +262,8 @@ class UserEnvironment: ObservableObject {
             }
         }
     }
+    /// Unlock olduğunda UI'ın göstereceği toast için pending id.
+    @Published var pendingAchievementToastId: String? = nil
     /// En iyi 5 skor — her run sonunda eklenir, sıralanıp kırpılır.
     @Published var topScores: [LocalScoreEntry] {
         didSet {
@@ -260,6 +279,46 @@ class UserEnvironment: ObservableObject {
         didSet {
             if let data = try? JSONEncoder().encode(characterMaxChapter) {
                 UserDefaults.standard.set(data, forKey: "characterMaxChapter")
+            }
+        }
+    }
+
+    // MARK: - Character Questline (7-day chain)
+
+    /// Her karakter için quest zincirinde hangi günde (1..7) olduğunu tutar.
+    @Published var characterQuestDay: [String: Int] {
+        didSet {
+            if let data = try? JSONEncoder().encode(characterQuestDay) {
+                UserDefaults.standard.set(data, forKey: "characterQuestDay")
+            }
+        }
+    }
+
+    /// Aktif quest için karakter bazlı progress (0..goal).
+    @Published var characterQuestProgress: [String: Int] {
+        didSet {
+            if let data = try? JSONEncoder().encode(characterQuestProgress) {
+                UserDefaults.standard.set(data, forKey: "characterQuestProgress")
+            }
+        }
+    }
+
+    /// Aynı karakterin quest gününü günde 1 kez ilerletebilmek için.
+    /// Format: yyyy-MM-dd
+    @Published var characterQuestLastAdvanceDay: [String: String] {
+        didSet {
+            if let data = try? JSONEncoder().encode(characterQuestLastAdvanceDay) {
+                UserDefaults.standard.set(data, forKey: "characterQuestLastAdvanceDay")
+            }
+        }
+    }
+
+    // MARK: - Cosmetics (UI-only ownership)
+
+    @Published var ownedCosmeticIDs: Set<String> {
+        didSet {
+            if let data = try? JSONEncoder().encode(ownedCosmeticIDs) {
+                UserDefaults.standard.set(data, forKey: "ownedCosmetics")
             }
         }
     }
@@ -294,6 +353,7 @@ class UserEnvironment: ObservableObject {
         }
 
         self.tutorialCompleted = UserDefaults.standard.bool(forKey: "tutorialCompleted")
+        self.hubIntroShown = UserDefaults.standard.bool(forKey: "hubIntroShown")
         self.selectedCharacterID = UserDefaults.standard.string(forKey: "selectedCharacterID") ?? "block_e"
 
         if let data = UserDefaults.standard.data(forKey: "unlockedCharacters"),
@@ -344,6 +404,34 @@ class UserEnvironment: ObservableObject {
         } else {
             self.characterMaxChapter = [:]
         }
+        if let data = UserDefaults.standard.data(forKey: "characterQuestDay"),
+           let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
+            self.characterQuestDay = decoded
+        } else {
+            self.characterQuestDay = [:]
+        }
+        if let data = UserDefaults.standard.data(forKey: "characterQuestProgress"),
+           let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
+            self.characterQuestProgress = decoded
+        } else {
+            self.characterQuestProgress = [:]
+        }
+        if let data = UserDefaults.standard.data(forKey: "characterQuestLastAdvanceDay"),
+           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
+            self.characterQuestLastAdvanceDay = decoded
+        } else {
+            self.characterQuestLastAdvanceDay = [:]
+        }
+        if let data = UserDefaults.standard.data(forKey: "ownedCosmetics"),
+           let decoded = try? JSONDecoder().decode(Set<String>.self, from: data) {
+            self.ownedCosmeticIDs = decoded
+        } else {
+            self.ownedCosmeticIDs = []
+        }
+
+        self.trialCharacterLastDay = UserDefaults.standard.string(forKey: "trialCharacterLastDay") ?? ""
+        self.trialCharacterIdToday = UserDefaults.standard.string(forKey: "trialCharacterIdToday") ?? ""
+        self.trialRunUsedToday = UserDefaults.standard.object(forKey: "trialRunUsedToday") as? Bool ?? false
 
         // 2. Perform post-init logic (Testing Boost etc.)
         if self.diamonds < 50000 {
@@ -414,6 +502,7 @@ class UserEnvironment: ObservableObject {
         let cost = upgrade.cost(for: nextLevel)
         guard spend(gold: cost) else { return false }
         goldUpgradeLevels[upgrade.rawValue] = nextLevel
+        syncWithSlot()
         return true
     }
 
@@ -469,6 +558,45 @@ class UserEnvironment: ObservableObject {
         if let cid = slot.characterId, !cid.isEmpty {
             self.selectedCharacterID = cid
         }
+    }
+
+    func setRunConfig(_ config: RunConfig?) {
+        runConfig = config
+    }
+
+    // MARK: - Trial helpers
+    func canStartTrialToday() -> Bool {
+        // Yeni gün → reset hissi (id boş olmasa bile)
+        if trialCharacterLastDay != todayKey() { return true }
+        return !trialRunUsedToday
+    }
+
+    func startTrial(characterId: String) {
+        guard !characterId.isEmpty else { return }
+        trialCharacterLastDay = todayKey()
+        trialCharacterIdToday = characterId
+        trialRunUsedToday = false
+        HapticManager.shared.play(.success)
+        AudioManager.shared.playSFX(.perkUnlock)
+    }
+
+    func isTrialCharacterAvailableNow(_ characterId: String) -> Bool {
+        guard trialCharacterLastDay == todayKey(),
+              trialCharacterIdToday == characterId,
+              !trialRunUsedToday else { return false }
+        return true
+    }
+
+    func consumeTrialRunIfNeeded(selectedCharacterId: String) {
+        guard isTrialCharacterAvailableNow(selectedCharacterId) else { return }
+        trialRunUsedToday = true
+    }
+
+    func wasTrialRunUsedToday(for characterId: String) -> Bool {
+        guard !characterId.isEmpty else { return false }
+        return trialCharacterLastDay == todayKey()
+            && trialCharacterIdToday == characterId
+            && trialRunUsedToday
     }
 
     /// Aktif slot bağlamını kapatır. Dashboard'a dönerken çağrılır; böylece
@@ -536,6 +664,12 @@ class UserEnvironment: ObservableObject {
             if achievement.rewardGold > 0 { earn(gold: achievement.rewardGold) }
             if achievement.rewardDiamonds > 0 { earn(diamonds: achievement.rewardDiamonds) }
             AudioManager.shared.playSFX(.perkUnlock)
+            pendingAchievementToastId = id
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { [weak self] in
+                if self?.pendingAchievementToastId == id {
+                    self?.pendingAchievementToastId = nil
+                }
+            }
         }
     }
 
@@ -551,9 +685,19 @@ class UserEnvironment: ObservableObject {
     func recordCharacterChapterClear(characterId: String, chapter: Int) {
         guard !characterId.isEmpty, chapter > 0 else { return }
         let current = characterMaxChapter[characterId] ?? 0
-        if chapter > current {
-            characterMaxChapter[characterId] = chapter
-        }
+        guard chapter > current else { return }
+
+        characterMaxChapter[characterId] = chapter
+
+        // First-time character clear bonus (1 kez / chapter / character)
+        // Satın alma motivasyonu: premium karakterle yeni chapter bitirmek “ödül” verir.
+        // (Farm engeli: sadece max chapter artınca tetiklenir.)
+        let baseGold = 150 + min(20, chapter) * 25
+        let baseDiamonds = 3 + min(20, chapter) / 2
+
+        earn(gold: baseGold)
+        earn(diamonds: baseDiamonds)
+        AudioManager.shared.playSFX(.perkUnlock)
     }
 
     /// Bir karakterin şu ana kadar ulaştığı en yüksek chapter.
@@ -564,6 +708,73 @@ class UserEnvironment: ObservableObject {
     /// Karakter %100 master'lanmış mı? (Ch20 = son bölüm)
     func isCharacterMastered(_ characterId: String) -> Bool {
         maxChapter(for: characterId) >= 20
+    }
+
+    // MARK: - Questline helpers
+
+    private func todayKey() -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.calendar = Calendar(identifier: .gregorian)
+        df.dateFormat = "yyyy-MM-dd"
+        return df.string(from: Date())
+    }
+
+    func questDay(for characterId: String) -> Int {
+        min(7, max(1, characterQuestDay[characterId] ?? 1))
+    }
+
+    func questProgress(for characterId: String) -> Int {
+        max(0, characterQuestProgress[characterId] ?? 0)
+    }
+
+    func canAdvanceQuestToday(for characterId: String) -> Bool {
+        let today = todayKey()
+        return characterQuestLastAdvanceDay[characterId] != today
+    }
+
+    func resetQuestProgress(for characterId: String) {
+        characterQuestProgress[characterId] = 0
+    }
+
+    /// Quest event raporla. Aktif quest bu event'i dinliyorsa progress artar.
+    func reportQuestEvent(characterId: String, event: CharacterQuestEvent, amount: Int = 1) {
+        guard !characterId.isEmpty, amount > 0 else { return }
+        // Aynı karakter quest zincirinde günde 1 adım kuralı:
+        // Bir quest tamamlanıp gün ilerlediğinde (lastAdvanceDay=today), yeni
+        // quest'e aynı gün progress yazmayı durduruyoruz.
+        guard canAdvanceQuestToday(for: characterId) else { return }
+        guard let quest = CharacterQuestEngine.currentQuest(for: characterId, day: questDay(for: characterId)) else { return }
+        guard quest.event == event else { return }
+
+        let updated = min(quest.goal, questProgress(for: characterId) + amount)
+        characterQuestProgress[characterId] = updated
+
+        if updated >= quest.goal && canAdvanceQuestToday(for: characterId) {
+            if quest.rewardGold > 0 { earn(gold: quest.rewardGold) }
+            if quest.rewardDiamonds > 0 { earn(diamonds: quest.rewardDiamonds) }
+            AudioManager.shared.playSFX(.perkUnlock)
+
+            // Advance day
+            characterQuestLastAdvanceDay[characterId] = todayKey()
+            characterQuestDay[characterId] = min(7, questDay(for: characterId) + 1)
+            characterQuestProgress[characterId] = 0
+        }
+    }
+
+    func isQuestLockedToday(for characterId: String) -> Bool {
+        !canAdvanceQuestToday(for: characterId)
+    }
+
+    // MARK: - Cosmetics API
+
+    func ownsCosmetic(_ id: String) -> Bool {
+        ownedCosmeticIDs.contains(id)
+    }
+
+    func unlockCosmetic(_ id: String) {
+        guard !id.isEmpty else { return }
+        ownedCosmeticIDs.insert(id)
     }
 
     // MARK: - Phase 8: Leaderboard API

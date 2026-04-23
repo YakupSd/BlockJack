@@ -73,8 +73,8 @@ struct PerkSelectionView: View {
                         userEnv.loadFromSlot(newSlot)
                     }
                     
-                    // Dünya Haritasına (Campaign) geç
-                    MainViewsRouter.shared.pushToWorldMap(slotId: slotId)
+                    // İlk kurulum sonrası Hub'a düş (kullanıcı kampanyaya bilerek başlasın)
+                    MainViewsRouter.shared.pushToSlotHub(slotId: slotId)
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "play.fill")
@@ -125,11 +125,11 @@ struct PerkSelectionView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(perk.name)
+                    Text(userEnv.localizedString(perk.nameTR, perk.nameEN))
                         .font(.setCustomFont(name: .InterBold, size: 16))
                         .foregroundStyle(isSelected ? ThemeColors.electricYellow : .white)
                     
-                    Text(perk.desc)
+                    Text(userEnv.localizedString(perk.descTR, perk.descEN))
                         .font(.setCustomFont(name: .InterMedium, size: 12))
                         .foregroundStyle(ThemeColors.textSecondary)
                         .multilineTextAlignment(.leading)

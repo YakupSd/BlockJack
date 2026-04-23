@@ -161,43 +161,128 @@ struct PauseOverlay: View {
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.8).ignoresSafeArea()
+            Color.black.opacity(0.82).ignoresSafeArea()
             
-            VStack(spacing: 24) {
-                Text(userEnv.localizedString("MODÜL DURAKLATILDI", "SYSTEM PAUSED"))
-                    .font(.setCustomFont(name: .InterBlack, size: 28))
-                    .foregroundStyle(ThemeColors.electricYellow)
-                    .tracking(2)
-                
-                Button {
-                    HapticManager.shared.play(.buttonTap)
-                    vm.resumeGame()
-                } label: {
-                    Text(userEnv.localizedString("DEVAM ET", "RESUME"))
-                        .font(.setCustomFont(name: .InterExtraBold, size: 20))
-                        .foregroundStyle(.white)
-                        .frame(width: 240)
-                        .padding(.vertical, 16)
-                        .background(ThemeColors.neonCyan)
-                        .clipShape(Capsule())
+            AdaptiveOverlay(
+                header: {
+                    OverlayTitleBlock(
+                        userEnv.localizedString("DURAKLATILDI", "PAUSED"),
+                        subtitle: userEnv.localizedString("Sistem ayarlarını yönet ve devam et.", "Manage system settings and continue."),
+                        color: ThemeColors.electricYellow
+                    )
+                },
+                content: {
+                    VStack(spacing: 14) {
+                        // Quick toggles
+                        toggleRow(
+                            title: userEnv.localizedString("Ses", "Sound"),
+                            systemIcon: "speaker.wave.2.fill",
+                            isOn: $userEnv.isSoundEnabled,
+                            tint: ThemeColors.neonCyan
+                        )
+                        toggleRow(
+                            title: userEnv.localizedString("Titreşim", "Haptics"),
+                            systemIcon: "waveform.path",
+                            isOn: $userEnv.isHapticEnabled,
+                            tint: ThemeColors.neonPurple
+                        )
+                        
+                        // Actions
+                        actionButton(
+                            title: userEnv.localizedString("DEVAM ET", "RESUME"),
+                            color: ThemeColors.neonCyan
+                        ) {
+                            HapticManager.shared.play(.buttonTap)
+                            vm.resumeGame()
+                        }
+                        
+                        actionButton(
+                            title: userEnv.localizedString("ROUND'U YENİDEN BAŞLAT", "RESTART ROUND"),
+                            color: ThemeColors.electricYellow
+                        ) {
+                            HapticManager.shared.play(.buttonTap)
+                            vm.board.resetGrid()
+                            vm.startRound()
+                        }
+                        
+                        actionButton(
+                            title: userEnv.localizedString("AYARLAR", "SETTINGS"),
+                            color: ThemeColors.neonPink
+                        ) {
+                            HapticManager.shared.play(.buttonTap)
+                            MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(
+                                SettingsView().environmentObject(userEnv),
+                                withNavigationTitle: "", navigationBarHidden: true
+                            ))
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .frame(maxWidth: .infinity)
+                },
+                footer: {
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        vm.saveGameState()
+                        MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
+                    } label: {
+                        Text(userEnv.localizedString("KAYDET VE HUB'A DÖN", "SAVE & BACK TO HUB"))
+                            .font(.setCustomFont(name: .InterExtraBold, size: 18))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.white.opacity(0.10))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(ThemeColors.gridStroke.opacity(0.7), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
                 }
-                
-                Button {
-                    HapticManager.shared.play(.buttonTap)
-                    vm.saveGameState()
-                    MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
-                } label: {
-                    Text(userEnv.localizedString("KAYDET VE ÇIK", "SAVE & QUIT"))
-                        .font(.setCustomFont(name: .InterExtraBold, size: 20))
-                        .foregroundStyle(ThemeColors.textSecondary)
-                        .frame(width: 240)
-                        .padding(.vertical, 16)
-                        .background(ThemeColors.gridDark)
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(ThemeColors.gridStroke, lineWidth: 1))
-                }
-            }
+            )
         }
+    }
+    
+    private func actionButton(title: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.setCustomFont(name: .InterExtraBold, size: 16))
+                .foregroundStyle(ThemeColors.cosmicBlack)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(color)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .shadow(color: color.opacity(0.35), radius: 10)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func toggleRow(title: String, systemIcon: String, isOn: Binding<Bool>, tint: Color) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemIcon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(tint)
+                .frame(width: 28)
+            
+            Text(title)
+                .font(.setCustomFont(name: .InterBold, size: 14))
+                .foregroundStyle(.white)
+            
+            Spacer()
+            
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(tint)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(tint.opacity(0.25), lineWidth: 1)
+        )
     }
 }
 
@@ -302,9 +387,10 @@ struct ChapterCompleteOverlay: View {
                 Spacer().frame(height: 40)
                 
                 Button {
-                    // Phase 9: Haritayı yenile ve dön
-                    SaveManager.shared.advanceToNextChapter(slotId: vm.activeSlotId)
-                    MainViewsRouter.shared.popToMap(slotId: vm.activeSlotId)
+                    // Post-run standard: chapter bitti → mini map state’i temizle,
+                    // WorldMap’e dön ve bir sonraki level’ı oradan seç.
+                    SaveManager.shared.clearChapterMap(slotId: vm.activeSlotId)
+                    MainViewsRouter.shared.popToWorldMap(slotId: vm.activeSlotId)
                 } label: {
                     Text(userEnv.localizedString("DEVAM ET", "CONTINUE"))
                         .font(.setCustomFont(name: .InterExtraBold, size: 24))

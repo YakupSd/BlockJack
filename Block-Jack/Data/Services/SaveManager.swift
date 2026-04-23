@@ -52,8 +52,12 @@ class SaveManager: ObservableObject {
         newSlot.currentRound = 1
         newSlot.currentScore = 0
         
-        // Phase 9: Initialize map and base properties
-        newSlot.currentChapterMap = ChapterMapGenerator.generate(chapterIndex: 1)
+        // Phase 9: Initialize run base properties
+        // NOT: ChapterMap'i burada yaratmayalım. Aksi halde Hub "aktif run var"
+        // sanıp direkt mini map'e düşüyor. World Select/World Map akışı için
+        // map sadece oyuncu bir level seçince (WorldMapViewModel.startLevel)
+        // üretilmeli.
+        newSlot.currentChapterMap = nil
         newSlot.completedNodeIds = []
         newSlot.activePassivePerks = []
         newSlot.gold = 0
@@ -63,6 +67,9 @@ class SaveManager: ObservableObject {
         newSlot.unlockedWorldLevel = 1
         newSlot.goldUpgradeLevels = [:]
         newSlot.unlockedMetaUpgradeIDs = []
+        newSlot.bestScore = 0
+        newSlot.bestWorldLevel = 1
+        newSlot.recentRuns = []
         
         slots[index] = newSlot
         saveToDisk()
@@ -170,6 +177,10 @@ class SaveManager: ObservableObject {
     func addPassivePerk(slotId: Int, perk: PassivePerk) {
         guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
         
+        // Koleksiyon keşfi: Perk ilk kez görüldüğünde katalogda açılır.
+        // `discoverPerk` içi set kontrolü yaptığından güvenle her eklemede çağrılabilir.
+        UserEnvironment.shared.discoverPerk(perk.id)
+
         if let existingIndex = slots[index].activePassivePerks.firstIndex(where: { $0.id == perk.id }) {
             // Level up existing perk
             slots[index].activePassivePerks[existingIndex].tier += 1
@@ -185,6 +196,7 @@ class SaveManager: ObservableObject {
     
     func upgradePassivePerk(slotId: Int, perkId: String) {
         guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        UserEnvironment.shared.discoverPerk(perkId)
         if let perkIndex = slots[index].activePassivePerks.firstIndex(where: { $0.id == perkId }) {
             slots[index].activePassivePerks[perkIndex].tier += 1
             slots[index].lastSaved = Date()
@@ -212,12 +224,50 @@ class SaveManager: ObservableObject {
         }
     }
 
+    /// Slot bağlamında seçili starting perk id'sini günceller.
+    func setStartingPerk(slotId: Int, perkId: String) {
+        guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        slots[index].selectedPerkId = perkId
+        slots[index].lastSaved = Date()
+        saveToDisk()
+    }
+
     // MARK: - Slot Progression (Phase 11)
     func updateSlotProgression(slotId: Int, worldLevel: Int, goldUpgrades: [String: Int], metaUpgrades: [String]) {
         guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
         slots[index].unlockedWorldLevel = worldLevel
         slots[index].goldUpgradeLevels = goldUpgrades
         slots[index].unlockedMetaUpgradeIDs = metaUpgrades
+        slots[index].lastSaved = Date()
+        saveToDisk()
+    }
+
+    // MARK: - Slot Run History
+    func recordSlotRun(slotId: Int, score: Int, worldLevelReached: Int, characterId: String, perksCount: Int, wasTrial: Bool) {
+        guard score > 0, let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        let entry = SlotRunEntry(score: score, worldLevelReached: max(1, worldLevelReached), characterId: characterId)
+        slots[index].recentRuns.insert(entry, at: 0)
+        if slots[index].recentRuns.count > 3 {
+            slots[index].recentRuns = Array(slots[index].recentRuns.prefix(3))
+        }
+        slots[index].bestScore = max(slots[index].bestScore, score)
+        slots[index].bestWorldLevel = max(slots[index].bestWorldLevel, max(1, worldLevelReached))
+        slots[index].lastRunSummary = LastRunSummary(
+            score: score,
+            worldLevelReached: max(1, worldLevelReached),
+            characterId: characterId,
+            goldTotal: slots[index].gold,
+            perksCount: max(0, perksCount),
+            wasTrial: wasTrial,
+            timestamp: Date().timeIntervalSince1970
+        )
+        slots[index].lastSaved = Date()
+        saveToDisk()
+    }
+
+    func setBossContract(slotId: Int, contractId: String?) {
+        guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        slots[index].activeBossContractId = contractId
         slots[index].lastSaved = Date()
         saveToDisk()
     }

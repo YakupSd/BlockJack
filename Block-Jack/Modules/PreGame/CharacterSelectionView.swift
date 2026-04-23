@@ -89,15 +89,23 @@ struct CharacterSelectionView: View {
                     if isUnlocked {
                         handleConfirm(char: char)
                     } else {
-                        // Attempt buy using diamonds as base for quick unlock in selection
-                        _ = userEnv.unlockCharacter(char, useDiamonds: true)
+                        // Trial varsa önce trial ver (günlük 1 run)
+                        if userEnv.canStartTrialToday() {
+                            userEnv.startTrial(characterId: char.id)
+                            handleConfirm(char: char)
+                        } else {
+                            // Attempt buy using diamonds as base for quick unlock in selection
+                            _ = userEnv.unlockCharacter(char, useDiamonds: true)
+                        }
                     }
                 } label: {
                     Text(isUnlocked
                          ? (mode == .changeInHub
                             ? userEnv.localizedString("BU KARAKTERİ SEÇ", "SELECT THIS CHARACTER")
                             : userEnv.localizedString("SEÇ VE DEVAM ET", "SELECT & CONTINUE"))
-                         : "\(char.cost) 💎 UNLOCK")
+                         : (userEnv.canStartTrialToday()
+                            ? userEnv.localizedString("TRIAL (ÜCRETSİZ) — 1 RUN", "TRIAL (FREE) — 1 RUN")
+                            : "\(char.cost) 💎 UNLOCK"))
                         .font(.setCustomFont(name: .InterExtraBold, size: 18))
                         .foregroundStyle(ThemeColors.cosmicBlack)
                         .frame(maxWidth: .infinity)

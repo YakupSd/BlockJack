@@ -234,17 +234,36 @@ struct GameBlock: Identifiable, Equatable, Codable {
 
     /// Normal round havuzundan rastgele blok
     static func random(forRound round: Int = 99) -> GameBlock {
+        random(forRound: round, luckLevel: 0)
+    }
+
+    /// Normal round havuzundan rastgele blok (Gold Upgrade: Block Luck ile boost)
+    /// - luckLevel: 0...5 (UserEnvironment.GoldUpgrade.blockLuck)
+    static func random(forRound round: Int = 99, luckLevel: Int) -> GameBlock {
         let available = BlockType.allCases.filter { $0.isAvailable(forRound: round) }
+        let clampedLuck = max(0, min(5, luckLevel))
         let weighted = available.flatMap { type in
-            Array(repeating: type, count: type.rarity.spawnWeight)
+            var w = type.rarity.spawnWeight
+            // Block Luck: nadir blokların ağırlığını artır, common'ı hafifçe azalt.
+            switch type.rarity {
+            case .rare:
+                w += (2 * clampedLuck) // +0...+10
+            case .uncommon:
+                w += clampedLuck       // +0...+5
+            case .common:
+                w = max(1, w - clampedLuck) // 8 -> 3 (luck 5)
+            }
+            return Array(repeating: type, count: max(1, w))
         }
         let type = weighted.randomElement() ?? .O
         let color = BlockDisplayColor.allCases.randomElement() ?? .blue
         
         // Özel blok şansı (Round 3'ten itibaren, %8 ihtimal)
+        // Block Luck ile +%2/level (max +%10) → toplam max %18
         let abilityRoll = Int.random(in: 1...100)
         let ability: BlockAbility
-        if round >= 3 && abilityRoll <= 8 {
+        let specialChance = 8 + (2 * clampedLuck)
+        if round >= 3 && abilityRoll <= specialChance {
             ability = [BlockAbility.lightning, .bomb, .wild].randomElement() ?? .normal
         } else {
             ability = .normal

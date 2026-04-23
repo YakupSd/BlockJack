@@ -109,6 +109,17 @@ class MapViewModel: ObservableObject {
         currentMap.isCleared
     }
 
+    /// Map açılışında ekranın fokuslanacağı node.
+    /// Öncelik:
+    /// 1) son tamamlanan node (run devam)
+    /// 2) erişilebilir ilk node
+    /// 3) start node
+    var preferredFocusNodeId: UUID? {
+        if let lastCompletedNodeId { return lastCompletedNodeId }
+        if let accessible = currentMap.nodes.first(where: { $0.isAccessible })?.id { return accessible }
+        return currentMap.startNodeId
+    }
+
     /// ANA MENÜ / DÜNYA HARİTASI butonunun tek giriş noktası.
     /// - Bölüm bitmişse: map'i temizle ve doğrudan WorldMapView'a geç.
     ///   Kullanıcı aynı bitik haritaya dönmesin diye `hasActiveRun`=false
@@ -116,6 +127,15 @@ class MapViewModel: ObservableObject {
     /// - Bölüm bitmediyse: eski davranış — Slot Hub'a dön (run'a devam edilebilir).
     func handleExitPressed() {
         HapticManager.shared.play(.buttonTap)
+        // Replay-safe exit:
+        // Kullanıcı daha önce geçtiği bir stage'e test için girerse (ör. 5'ten 2'ye),
+        // bu map state slot'u "aktif run" gibi kilitlemesin. Çıkışta WorldMap'e dön.
+        if currentMap.chapterIndex < UserEnvironment.shared.unlockedWorldLevel {
+            SaveManager.shared.clearChapterMap(slotId: slotId)
+            MainViewsRouter.shared.popToWorldMap(slotId: slotId)
+            return
+        }
+
         if isChapterCleared {
             // Haritayı diskten temizle → SlotHub artık "SEFERE BAŞLA" gösterir.
             SaveManager.shared.clearChapterMap(slotId: slotId)

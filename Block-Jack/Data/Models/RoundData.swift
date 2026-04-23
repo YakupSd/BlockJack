@@ -11,6 +11,33 @@ enum BossModifier: String, Codable, CaseIterable {
     case fog      // Timer bar hidden
     case weight   // Heavy blocks (2 hits)
     case phantom  // Blocks flicker in/out
+
+    var recommendedCharacterId: String {
+        switch self {
+        case .fog: return "timebender"
+        case .weight: return "titan"
+        case .phantom: return "ghost"
+        case .glitch: return "architect"
+        }
+    }
+
+    func counterTipTR(recommendedName: String) -> String {
+        switch self {
+        case .fog: return "FOG: Zaman gizli — \(recommendedName) önerilir."
+        case .weight: return "WEIGHT: Heavy hücreler — \(recommendedName) önerilir."
+        case .phantom: return "PHANTOM: Flicker — \(recommendedName) önerilir."
+        case .glitch: return "GLITCH: Kilitli hücreler — \(recommendedName) önerilir."
+        }
+    }
+
+    func counterTipEN(recommendedName: String) -> String {
+        switch self {
+        case .fog: return "FOG: Hidden timer — \(recommendedName) recommended."
+        case .weight: return "WEIGHT: Heavy cells — \(recommendedName) recommended."
+        case .phantom: return "PHANTOM: Flicker — \(recommendedName) recommended."
+        case .glitch: return "GLITCH: Locked cells — \(recommendedName) recommended."
+        }
+    }
     
     var title: String {
         switch self {
@@ -60,7 +87,8 @@ struct RoundData {
 
         // Taban eğri: lineer + kuadratik + hafif üstel (round büyüdükçe hızlanır)
         let rr = Double(r - 1)
-        let base = 2200.0 + rr * 2600.0 + rr * rr * 220.0
+        // Zone puanları nerf'lenince pacing'i korumak için hedef eğrisini orantılı arttır.
+        let base = 2500.0 + rr * 2900.0 + rr * rr * 260.0
 
         // World Level çarpanı: daha agresif (W10+ modifier’larla skor da artıyor)
         let worldMultiplier = 1.0 + Double(wl - 1) * 0.35
@@ -74,11 +102,11 @@ struct RoundData {
             let bump = 1.6 + Double(bossIndex) * 0.22
             finalTarget *= bump
         } else {
-            finalTarget *= 2.1
+            finalTarget *= 2.4
         }
 
         // Alt sınır: round 1 bile “tek patlatma ile bitmesin”
-        return max(3500, Int(finalTarget.rounded()))
+        return max(4500, Int(finalTarget.rounded()))
     }
 
     static func make(round: Int, worldLevel: Int = 1, modifier: BossModifier? = nil) -> RoundData {
@@ -116,6 +144,9 @@ struct RunState {
     var overkillCarryover: Int = 0
     var sculptorUses: Int = 0
     var worldLevel: Int = 1 // New: Current world level for scaling
+
+    // Pre-run loadout (1 kez / run)
+    var startingItemApplied: Bool = false
     
     // NEW PERK FLAGS
     var maxTraySlots: Int = 3

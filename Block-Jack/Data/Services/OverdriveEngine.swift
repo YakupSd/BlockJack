@@ -93,6 +93,9 @@ class OverdriveEngine {
     static func execute(tier: OverdriveTier, charId: String, vm: GameViewModel) {
         guard tier != .none else { return }
 
+        // Questline: her overdrive kullanımını raporla
+        UserEnvironment.shared.reportQuestEvent(characterId: charId, event: .overdriveUsed, amount: 1)
+
         switch charId {
         case "block_e", "architect":
             // Bu karakterler hedef seçim moduna girer, asıl etki executeTargeted'da
@@ -208,11 +211,6 @@ class OverdriveEngine {
         }
 
         let res = vm.board.removeCells(at: clearedPos)
-        guard !res.clearedCells.isEmpty else {
-            vm.addPopup(text: "HEDEF BOŞ!", color: ThemeColors.textMuted)
-            return
-        }
-
         vm.clearFlashPositions = clearedPos
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             vm.clearFlashPositions = []
@@ -220,14 +218,19 @@ class OverdriveEngine {
         vm.particleBurst = GameViewModel.ParticleBurstEvent(kind: .overdriveBoom(
             centerRow: pos.row, centerCol: pos.col
         ))
-        vm.handleClear(result: BoardViewModel.ClearResult(
-            clearedCells: res.clearedCells,
-            clearedPositions: res.clearedPositions,
-            rowsCleared: 0, colsCleared: 0, zonesCleared: 0
-        ))
+
+        if !res.clearedCells.isEmpty {
+            vm.handleClear(result: BoardViewModel.ClearResult(
+                clearedCells: res.clearedCells,
+                clearedPositions: res.clearedPositions,
+                rowsCleared: 0, colsCleared: 0, zonesCleared: 0
+            ))
+        }
         if bonusScore > 0 {
             vm.run.addScore(bonusScore)
             vm.addPopup(text: "MEGA YIKIM +\(bonusScore)!", color: ThemeColors.electricYellow)
+        } else if res.clearedCells.isEmpty {
+            vm.addPopup(text: "HEDEF BOŞ!", color: ThemeColors.textMuted)
         } else {
             vm.addPopup(text: "ARCHITECT ARCHIVES!", color: ThemeColors.neonCyan)
         }
@@ -402,6 +405,7 @@ class OverdriveEngine {
             vm.run.addScore(2500)
             vm.addPopup(text: "EARTHQUAKE! +2500 puan", color: ThemeColors.electricYellow)
             UserEnvironment.shared.bumpAchievement("titan_earthquake", by: 1)
+            UserEnvironment.shared.reportQuestEvent(characterId: "titan", event: .titanEarthquake, amount: 1)
         default: break
         }
     }

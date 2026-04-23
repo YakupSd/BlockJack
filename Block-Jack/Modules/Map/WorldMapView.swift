@@ -76,6 +76,7 @@ struct WorldMapView: View {
         .navigationBarHidden(true)
         .sheet(item: $vm.selectedLevel) { level in
             WorldMapDetailSheet(
+                slotId: vm.slotId,
                 level: level,
                 onEnter: {
                     vm.selectedLevel = nil
@@ -119,8 +120,13 @@ struct WorldMapView: View {
         switch vm.currentTheme {
         case .concreteRuins:
             WorldMapConcreteBackground()
-        case .neonGrid, .candyLab, .deepAbyss, .coreSingularity:
-            // Dünya 3-5 için özel arka planlar henüz yapılmadı — neon fallback.
+        case .candyLab:
+            WorldMapCandyBackground()
+        case .deepAbyss:
+            WorldMapAbyssBackground()
+        case .coreSingularity:
+            WorldMapCoreBackground()
+        case .neonGrid:
             WorldMapNeonBackground()
         }
     }
@@ -188,7 +194,7 @@ struct WorldMapView: View {
 
 // MARK: - Preview
 #Preview {
-    WorldMapView(vm: WorldMapViewModel(slotId: 0, userEnv: UserEnvironment.shared))
+    WorldMapView(vm: WorldMapViewModel(slotId: 0, worldId: 1, userEnv: UserEnvironment.shared))
         .environmentObject(UserEnvironment.shared)
         .preferredColorScheme(.dark)
 }

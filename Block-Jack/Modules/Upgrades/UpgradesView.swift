@@ -278,6 +278,7 @@ struct UpgradesView: View {
         let nextLevel = level + 1
         let cost = upgrade.cost(for: nextLevel)
         let canAfford = userEnv.gold >= cost
+        let effectText = currentEffectText(for: upgrade, level: level)
         
         HStack(spacing: 14) {
             // Icon + Level Badge
@@ -324,6 +325,13 @@ struct UpgradesView: View {
                     Text(userEnv.localizedString(upgrade.descTR(level: level), upgrade.descEN(level: level)))
                         .font(.setCustomFont(name: .InterMedium, size: 11))
                         .foregroundStyle(ThemeColors.electricYellow.opacity(0.8))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let effectText {
+                    Text(effectText)
+                        .font(.setCustomFont(name: .InterMedium, size: 10))
+                        .foregroundStyle(ThemeColors.textMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 
@@ -391,6 +399,23 @@ struct UpgradesView: View {
                 .stroke(level > 0 ? ThemeColors.electricYellow.opacity(0.4) : ThemeColors.gridStroke.opacity(0.4), lineWidth: 1)
         )
         .shadow(color: level > 0 ? ThemeColors.electricYellow.opacity(0.1) : .clear, radius: 8)
+    }
+
+    private func currentEffectText(for upgrade: GoldUpgrade, level: Int) -> String? {
+        guard level > 0 else { return nil }
+        switch upgrade {
+        case .startBonus:
+            return userEnv.localizedString("Şu an: +\(level * 50) puan / round", "Now: +\(level * 50) score / round")
+        case .goldMagnet:
+            return userEnv.localizedString("Şu an: +\(level * 10) altın / round", "Now: +\(level * 10) gold / round")
+        case .overdriveFill:
+            return userEnv.localizedString("Şu an: +%\(level * 10) dolum hızı", "Now: +\(level * 10)% fill rate")
+        case .comboTime:
+            let pct = min(50, level * 10)
+            return userEnv.localizedString("Şu an: streak düşüşü %\(pct) daha yavaş", "Now: streak decays \(pct)% slower")
+        case .blockLuck:
+            return userEnv.localizedString("Şu an: daha iyi blok şansı +\(level)", "Now: improved block odds +\(level)")
+        }
     }
 }
 

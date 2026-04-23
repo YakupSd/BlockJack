@@ -10,6 +10,7 @@ import CoreGraphics
 enum NodeType: String, Codable, CaseIterable {
     case normal
     case elite
+    case challenge
     case merchant
     case treasure
     case rest
@@ -228,6 +229,7 @@ class ChapterMapGenerator {
                 let jitterY = CGFloat.random(in: -0.02...0.02)
 
                 let type = pickNodeType(
+                    chapterIndex: chapterIndex,
                     layer: layer,
                     numLayers: numLayers,
                     laneIdx: laneIdx,
@@ -237,7 +239,10 @@ class ChapterMapGenerator {
 
                 let node = MapNode(
                     type: type,
-                    position: CGPoint(x: xPos + jitterX, y: baseY + jitterY),
+                    position: CGPoint(
+                        x: min(0.95, max(0.05, xPos + jitterX)),
+                        y: min(0.95, max(0.05, baseY + jitterY))
+                    ),
                     layerIndex: layer
                 )
                 currentLayer.append(node)
@@ -299,6 +304,13 @@ class ChapterMapGenerator {
         // NOTE: `bossNodeId` semantik olarak artık "finale node id". Boss olmayan
         // chapter'larda bu bir elite encounter'ı işaret eder. İsim geriye dönük
         // uyumluluk için korundu (save dosyaları).
+
+        // Safety: duplicate/self connections temizliği (UI/logic edge-case'leri önler)
+        for i in nodes.indices {
+            let unique = Set(nodes[i].connections).subtracting([nodes[i].id])
+            nodes[i].connections = Array(unique)
+        }
+
         return ChapterMap(
             id: UUID(),
             chapterIndex: chapterIndex,
@@ -314,6 +326,7 @@ class ChapterMapGenerator {
     /// - Dallanmalı layer'larda sol lane "tehlikeli" (elite/mystery), sağ lane
     ///   "güvenli" (merchant/rest) eğilimindedir — kullanıcıya net seçim sunar.
     private static func pickNodeType(
+        chapterIndex: Int,
         layer: Int,
         numLayers: Int,
         laneIdx: Int,
@@ -339,6 +352,15 @@ class ChapterMapGenerator {
         let isRightLane = lanes > 1 && laneIdx == lanes - 1
 
         let rand = Double.random(in: 0...1)
+
+        // Opsiyonel Challenge Node (özellikle geç chapter): oyuncuya “yüksek risk / yüksek ödül” seçimi.
+        // Sol lane zaten risky olduğu için Challenge burada ortaya çıkıyor.
+        // Boss chapter'larında daha nadir; normal chapter'larda daha sık.
+        if chapterIndex >= 12, isLeftLane, layer >= 2, layer <= max(2, numLayers - 2) {
+            let chance: Double = isBossChapter ? 0.10 : (chapterIndex >= 16 ? 0.22 : 0.16)
+            if rand < chance { return .challenge }
+        }
+
         if isBossChapter {
             if isLeftLane {
                 if rand < 0.45 { return .elite }

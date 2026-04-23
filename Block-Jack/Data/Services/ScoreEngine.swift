@@ -43,8 +43,10 @@ enum ClearCombo {
         case .double:    return 3.5
         case .triple:    return 8.0
         case .cross:     return 5.0
-        case .zoneBlast: return 6.0
-        case .megaZone:  return 12.0
+        // Zone blast'ler çok "tek atış" yapıyordu. Zone'ları hâlâ tatmin edici tutup
+        // pacing'i korumak için çarpanları ciddi düşürüyoruz.
+        case .zoneBlast: return 1.3
+        case .megaZone:  return 3.0
         }
     }
     
@@ -54,8 +56,8 @@ enum ClearCombo {
         case .double: return "DOUBLE CLEAR! ×3.5"
         case .triple: return "MEGA CLEAR! ×8"
         case .cross:  return "CROSS CLEAR! ×5"
-        case .zoneBlast: return "ZONE BLAST! ×6"
-        case .megaZone: return "OMEGA BLAST! ×12"
+        case .zoneBlast: return "ZONE BLAST! ×1.3"
+        case .megaZone: return "OMEGA BLAST! ×3"
         }
     }
 }
@@ -97,7 +99,7 @@ struct ScoreEngine {
     // SCORING v2 — "Juice Pass":
     //  • Her temizlenen hücre: 40 puan (eski 15)
     //  • Satır/sütun başına: +350 puan (eski 150)
-    //  • Zone (4x4/5x5) başına: +2500 puan (eski 1000)
+    //  • Zone (4x4/5x5) başına: +500 puan (pacing fix: zone tek başına round bitirmesin)
     //  • Combo/flush/streak çarpanları da belirgin büyütüldü — böylece
     //    küçük temizlikler bile "anlamlı sayı" hissi veriyor, büyük
     //    combo'lar ekranda patlama gibi duruyor (Balatro tarzı ödül).
@@ -116,7 +118,7 @@ struct ScoreEngine {
         // --- BASE SCORE ---
         let cellPoints = clearedCells.count * 40      // Her temizlenen hücre 40 puan
         let lineClearBonus = (clearedRows + clearedCols) * 350
-        let zoneClearBonus = clearedZones * 2500      // 4x4/5x5 alan: ciddi ödül
+        let zoneClearBonus = clearedZones * 500       // Zone artık "bonus", tek başına run taşımasın
         
         let baseScore = cellPoints + lineClearBonus + zoneClearBonus
         
@@ -195,8 +197,9 @@ struct ScoreEngine {
         case .double: bonus = 5.0
         case .triple: bonus = 10.0
         case .cross:  bonus = 8.0
-        case .zoneBlast: bonus = 12.0
-        case .megaZone: bonus = 15.0
+        // Zone'lar zaten hücre bazında çok değerli; ekstra süre bonusunu da düşür.
+        case .zoneBlast: bonus = 6.0
+        case .megaZone: bonus = 8.0
         }
         if isFlush { bonus += 4.0 }
         if streakCount >= 5 { bonus += 3.0 }

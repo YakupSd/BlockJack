@@ -22,7 +22,7 @@ struct MapView: View {
         self.onNodeSelected = onNodeSelected ?? { node in
             // Default yönlendirme
             switch node.type {
-            case .normal, .elite, .boss:
+            case .normal, .elite, .challenge, .boss:
                 MainViewsRouter.shared.pushToGame(slotId: slotId, nodeType: node.type)
             case .merchant:
                 MainViewsRouter.shared.pushToMerchant(slotId: slotId)
@@ -51,18 +51,36 @@ struct MapView: View {
             ScanningLine()
                 .ignoresSafeArea()
             
-            GeometryReader { geometry in
-                let width = geometry.size.width
-                let height = geometry.size.height
-                
-                // 2. Ethereal Connection Lines
-                drawConnections(width: width, height: height)
-                
-                // 3. Tech Nodes
-                drawNodes(width: width, height: height)
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    GeometryReader { geometry in
+                        let width = geometry.size.width
+                        let height = geometry.size.height
+                        
+                        // 2. Ethereal Connection Lines
+                        drawConnections(width: width, height: height)
+                        
+                        // 3. Tech Nodes
+                        drawNodes(width: width, height: height)
+                    }
+                    // Map alanı: node’lar normalized olduğundan burada sabit bir
+                    // içerik yüksekliği veriyoruz ki scroll/focus mümkün olsun.
+                    .frame(height: 980)
+                    .padding(.top, 100)
+                    .padding(.bottom, 60)
+                }
+                .onAppear {
+                    // Map açılışında kullanıcı hangi stage’deyse oraya fokuslan.
+                    // İlk layout’un oturması için kısa bir gecikme veriyoruz.
+                    let target = viewModel.preferredFocusNodeId
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        guard let id = target else { return }
+                        withAnimation(.easeOut(duration: 0.45)) {
+                            proxy.scrollTo(id, anchor: .center)
+                        }
+                    }
+                }
             }
-            .padding(.top, 100)
-            .padding(.bottom, 60)
             
             // 4. Pearl HUD
             VStack {
@@ -208,6 +226,7 @@ struct MapView: View {
             
             MapNodeView(node: node, isSelected: viewModel.selectedNode?.id == node.id)
                 .position(x: posX, y: posY)
+                .id(node.id) // ScrollViewReader focus anchor
                 .onTapGesture {
                     HapticManager.shared.play(.buttonTap)
                     viewModel.selectNode(node)
@@ -237,13 +256,13 @@ struct MapView: View {
                         )
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(titleForNodeType(node.type))
+                        Text(titleForNodeType(node.type, userEnv: userEnv))
                             .font(.setCustomFont(name: .ManropeExtraBold, size: 18))
                             .foregroundColor(Color.black.opacity(0.8))
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
 
-                        Text(descForNodeType(node.type))
+                        Text(descForNodeType(node.type, userEnv: userEnv))
                             .font(.setCustomFont(name: .InterRegular, size: 14))
                             .foregroundColor(Color.black.opacity(0.5))
                             .lineLimit(3)
@@ -258,7 +277,9 @@ struct MapView: View {
                     viewModel.markNodeCompleted(node.id)
                     onNodeSelected?(node)
                 }) {
-                    Text(node.isReplayable ? "YENİDEN BAŞLAT" : "GÖREVE BAŞLA")
+                    Text(node.isReplayable
+                         ? userEnv.localizedString("YENİDEN BAŞLAT", "RESTART")
+                         : userEnv.localizedString("GÖREVE BAŞLA", "START MISSION"))
                         .font(.luminescentHeader(size: 16))
                         .luminescentTracking()
                         .frame(maxWidth: .infinity)
@@ -360,6 +381,7 @@ func colorForNodeType(_ type: NodeType) -> Color {
     switch type {
     case .normal:   return ThemeColors.luminescentPrimary
     case .elite:    return Color.orange
+    case .challenge:return ThemeColors.neonPurple
     case .merchant: return Color.blue
     case .treasure: return Color.green
     case .rest:     return Color.cyan
@@ -372,6 +394,7 @@ func iconForNodeType(_ type: NodeType) -> String {
     switch type {
     case .normal:   return "bolt.shield"
     case .elite:    return "flame"
+    case .challenge:return "exclamationmark.triangle"
     case .merchant: return "cart"
     case .treasure: return "gift"
     case .rest:     return "leaf"
@@ -380,27 +403,29 @@ func iconForNodeType(_ type: NodeType) -> String {
     }
 }
 
-func titleForNodeType(_ type: NodeType) -> String {
+func titleForNodeType(_ type: NodeType, userEnv: UserEnvironment = .shared) -> String {
     switch type {
-    case .normal:   return "Sektörel Temizlik"
-    case .elite:    return "Zorlu Müdahale"
-    case .merchant: return "Veri Tüccarı"
-    case .treasure: return "Sistem Ödülü"
-    case .rest:     return "Veri Yedekleme"
-    case .mystery:  return "Anomali Tespiti"
-    case .boss:     return "Kritik Protokol"
+    case .normal:   return userEnv.localizedString("Sektörel Temizlik", "Standard Sweep")
+    case .elite:    return userEnv.localizedString("Zorlu Müdahale", "Elite Encounter")
+    case .challenge:return userEnv.localizedString("Challenge Protokolü", "Challenge Protocol")
+    case .merchant: return userEnv.localizedString("Veri Tüccarı", "Merchant")
+    case .treasure: return userEnv.localizedString("Sistem Ödülü", "Treasure")
+    case .rest:     return userEnv.localizedString("Veri Yedekleme", "Safe Zone")
+    case .mystery:  return userEnv.localizedString("Anomali Tespiti", "Mystery Signal")
+    case .boss:     return userEnv.localizedString("Kritik Protokol", "Boss Protocol")
     }
 }
 
-func descForNodeType(_ type: NodeType) -> String {
+func descForNodeType(_ type: NodeType, userEnv: UserEnvironment = .shared) -> String {
     switch type {
-    case .normal:   return "Standart glitch temizleme görevi."
-    case .elite:    return "Yüksek yoğunluklu veri anomalisi."
-    case .merchant: return "Eski donanımları yeni modüllerle takas et."
-    case .treasure: return "Sistem tarafından bırakılmış sahipsiz yetenekler."
-    case .rest:     return "Sistem sağlığını onar veya modülleri optimize et."
-    case .mystery:  return "Analiz edilemeyen dış kaynaklı bir sinyal."
-    case .boss:     return "Ana sunucuyu ele geçiren karanlık protokol."
+    case .normal:   return userEnv.localizedString("Standart glitch temizleme görevi.", "A standard cleanup mission.")
+    case .elite:    return userEnv.localizedString("Yüksek yoğunluklu veri anomalisi.", "A high-intensity anomaly.")
+    case .challenge:return userEnv.localizedString("Opsiyonel: Daha zor savaş, daha yüksek ödül.", "Optional: harder fight, higher rewards.")
+    case .merchant: return userEnv.localizedString("Eski donanımları yeni modüllerle takas et.", "Trade old hardware for new modules.")
+    case .treasure: return userEnv.localizedString("Sistem tarafından bırakılmış sahipsiz yetenekler.", "Abandoned upgrades left by the system.")
+    case .rest:     return userEnv.localizedString("Sistem sağlığını onar veya modülleri optimize et.", "Repair systems or optimize modules.")
+    case .mystery:  return userEnv.localizedString("Analiz edilemeyen dış kaynaklı bir sinyal.", "An unknown external signal.")
+    case .boss:     return userEnv.localizedString("Ana sunucuyu ele geçiren karanlık protokol.", "A hostile protocol controlling the core server.")
     }
 }
 

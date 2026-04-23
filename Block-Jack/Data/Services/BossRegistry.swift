@@ -5,6 +5,13 @@
 
 import Foundation
 
+enum BossArchetype: String, CaseIterable, Codable {
+    case breaker       // Grid'i parçalar: sabotage/erase/scramble
+    case timerHunter   // Süre/tempo: time heist / tray lock / curse
+    case heavyKing     // Ağır baskı: heavy armor / lockdown
+    case phantom       // İstikrarsız: curse / scramble / erase
+}
+
 struct BossEncounter: Identifiable {
     let id: String
     let name: String
@@ -27,13 +34,29 @@ struct BossEncounter: Identifiable {
     func getRandomIntent() -> String {
         switch modifier {
         case .fog:
-            return ["VERİ SİSİ GELİYOR!", "GÖRÜŞ ALANI DARALIYOR", "SİSTEM KARARMASI BEKLENİYOR"].randomElement()!
+            return [
+                UserEnvironment.shared.localizedString("VERİ SİSİ GELİYOR!", "DATA FOG INCOMING!"),
+                UserEnvironment.shared.localizedString("GÖRÜŞ ALANI DARALIYOR", "VISIBILITY DROPPING"),
+                UserEnvironment.shared.localizedString("SİSTEM KARARMASI BEKLENİYOR", "SYSTEM BLACKOUT DETECTED")
+            ].randomElement()!
         case .glitch:
-            return ["GLITCH PROTOKOLÜ 1.0", "GRID BOZULMASI TESPİT EDİLDİ", "SİSTEM HATASI OLUŞTURULUYOR"].randomElement()!
+            return [
+                UserEnvironment.shared.localizedString("GLITCH PROTOKOLÜ 1.0", "GLITCH PROTOCOL 1.0"),
+                UserEnvironment.shared.localizedString("GRID BOZULMASI TESPİT EDİLDİ", "GRID CORRUPTION DETECTED"),
+                UserEnvironment.shared.localizedString("SİSTEM HATASI OLUŞTURULUYOR", "FORCING A SYSTEM ERROR")
+            ].randomElement()!
         case .phantom:
-            return ["PHANTOM YÜKLENİYOR", "HAYALET BLOKLAR GELİYOR", "GERÇEKLİK KIRILMASI"].randomElement()!
+            return [
+                UserEnvironment.shared.localizedString("PHANTOM YÜKLENİYOR", "PHANTOM LOADING"),
+                UserEnvironment.shared.localizedString("HAYALET BLOKLAR GELİYOR", "GHOST BLOCKS INBOUND"),
+                UserEnvironment.shared.localizedString("GERÇEKLİK KIRILMASI", "REALITY FRACTURE")
+            ].randomElement()!
         case .weight:
-            return ["AĞIRLIK ARTIŞI!", "AĞIR BLOKLAR YOLDA", "YERÇEKİMİ ANOMALİSİ"].randomElement()!
+            return [
+                UserEnvironment.shared.localizedString("AĞIRLIK ARTIŞI!", "WEIGHT INCREASE!"),
+                UserEnvironment.shared.localizedString("AĞIR BLOKLAR YOLDA", "HEAVY BLOCKS INBOUND"),
+                UserEnvironment.shared.localizedString("YERÇEKİMİ ANOMALİSİ", "GRAVITY ANOMALY")
+            ].randomElement()!
         }
     }
 }
@@ -118,6 +141,23 @@ class BossRegistry {
         case 8...11:  return bossesSnapshot[2] // ghost_mother
         case 12...17: return bossesSnapshot[3] // juggernaut
         default:      return bossesSnapshot[4] // neon_overlord (18+)
+        }
+    }
+
+    /// Aynı boss'un farklı davranış varyantı (archetype).
+    /// Amaç: Yeni boss eklemeden tekrar oynanabilirlik.
+    func archetype(for worldLevel: Int) -> BossArchetype {
+        let boss = getBoss(for: worldLevel)
+        // Modifier + level bandına göre deterministik seçim.
+        switch boss.modifier {
+        case .weight:
+            return .heavyKing
+        case .phantom:
+            return (worldLevel % 2 == 0) ? .phantom : .breaker
+        case .fog:
+            return (worldLevel % 2 == 0) ? .timerHunter : .phantom
+        case .glitch:
+            return (worldLevel % 2 == 0) ? .breaker : .timerHunter
         }
     }
 

@@ -102,6 +102,7 @@ final class GameViewModel: ObservableObject {
     @Published var isOverdriveActive: Bool = false
     @Published var isTargetingOverdrive: Bool = false
     var activeOverdriveTierForTargeting: OverdriveTier = .none
+    private var pendingTargetedOverdriveConsumption: Bool = false
     
     // Character Specific State
     @Published var isWraithActive: Bool = false    // Neon Wraith skill
@@ -115,6 +116,18 @@ final class GameViewModel: ObservableObject {
     private var lastPlacedBlockType: BlockType? = nil // Architect passive için
     var jokerMultBonus: Double = 0.0   // Joker bonusu — OverdriveEngine erişir
     private var maxRoundScore: Int = 0 // Echoes perk için
+
+    // MARK: - Debug (Pacing / Balance)
+    private var debugZoneBlastsThisRound: Int = 0
+    private var debugLineClearsThisRound: Int = 0
+
+    // MARK: - Pre-run loadout state
+    private var pendingStartingBombBlock: Bool = false
+
+    // MARK: - Boss variety
+    private var bossArchetype: BossArchetype? = nil
+    private var bossPhase: Int = 1
+    private(set) var isContractChallenge: Bool = false
 
     // MARK: - Karakter Ephemeral State (startRound'da sıfırlanır)
     private var blockEClearsThisRound: Int = 0   // BLOCK-E pasif: max 3/round cap
@@ -159,6 +172,10 @@ final class GameViewModel: ObservableObject {
 
     let activeSlotId: Int
     private let nodeType: NodeType?
+
+    var currentNodeType: NodeType {
+        nodeType ?? .normal
+    }
 
     init(slotId: Int, nodeType: NodeType? = nil, userEnv: UserEnvironment = UserEnvironment.shared) {
         self.activeSlotId = slotId
@@ -258,7 +275,26 @@ final class GameViewModel: ObservableObject {
         if nodeType == .boss {
             // Boss her zaman kendi modifier'ını taşır
             run.activeModifier = currentBoss.modifier
+            bossArchetype = BossRegistry.shared.archetype(for: run.worldLevel)
+            bossPhase = 1
             run.currentRoundTargetScore = RoundData.makeTarget(for: run.currentRound, worldLevel: worldLevel)
+
+            // Boss Contract (risk/ödül): sadece bu boss fight için
+            let contractId = SaveManager.shared.slots.first(where: { $0.id == activeSlotId })?.activeBossContractId ?? "safe"
+            if contractId == BossContract.risky.rawValue {
+                run.currentRoundTargetScore = Int(Double(run.currentRoundTargetScore) * 1.35)
+                isContractChallenge = true
+                addPopup(text: "CONTRACT: RISKY", color: ThemeColors.neonPink)
+            } else {
+                isContractChallenge = false
+            }
+            // Tek seferlik: tüket
+            SaveManager.shared.setBossContract(slotId: activeSlotId, contractId: nil)
+        } else if nodeType == .challenge {
+            // Challenge: opsiyonel yüksek risk — her zaman modifier + daha sert target + daha az süre.
+            run.activeModifier = BossModifier.allCases.randomElement()
+            let baseTarget = RoundData.makeTarget(for: run.currentRound, worldLevel: worldLevel)
+            run.currentRoundTargetScore = Int(Double(baseTarget) * 2.0)
         } else if nodeType == .elite {
             // Elite: W5+'da rastgele modifier, aksi halde nil
             if worldLevel >= 5 {
@@ -294,22 +330,71 @@ final class GameViewModel: ObservableObject {
         run.currentScore = 0
         run.halfBonusGiven = false
 
+        // Debug counters
+        debugZoneBlastsThisRound = 0
+        debugLineClearsThisRound = 0
+
         // Karakter per-round ephemeral state sıfırlama
         blockEClearsThisRound = 0
         timebenderFreezeMoves = 0
         alchemistDoubleCountMoves = 0
         ghostPhantomMultBonus = 0.0
         neonWraithActiveBoost = 0
+
+        // Gold Upgrade: Start Bonus (Head Start)
+        // Round başında skor bonusu ekle.
+        let startBonusLevel = userEnv.goldLevel(for: .startBonus)
+        if startBonusLevel > 0 {
+            let bonus = startBonusLevel * 50
+            run.addScore(bonus)
+            addPopup(text: "+\(bonus) START BONUS", color: ThemeColors.electricYellow)
+        }
+
+        // Gold Upgrade: Gold Magnet
+        // Her round başı ekstra altın.
+        let goldMagnetLevel = userEnv.goldLevel(for: .goldMagnet)
+        if goldMagnetLevel > 0 {
+            let goldBonus = goldMagnetLevel * 10
+            addRunGold(goldBonus)
+            addPopup(text: "+\(goldBonus) GOLD MAGNET", color: ThemeColors.electricYellow)
+        }
         
         // Timer: nodeType'a göre süre ayarla
         var initialTime = run.round.timeLimit
         if nodeType == .elite {
             initialTime = max(120.0, initialTime - 30.0) // Elite: -30sn, minimum 120sn
+        } else if nodeType == .challenge {
+            initialTime = max(105.0, initialTime - 45.0) // Challenge: daha kısa süre, minimum 105sn
         }
         
         // Kalıcı Geliştirme: Iron Will kontrolü
         if userEnv.unlockedUpgradeIDs.contains(MetaUpgrade.ironWill.rawValue) {
             initialTime += 10.0
+        }
+
+        // Starting Item (Loadout) — 1 kez / run
+        if !run.startingItemApplied {
+            let id = UserEnvironment.shared.runConfig?.startingItemId ?? ""
+            switch id {
+            case "life_plus1":
+                run.gainLife()
+                addPopup(text: "+1 LIFE", color: ThemeColors.neonCyan)
+                run.startingItemApplied = true
+            case "time_plus30":
+                initialTime += 30.0
+                addPopup(text: "+30s START", color: ThemeColors.neonCyan)
+                run.startingItemApplied = true
+            case "overdrive_50":
+                overdriveCharge = max(overdriveCharge, 1.5)
+                addPopup(text: "OVERDRIVE +50%", color: ThemeColors.neonCyan)
+                run.startingItemApplied = true
+            case "bomb_block":
+                pendingStartingBombBlock = true
+                addPopup(text: "START BOMB", color: ThemeColors.neonCyan)
+                run.startingItemApplied = true
+            default:
+                break
+            }
         }
         
         timer.setup(seconds: initialTime)
@@ -376,7 +461,9 @@ final class GameViewModel: ObservableObject {
         // Ensure starting perk is converted to passive list (for HUD and consistent checks)
         if let pid = activePerkId, pid != "none" {
             if !run.hasPerk(pid), let starting = StartingPerk.available.first(where: { $0.id == pid }) {
-                run.activePassivePerks.append(starting.toPassivePerk())
+                run.activePassivePerks.append(starting.toPassivePerk(lang: userEnv.language))
+                // Koleksiyon keşfi: starting perk seçildiğinde de aç.
+                userEnv.discoverPerk(pid)
             }
         }
         
@@ -459,6 +546,7 @@ final class GameViewModel: ObservableObject {
             addPopup(text: "GHOST OVERWRITE!", color: ThemeColors.neonPurple)
             if activeCharacterId == "ghost", overwrittenCount > 0 {
                 userEnv.bumpAchievement("ghost_phantom", by: overwrittenCount)
+                userEnv.reportQuestEvent(characterId: "ghost", event: .phantomOverwriteCells, amount: overwrittenCount)
             }
         }
 
@@ -575,7 +663,10 @@ final class GameViewModel: ObservableObject {
             // Minor charge per block (Faster charge)
             if overdriveCharge < 3.0 {
                 let previousTier = currentOverdriveTier
-                overdriveCharge = min(3.0, overdriveCharge + 0.15)
+                // Gold Upgrade: Overdrive Fill (+%10/level)
+                let overdriveFillLevel = userEnv.goldLevel(for: .overdriveFill)
+                let mult = 1.0 + (0.10 * Double(max(0, overdriveFillLevel)))
+                overdriveCharge = min(3.0, overdriveCharge + (0.15 * mult))
                 updateOverdriveTier(previous: previousTier)
             }
             
@@ -594,13 +685,19 @@ final class GameViewModel: ObservableObject {
                 // Temizleme olmadı → streak sıfırla (TimeBender pasifi yumuşatır)
                 // TimeBender "kombo süresi %50 yavaş düşer" → streak'i tam sıfırlamak
                 // yerine 2 azaltıyoruz; 2 temizsiz hamlede streak komple düşmüş olur.
-                if activeCharacterId == "timebender" && run.streak > 0 {
-                    run.streak = max(0, run.streak - 2)
-                    if run.streak > 0 {
+                if run.streak > 0 {
+                    let baseDecay: Int = (activeCharacterId == "timebender") ? 2 : run.streak
+                    // Gold Upgrade: Combo Time (+%10/level slower decay)
+                    let comboTimeLevel = userEnv.goldLevel(for: .comboTime)
+                    let slowPct = min(0.50, 0.10 * Double(max(0, comboTimeLevel))) // max %50
+                    let adjustedDecay = max(1, Int(round(Double(baseDecay) * (1.0 - slowPct))))
+                    run.streak = max(0, run.streak - adjustedDecay)
+
+                    if activeCharacterId == "timebender", run.streak > 0 {
                         addPopup(text: "TIME BEND: STREAK \(run.streak)", color: ThemeColors.neonCyan)
+                    } else if comboTimeLevel > 0, run.streak > 0 {
+                        addPopup(text: "COMBO TIME: STREAK \(run.streak)", color: ThemeColors.neonPurple)
                     }
-                } else {
-                    run.streak = 0
                 }
                 comboCount = 0
                 
@@ -648,13 +745,45 @@ final class GameViewModel: ObservableObject {
         }
     }
 
+    private func updateBossPhaseIfNeeded() {
+        guard currentNodeType == .boss else { return }
+        let p: Int = {
+            let prog = run.scoreProgress
+            if prog >= 0.66 { return 3 }
+            if prog >= 0.33 { return 2 }
+            return 1
+        }()
+        guard p != bossPhase else { return }
+        bossPhase = p
+
+        // Phase değiştiğinde düşman döngüsünü “pattern değişimi” gibi yeniden ayarla.
+        if phase == .playing {
+            startEnemyAttackLoop()
+            addPopup(text: "BOSS PHASE \(bossPhase)", color: ThemeColors.nodeBoss)
+        }
+    }
+
     func handleClear(result: BoardViewModel.ClearResult, blockCellCount: Int = 4) {
         let clearedCells = result.clearedCells
         let clearedRows = result.rowsCleared
         let clearedCols = result.colsCleared
+
+        // Debug counters for pacing: how many "meaningful clears" per round
+        if result.zonesCleared > 0 { debugZoneBlastsThisRound += result.zonesCleared }
+        if (clearedRows + clearedCols) > 0 { debugLineClearsThisRound += (clearedRows + clearedCols) }
         
         comboCount += 1
         run.streak += 1
+
+        // Questline: line progress (satır + sütun)
+        let totalLines = clearedRows + clearedCols
+        if totalLines > 0 {
+            userEnv.reportQuestEvent(
+                characterId: activeCharacterId ?? "block_e",
+                event: .linesCleared,
+                amount: totalLines
+            )
+        }
         
         // 1. Particle & Flash Effects
         let flashPositions = result.clearedPositions
@@ -747,6 +876,9 @@ final class GameViewModel: ObservableObject {
                 characterMult += bonus
                 addPopup(text: "HEAVY DUTY! \(heavyCount)× +\(Int(bonus))x", color: ThemeColors.neonOrange)
                 haptic.play(.success)
+
+                // Questline: heavy hücre kırma (özellikle Titan questleri)
+                userEnv.reportQuestEvent(characterId: activeCharacterId ?? "block_e", event: .heavyCellsCleared, amount: heavyCount)
             }
         }
         
@@ -770,6 +902,7 @@ final class GameViewModel: ObservableObject {
                     addPopup(text: "JACKPOT! ×10", color: ThemeColors.electricYellow)
                     haptic.play(.success)
                     userEnv.bumpAchievement("gambler_jackpot", by: 1)
+                    userEnv.reportQuestEvent(characterId: "gambler", event: .gamblerJackpot, amount: 1)
                 }
             case "neonwraith":
                 // Neon Wraith: Süre <%20 → fury +2.5 mult
@@ -777,6 +910,7 @@ final class GameViewModel: ObservableObject {
                     characterMult += 2.5
                     addPopup(text: "WRAITH FURY!", color: ThemeColors.neonPurple)
                     userEnv.bumpAchievement("wraith_clutch", by: 1)
+                    userEnv.reportQuestEvent(characterId: "neonwraith", event: .neonWraithLowTimeClears, amount: 1)
                 }
                 // Neon Wraith active boost: sonraki N clear'de +2 bonus
                 if neonWraithActiveBoost > 0 {
@@ -795,6 +929,7 @@ final class GameViewModel: ObservableObject {
                     addPopup(text: "ALCHEMY RESONANCE!", color: ThemeColors.neonPurple)
                     haptic.play(.success)
                     userEnv.bumpAchievement("alchemist_resonance", by: 1)
+                    userEnv.reportQuestEvent(characterId: "alchemist", event: .alchemistMonoResonance, amount: 1)
                 }
             case "titan":
                 // Titan pasifi: Heavy (weight modifier) hücre temizlenince +0.5 her biri için
@@ -806,6 +941,8 @@ final class GameViewModel: ObservableObject {
                     characterMult += bonus
                     addPopup(text: "TITAN SMASH! +\(String(format: "%.1f", bonus))x", color: ThemeColors.electricYellow)
                     haptic.play(.success)
+
+                    userEnv.reportQuestEvent(characterId: "titan", event: .heavyCellsCleared, amount: heavyCount)
                 }
             default: break
             }
@@ -866,6 +1003,11 @@ final class GameViewModel: ObservableObject {
         lastScoreResult = scoreResult
         var finalScore = scoreResult.totalScore
 
+        // Questline: flush
+        if scoreResult.isFlush {
+            userEnv.reportQuestEvent(characterId: activeCharacterId ?? "block_e", event: .flushScored, amount: 1)
+        }
+
         // Alchemist active T3: doubleCount hamleleri boyunca skor ×2
         if alchemistDoubleCountMoves > 0 {
             finalScore *= 2
@@ -879,7 +1021,43 @@ final class GameViewModel: ObservableObject {
             ghostPhantomMultBonus = 0.0
         }
 
+        // Anti-build boss (soft counter): belirli build'leri kırmadan yumuşak baskı.
+        if currentNodeType == .boss, let arch = bossArchetype {
+            switch arch {
+            case .breaker:
+                if scoreResult.clearCombo == .zoneBlast || scoreResult.clearCombo == .megaZone {
+                    finalScore = Int(Double(finalScore) * 0.88)
+                }
+            case .heavyKing:
+                // Line-clear ağırlıklı build'leri hafif törpüle (single/double/triple/cross).
+                if scoreResult.clearedRows + scoreResult.clearedCols > 0, scoreResult.clearCombo != .zoneBlast, scoreResult.clearCombo != .megaZone {
+                    finalScore = Int(Double(finalScore) * 0.90)
+                }
+            case .timerHunter:
+                // timerHunter: time bonusu yüksek clear'ları azcık törpüle
+                if scoreResult.clearCombo == .megaZone {
+                    finalScore = Int(Double(finalScore) * 0.92)
+                }
+            case .phantom:
+                // phantom: tek hamle mega spike'ları azalt
+                if scoreResult.clearCombo == .megaZone || scoreResult.clearCombo == .double {
+                    finalScore = Int(Double(finalScore) * 0.93)
+                }
+            }
+        }
+
         run.addScore(finalScore)
+        updateBossPhaseIfNeeded()
+
+#if DEBUG
+        // Pacing snapshot per clear
+        if scoreResult.clearCombo == .zoneBlast || scoreResult.clearCombo == .megaZone {
+            print("[PACING] R\(run.currentRound) WL\(run.worldLevel) +\(finalScore) (\(scoreResult.clearCombo)) " +
+                  "zones=\(result.zonesCleared) lines=\(clearedRows + clearedCols) " +
+                  "score=\(run.currentScore)/\(run.currentRoundTargetScore) " +
+                  "streak=\(run.streak) moves=\(run.movesUsed)")
+        }
+#endif
 
         // 6. UI & Perk Effects
         if scoreResult.clearCombo != ClearCombo.single {
@@ -1083,15 +1261,19 @@ final class GameViewModel: ObservableObject {
         // Store tier for targeting characters before resetting
         if charId == "block_e" || charId == "architect" {
             activeOverdriveTierForTargeting = tier
+            // Hedefli karakterlerde şarjı drop sonrası tüketeceğiz (stabil kullanım).
+            pendingTargetedOverdriveConsumption = true
         }
         
         OverdriveEngine.execute(tier: tier, charId: charId, vm: self)
         
         // Şarjı tüket
-        guard let char = SaveManager.shared.slots.first(where: { $0.id == activeSlotId })?.character else { return }
-        // Seviyenin threshold'u kadar harcatır veya tamamen sıfırlarız, simdilik sifirliyoruz
-        overdriveCharge = 0.0
-        currentOverdriveTier = .none
+        // - Hedefli (Architect/BLOCK-E): drop sonrası tüketilir.
+        // - Diğerleri: anında tüketilir.
+        if !(charId == "block_e" || charId == "architect") {
+            overdriveCharge = 0.0
+            currentOverdriveTier = .none
+        }
     }
     
     func applyTargetedOverdrive(at pos: GridPosition) {
@@ -1104,6 +1286,13 @@ final class GameViewModel: ObservableObject {
         
         // Sadece UI bayrağını sıfırla — charge zaten activateOverdrive'da sıfırlandı
         isTargetingOverdrive = false
+
+        // Consume charge now (targeted characters)
+        if pendingTargetedOverdriveConsumption, (charId == "block_e" || charId == "architect") {
+            pendingTargetedOverdriveConsumption = false
+            overdriveCharge = 0.0
+            currentOverdriveTier = .none
+        }
     }
 
     // MARK: - Round Logic
@@ -1177,9 +1366,22 @@ final class GameViewModel: ObservableObject {
         UserEnvironment.shared.reportAchievement("gold_hoarder_5k", progress: UserEnvironment.shared.totalGoldEarned)
         UserEnvironment.shared.reportAchievement("perk_collector_5", progress: UserEnvironment.shared.discoveredPerkIDs.count)
 
+        // Boss discovery (anında): boss node kazanıldığı anda kolleksiyonda açılsın.
+        if currentNodeType == .boss {
+            UserEnvironment.shared.discoverBoss(currentBoss.id)
+            UserEnvironment.shared.reportAchievement(
+                "boss_slayer_3",
+                progress: UserEnvironment.shared.totalBossesDefeated
+            )
+            UserEnvironment.shared.reportAchievement(
+                "world_explorer_2",
+                progress: UserEnvironment.shared.unlockedWorldLevel
+            )
+        }
+
         
         // Boss round kazanma = +1 can!
-        if run.round.isBossRound {
+        if currentNodeType == .boss {
             run.gainLife()
             showBigComboLabel = "BOSS DEFEATED!" // Üstte büyük yazı çıksın
             haptic.play(.heavy)
@@ -1204,6 +1406,12 @@ final class GameViewModel: ObservableObject {
             score: run.currentScore,
             round: run.currentRound
         )
+
+#if DEBUG
+        print("[PACING] ROUND COMPLETE R\(run.currentRound) WL\(run.worldLevel) " +
+              "moves=\(run.movesUsed) score=\(run.currentScore)/\(run.currentRoundTargetScore) " +
+              "zoneBlasts=\(debugZoneBlastsThisRound) lineClears=\(debugLineClearsThisRound)")
+#endif
     }
 
     func proceedToNextRound() {
@@ -1373,21 +1581,7 @@ final class GameViewModel: ObservableObject {
             SaveManager.shared.slots[index] = slot
         }
         
-        // Boss discovery: kimliği artık BossRegistry üzerinden veriyoruz ki
-        // "boss_5" gibi tur bazlı takma isimler yerine gerçek boss id'si
-        // (viper_x, sentinel_k, …) kolleksiyonda açığa çıksın.
-        if run.round.isBossRound && run.currentScore >= run.currentRoundTargetScore {
-            UserEnvironment.shared.discoverBoss(currentBoss.id)
-            // Phase 8: boss yenildi — achievement + world progression sinyali.
-            UserEnvironment.shared.reportAchievement(
-                "boss_slayer_3",
-                progress: UserEnvironment.shared.totalBossesDefeated
-            )
-            UserEnvironment.shared.reportAchievement(
-                "world_explorer_2",
-                progress: UserEnvironment.shared.unlockedWorldLevel
-            )
-        }
+        // Boss discovery artık roundComplete anında yapılıyor (anında koleksiyon açılması için).
         
         // Cüzdan ve slot gold tek havuza bağlı (setGold içinde UserEnvironment.gold
         // da yazılır). Burada sadece diske yaz.
@@ -1443,6 +1637,18 @@ final class GameViewModel: ObservableObject {
                 score: run.currentScore,
                 worldLevelReached: max(1, run.worldLevel)
             )
+
+            // Slot bazlı run history / best
+            let cid = SaveManager.shared.slots.first(where: { $0.id == activeSlotId })?.characterId
+                ?? UserEnvironment.shared.selectedCharacterID
+            SaveManager.shared.recordSlotRun(
+                slotId: activeSlotId,
+                score: run.currentScore,
+                worldLevelReached: max(1, run.worldLevel),
+                characterId: cid,
+                perksCount: run.activePassivePerks.count,
+                wasTrial: UserEnvironment.shared.wasTrialRunUsedToday(for: cid)
+            )
         }
     }
 
@@ -1450,8 +1656,14 @@ final class GameViewModel: ObservableObject {
 
     func refillBlockTray() {
         var newBlocks: [GameBlock] = []
+        let blockLuckLevel = userEnv.goldLevel(for: .blockLuck)
         for _ in 0..<run.maxTraySlots {
-            newBlocks.append(GameBlock.random(forRound: run.currentRound))
+            newBlocks.append(GameBlock.random(forRound: run.currentRound, luckLevel: blockLuckLevel))
+        }
+        if pendingStartingBombBlock, let first = newBlocks.first {
+            let bomb = GameBlock(type: first.type, color: first.color, ability: .bomb, pairedBlockId: first.pairedBlockId, rotationSteps: first.rotationSteps)
+            newBlocks[0] = bomb
+            pendingStartingBombBlock = false
         }
         blockTray = newBlocks
         
@@ -1523,8 +1735,14 @@ final class GameViewModel: ObservableObject {
         if let pos = gridSpaceConverter?(dragLocation) {
             applyTargetedOverdrive(at: pos)
         } else {
-            isTargetingOverdrive = false
+            cancelTargetedOverdrive()
         }
+    }
+
+    func cancelTargetedOverdrive() {
+        isTargetingOverdrive = false
+        pendingTargetedOverdriveConsumption = false
+        dragLocation = .zero
     }
     
     private func resetDrag() {
@@ -1596,6 +1814,7 @@ final class GameViewModel: ObservableObject {
                         )
                         self.haptic.play(.lineClear)
                         self.userEnv.bumpAchievement("block_e_custodian", by: 1)
+                        self.userEnv.reportQuestEvent(characterId: "block_e", event: .blockEPassiveTicks, amount: 1)
                     case "ghost":
                         // Ghost pasifi: Her 10sn +3sn whisper bonusu (stealth zamanı)
                         self.timer.addTime(3.0)
@@ -1685,9 +1904,18 @@ final class GameViewModel: ObservableObject {
         
         // Bu round için rastgele bir düşman seç
         enemy = EnemyState()
-        enemy.currentAttack = EnemyAttackType.random(forRound: run.currentRound)
+        if currentNodeType == .boss {
+            enemy.currentAttack = EnemyAttackType.random(forRound: run.currentRound, archetype: bossArchetype, phase: bossPhase)
+        } else {
+            enemy.currentAttack = EnemyAttackType.random(forRound: run.currentRound)
+        }
         
-        let interval = EnemyAttackType.attackInterval(forRound: run.currentRound)
+        let interval: Double = {
+            if currentNodeType == .boss {
+                return EnemyAttackType.attackInterval(forRound: run.currentRound, archetype: bossArchetype, phase: bossPhase)
+            }
+            return EnemyAttackType.attackInterval(forRound: run.currentRound)
+        }()
         enemy.nextAttackIn = interval
         
         // Ana atak timer'ı: her `interval` saniyede bir çalışır
@@ -1806,10 +2034,14 @@ final class GameViewModel: ObservableObject {
         }
         
         // Sonraki atak türünü değiştir (her ataktan sonra farklı biri)
-        let nextAttack = EnemyAttackType.allCases
-            .filter { $0 != attack }
-            .randomElement() ?? attack
-        enemy.currentAttack = nextAttack
+        if currentNodeType == .boss {
+            enemy.currentAttack = EnemyAttackType.random(forRound: run.currentRound, archetype: bossArchetype, phase: bossPhase)
+        } else {
+            let nextAttack = EnemyAttackType.allCases
+                .filter { $0 != attack }
+                .randomElement() ?? attack
+            enemy.currentAttack = nextAttack
+        }
     }
     
     func stopEnemyLoop() {

@@ -11,6 +11,7 @@ import SwiftUI
 
 // MARK: - Detail Sheet
 struct WorldMapDetailSheet: View {
+    let slotId: Int
     let level: WorldLevel
     let onEnter: () -> Void
     let onDismiss: () -> Void
@@ -34,7 +35,7 @@ struct WorldMapDetailSheet: View {
             // İçerik — type'a göre
             Group {
                 if level.type == .boss {
-                    WorldSheetBossContent(level: level)
+                    WorldSheetBossContent(slotId: slotId, level: level)
                 } else {
                     WorldSheetBattleContent(level: level)
                 }
@@ -83,6 +84,18 @@ struct WorldMapDetailSheet: View {
                     .minimumScaleFactor(0.75)
 
                 difficultyBar
+
+                if let hint = modifierHintText {
+                    Text(hint)
+                        .font(.pixel(5))
+                        .foregroundColor(nodeHeaderBorder.opacity(0.9))
+                        .tracking(1)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(nodeHeaderBorder.opacity(0.10))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(nodeHeaderBorder.opacity(0.18), lineWidth: 1))
+                }
             }
 
             Spacer(minLength: 4)
@@ -101,6 +114,10 @@ struct WorldMapDetailSheet: View {
         case (.boss, _):
             return userEnv.localizedString("BOSS", "BOSS")
         case (_, .completed):
+            // Replay: daha önce geçilmiş sektör. Kullanıcı test için giriyorsa net etiket ver.
+            if level.id < userEnv.unlockedWorldLevel {
+                return userEnv.localizedString("REPLAY", "REPLAY")
+            }
             return userEnv.localizedString("TAMAMLANDI", "CLEARED")
         case (_, .locked):
             return userEnv.localizedString("KİLİTLİ", "LOCKED")
@@ -127,6 +144,22 @@ struct WorldMapDetailSheet: View {
                 .foregroundColor(ThemeColors.mapHudMuted)
                 .tracking(1)
                 .padding(.leading, 2)
+        }
+    }
+
+    private var modifierHintText: String? {
+        // Basit rotasyon — gerçek sistem gelene kadar “öneri” UX’i hazır dursun.
+        // Level bandı ilerledikçe farklı counter karakterler önerilir.
+        let bucket = (level.id / 5) % 4
+        switch bucket {
+        case 0:
+            return userEnv.localizedString("UPCOMING: WEIGHT → TITAN", "UPCOMING: WEIGHT → TITAN")
+        case 1:
+            return userEnv.localizedString("UPCOMING: FOG → TIME BENDER", "UPCOMING: FOG → TIME BENDER")
+        case 2:
+            return userEnv.localizedString("UPCOMING: PRESSURE → NEON WRAITH", "UPCOMING: PRESSURE → NEON WRAITH")
+        default:
+            return userEnv.localizedString("UPCOMING: VOID → GHOST", "UPCOMING: VOID → GHOST")
         }
     }
 
@@ -253,11 +286,13 @@ struct WorldSheetBattleContent: View {
 
 // MARK: - Boss içeriği
 struct WorldSheetBossContent: View {
+    let slotId: Int
     let level: WorldLevel
     @EnvironmentObject var userEnv: UserEnvironment
     @State private var warningPulse = false
     // Intent'i bir kere yakala — her re-render'da değişip titremesin
     @State private var bossIntent: String = ""
+    @State private var selectedContract: BossContract = .safe
 
     private var boss: BossEncounter {
         BossRegistry.shared.getBoss(for: level.id)
@@ -326,10 +361,79 @@ struct WorldSheetBossContent: View {
                                 value: userEnv.localizedString("NADİR", "RARE"),
                                 color: ThemeColors.neonPurple)
             }
+
+            // Boss Contract: opsiyonel risk/ödül seçimi (UI + run flag)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(userEnv.localizedString("BOSS CONTRACT", "BOSS CONTRACT"))
+                    .font(.pixel(6))
+                    .foregroundColor(ThemeColors.mapHudMuted)
+                    .tracking(1)
+
+                HStack(spacing: 8) {
+                    contractButton(.safe)
+                    contractButton(.risky)
+                }
+            }
+            .padding(10)
+            .background(ThemeColors.mapHudPanel)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(ThemeColors.mapHudBorder, lineWidth: 1)
+            )
         }
         .onAppear {
             warningPulse = true
             if bossIntent.isEmpty { bossIntent = boss.getRandomIntent() }
+            // Contract seçimini slot'tan restore et (sheet reopen olursa)
+            let saved = SaveManager.shared.slots.first(where: { $0.id == slotId })?.activeBossContractId ?? BossContract.safe.rawValue
+            selectedContract = BossContract(rawValue: saved) ?? .safe
+        }
+    }
+
+    private func contractButton(_ c: BossContract) -> some View {
+        let isSelected = selectedContract == c
+        return Button {
+            HapticManager.shared.play(.selection)
+            selectedContract = c
+            SaveManager.shared.setBossContract(slotId: slotId, contractId: c.rawValue)
+        } label: {
+            Text(userEnv.localizedString(c.titleTR, c.titleEN))
+                .font(.pixel(6))
+                .foregroundColor(isSelected ? c.color : ThemeColors.mapHudMuted)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background((isSelected ? c.color.opacity(0.12) : Color.white.opacity(0.04)))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke((isSelected ? c.color.opacity(0.45) : ThemeColors.mapHudBorder), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+enum BossContract: String, Codable {
+    case safe
+    case risky
+
+    var titleTR: String {
+        switch self {
+        case .safe: return "GÜVENLİ (+0)"
+        case .risky: return "RİSKLİ (+ÖDÜL)"
+        }
+    }
+    var titleEN: String {
+        switch self {
+        case .safe: return "SAFE (+0)"
+        case .risky: return "RISKY (+REWARD)"
+        }
+    }
+    var color: Color {
+        switch self {
+        case .safe: return ThemeColors.neonCyan
+        case .risky: return ThemeColors.neonPink
         }
     }
 }

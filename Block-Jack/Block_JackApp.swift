@@ -16,6 +16,17 @@ struct Block_JackApp: App {
                 AppRootView()
                     .environmentObject(userEnv)
                     .preferredColorScheme(.dark)
+
+                if let id = userEnv.pendingAchievementToastId,
+                   let ach = AchievementEngine.achievement(for: id) {
+                    VStack {
+                        AchievementToastView(achievement: ach)
+                            .environmentObject(userEnv)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                        Spacer()
+                    }
+                    .zIndex(20)
+                }
                 
                 if isSplashActive {
                     SplashScreenView {

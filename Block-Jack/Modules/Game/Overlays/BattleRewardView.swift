@@ -10,6 +10,7 @@ import SwiftUI
 
 struct BattleRewardView: View {
     let slotId: Int
+    var isChallenge: Bool = false
     let onClaim: () -> Void
 
     @EnvironmentObject var userEnv: UserEnvironment
@@ -36,7 +37,9 @@ struct BattleRewardView: View {
                 header: {
                     OverlayTitleBlock(
                         userEnv.localizedString("TUR TAMAMLANDI!", "ROUND COMPLETE!"),
-                        subtitle: userEnv.localizedString("Ganimeti topla ve güçlen.", "Claim your loot and power up."),
+                        subtitle: isChallenge
+                        ? userEnv.localizedString("BONUS ÖDÜL AKTİF (Challenge/Contract).", "BONUS REWARD ACTIVE (Challenge/Contract).")
+                        : userEnv.localizedString("Ganimeti topla ve güçlen.", "Claim your loot and power up."),
                         color: ThemeColors.electricYellow
                     )
                 },
@@ -95,7 +98,7 @@ struct BattleRewardView: View {
     private func generateRewards() {
         var options: [RewardOption] = []
 
-        let goldAmount = Int.random(in: 100...250)
+        let goldAmount = isChallenge ? Int.random(in: 220...480) : Int.random(in: 100...250)
         options.append(RewardOption(
             title: "Veri Önbelleği",
             icon: "💰",
@@ -105,6 +108,19 @@ struct BattleRewardView: View {
                 SaveManager.shared.updateGold(slotId: id, amount: goldAmount)
             }
         ))
+
+        if isChallenge {
+            let diamondAmount = Int.random(in: 8...18)
+            options.append(RewardOption(
+                title: "Elmas Önbelleği",
+                icon: "💎",
+                desc: "+\(diamondAmount) Elmas kazan.",
+                color: ThemeColors.neonCyan,
+                action: { _ in
+                    UserEnvironment.shared.earn(diamonds: diamondAmount)
+                }
+            ))
+        }
 
         if let randomPotion = ConsumableItem.shopPool.randomElement() {
             options.append(RewardOption(

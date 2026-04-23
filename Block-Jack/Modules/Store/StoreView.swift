@@ -16,12 +16,14 @@ enum StoreTab: Int, CaseIterable {
     case diamonds
     case gold
     case specials
+    case cosmetics
 
     func titleTR() -> String {
         switch self {
         case .diamonds: return "ELMAS"
         case .gold:     return "ALTIN"
         case .specials: return "ÖZEL"
+        case .cosmetics: return "KOZMETİK"
         }
     }
 
@@ -30,8 +32,20 @@ enum StoreTab: Int, CaseIterable {
         case .diamonds: return "GEMS"
         case .gold:     return "GOLD"
         case .specials: return "DEALS"
+        case .cosmetics: return "COSMETICS"
         }
     }
+}
+
+struct CosmeticItem: Identifiable, Hashable {
+    let id: String
+    let titleTR: String
+    let titleEN: String
+    let subtitleTR: String
+    let subtitleEN: String
+    let priceLabel: String
+    let iconSystemName: String
+    let tag: PackageTag?
 }
 
 struct StorePackage: Identifiable, Hashable {
@@ -178,6 +192,36 @@ enum StoreCatalog {
             priceLabel: "$49.99", tag: .bestValue
         )
     ]
+
+    static let cosmetics: [CosmeticItem] = [
+        CosmeticItem(
+            id: "cos_skin_neon_frame",
+            titleTR: "Neon Çerçeve", titleEN: "Neon Frame",
+            subtitleTR: "HUD ve kartlar için neon border teması",
+            subtitleEN: "Neon border theme for HUD and cards",
+            priceLabel: "$1.99",
+            iconSystemName: "sparkles",
+            tag: .popular
+        ),
+        CosmeticItem(
+            id: "cos_vfx_flush_trail",
+            titleTR: "Flush Trail VFX", titleEN: "Flush Trail VFX",
+            subtitleTR: "Flush anında özel ışık izi efekti",
+            subtitleEN: "Special light trail on flush clears",
+            priceLabel: "$2.99",
+            iconSystemName: "wand.and.stars",
+            tag: .bestValue
+        ),
+        CosmeticItem(
+            id: "cos_hud_pixel_theme",
+            titleTR: "Pixel HUD", titleEN: "Pixel HUD",
+            subtitleTR: "Harita + HUD için retro pixel tema",
+            subtitleEN: "Retro pixel theme for map + HUD",
+            priceLabel: "$0.99",
+            iconSystemName: "square.grid.3x3.fill",
+            tag: nil
+        )
+    ]
 }
 
 // MARK: - StoreView
@@ -212,6 +256,10 @@ struct StoreView: View {
                         case .specials:
                             ForEach(StoreCatalog.specialPackages) { pkg in
                                 specialCard(pkg)
+                            }
+                        case .cosmetics:
+                            ForEach(StoreCatalog.cosmetics) { item in
+                                cosmeticCard(item)
                             }
                         }
                     }
@@ -353,6 +401,7 @@ struct StoreView: View {
         case .diamonds: return ThemeColors.neonCyan
         case .gold:     return ThemeColors.electricYellow
         case .specials: return ThemeColors.neonPink
+        case .cosmetics: return ThemeColors.neonPurple
         }
     }
 
@@ -489,6 +538,91 @@ struct StoreView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - Cosmetic Card (UI-only)
+
+    private func cosmeticCard(_ item: CosmeticItem) -> some View {
+        let owned = userEnv.ownsCosmetic(item.id)
+        let accent = ThemeColors.neonPurple
+
+        return Button {
+            HapticManager.shared.play(.buttonTap)
+            guard !owned else { return }
+            pendingPackage = PendingPurchase(
+                id: item.id,
+                title: userEnv.localizedString(item.titleTR, item.titleEN),
+                amountText: userEnv.localizedString("Kozmetik kilidi açılır", "Cosmetic unlock"),
+                price: item.priceLabel,
+                iconName: item.iconSystemName,
+                isGold: false,
+                goldAmount: 0,
+                diamondAmount: 0,
+                cosmeticId: item.id
+            )
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(accent.opacity(0.12))
+                        .frame(width: 78, height: 78)
+                    Image(systemName: item.iconSystemName)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(accent)
+                        .shadow(color: accent.opacity(0.5), radius: 8)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(userEnv.localizedString(item.titleTR, item.titleEN))
+                            .font(.setCustomFont(name: .InterBlack, size: 16))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+
+                        if owned {
+                            Text(userEnv.localizedString("SAHİP", "OWNED"))
+                                .font(.setCustomFont(name: .InterBlack, size: 10))
+                                .foregroundStyle(ThemeColors.cosmicBlack)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(ThemeColors.neonGreen)
+                                .clipShape(Capsule())
+                        }
+                    }
+
+                    Text(userEnv.localizedString(item.subtitleTR, item.subtitleEN))
+                        .font(.setCustomFont(name: .InterMedium, size: 11))
+                        .foregroundStyle(ThemeColors.textSecondary)
+                        .lineLimit(2)
+
+                    if let tag = item.tag {
+                        Text(userEnv.localizedString(tag.titleTR(), tag.titleEN()))
+                            .font(.setCustomFont(name: .InterExtraBold, size: 9))
+                            .tracking(2)
+                            .foregroundStyle(tag.color)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(tag.color.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
+
+                Spacer()
+
+                if owned {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(ThemeColors.neonGreen)
+                        .font(.system(size: 18))
+                } else {
+                    priceBadge(item.priceLabel, accent: accent)
+                }
+            }
+            .padding(14)
+            .background(cardBackground(accent: accent, tag: item.tag))
+        }
+        .buttonStyle(.plain)
+        .opacity(owned ? 0.85 : 1.0)
+    }
+
     private func bundleRewardCapsule(iconName: String, amount: Int, color: Color) -> some View {
         HStack(spacing: 6) {
             Image(iconName)
@@ -606,6 +740,29 @@ struct StoreView: View {
     // yapılacak, Transaction.finish() ile doğrulama tamamlanacak.
 
     private func performPurchase(_ pending: PendingPurchase) {
+        // Alert'ı kapat
+        pendingPackage = nil
+
+        if let cosmeticId = pending.cosmeticId {
+            userEnv.unlockCosmetic(cosmeticId)
+            HapticManager.shared.play(.success)
+            AudioManager.shared.playSFX(.perkUnlock)
+
+            let msg = userEnv.localizedString(
+                "\(pending.title) açıldı!",
+                "\(pending.title) unlocked!"
+            )
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                successToast = msg
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    successToast = nil
+                }
+            }
+            return
+        }
+
         if pending.goldAmount > 0 {
             userEnv.earn(gold: pending.goldAmount)
         }
@@ -656,6 +813,7 @@ struct PendingPurchase: Identifiable {
     let isGold: Bool
     let goldAmount: Int
     let diamondAmount: Int
+    var cosmeticId: String? = nil
 
     func confirmationText(lang: AppLanguage) -> String {
         switch lang {
