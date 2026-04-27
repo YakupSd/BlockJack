@@ -150,7 +150,7 @@ struct RunState {
     
     // NEW PERK FLAGS
     var maxTraySlots: Int = 3
-    var lastStandUsed: Bool = false
+    var lastStandUses: Int = 0
     var undyingRageActive: Bool = false
     
     // MARK: - Lives System (Balatro tarzı)

@@ -32,7 +32,8 @@ struct WorldSelectionView: View {
     @EnvironmentObject var userEnv: UserEnvironment
     @Environment(\.dismiss) private var dismiss
 
-    @State private var didAppear: Bool = false
+    @State private var didAppear = false
+    @State private var hasAutoNavigated = false  // tek seferlik auto-skip guard
     @State private var shakeWorldId: Int? = nil
 
     var body: some View {
@@ -62,9 +63,12 @@ struct WorldSelectionView: View {
                 didAppear = true
                 // TODO 5: Sadece 1 world açıksa (yeni oyuncu) ekran gösterme,
                 // direkt o world'e git.
+                // hasAutoNavigated flag'i sayesinde WorldMap'ten geri dönüldüğünde
+                // bu blok tekrar çalışmaz → sonsuz döngü önlenir.
+                guard !hasAutoNavigated else { return }
                 let availableWorlds = worldCards.filter { $0.state != .locked }
                 if availableWorlds.count == 1, let only = availableWorlds.first {
-                    // Kısa gecikme — UI flash'tan kaçınmak için
+                    hasAutoNavigated = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                         MainViewsRouter.shared.pushToWorldMap(worldId: only.worldId, slotId: slotId)
                     }

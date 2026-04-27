@@ -548,8 +548,8 @@ class UserEnvironment: ObservableObject {
     func loadFromSlot(_ slot: SaveSlot) {
         self.activeSlotId = slot.id
         self.unlockedWorldLevel = slot.unlockedWorldLevel
-        self.goldUpgradeLevels = slot.goldUpgradeLevels
-        self.unlockedUpgradeIDs = slot.unlockedMetaUpgradeIDs
+        // Meta ve Gold upgradeleri global kalmalı, slot'tan yüklenmemeli!
+        // Aksi halde yeni save açıldığında hepsi sıfırlanır.
         self.gold = slot.gold
         // Slot bazlı karakter: Hub ve ekranlar aktif slot'un karakterini
         // okuyabilsin diye global `selectedCharacterID`'yi slot değerine
@@ -599,12 +599,14 @@ class UserEnvironment: ObservableObject {
             && trialRunUsedToday
     }
 
-    /// Aktif slot bağlamını kapatır. Dashboard'a dönerken çağrılır; böylece
-    /// global cüzdana yapılacak `spend/earn` çağrıları yanlışlıkla yakın
-    /// zamanda kapatılmış slot'a yönlendirilmez.
+    /// Aktif slot bağlamını kapatır. Dashboard'a dönerken çağrılır.
     func clearActiveSlot() {
         self.activeSlotId = nil
     }
+
+    /// Oyun kazanılınca MapView'e dönüşte tamamlanacak node.
+    /// In-memory only — force-close sonrasında nil olur, node accessible kalır (retry).
+    var pendingMapNodeId: UUID? = nil
     
     func localizedString(_ trText: String, _ enText: String) -> String {
         language == .turkish ? trText : enText

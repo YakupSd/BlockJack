@@ -33,9 +33,18 @@ class MerchantViewModel: ObservableObject {
     func generateStock() {
         var items: [ShopItem] = []
         
-        // 3 adet rastgele perk üret
-        let availablePerks = PerkEngine.perkPool.shuffled()
-        for i in 0..<3 {
+        let slotUnlocked = currentSlot?.unlockedPerkIDs ?? []
+        let unlockedIds = slotUnlocked.isEmpty ? StartingPerk.defaultUnlockedIDs : slotUnlocked
+        let activeIds = currentSlot?.activePassivePerks.map { $0.id } ?? []
+        
+        // Sadece açık olan ve henüz alınmamış perkleri filtrele
+        let availablePerks = PerkEngine.perkPool.filter { perk in
+            unlockedIds.contains(perk.id) && !activeIds.contains(perk.id)
+        }.shuffled()
+        
+        // En fazla 3 perk üret
+        let maxPerks = min(3, availablePerks.count)
+        for i in 0..<maxPerks {
             let perk = availablePerks[i]
             let cost = Int.random(in: 120...200)
             items.append(ShopItem(perk: perk, consumableType: nil, cost: cost))
@@ -94,9 +103,17 @@ class MerchantViewModel: ObservableObject {
         }
         
         // Yeni bir rastgele (belki daha güçlü) perk ver
-        // Şimdilik havuzdan rastgele birini veriyoruz (seçilenler hariç)
+        // Sadece açık olan ve seçilenler HARİCİ aktif olmayan perkler
+        let slotUnlocked = currentSlot?.unlockedPerkIDs ?? []
+        let unlockedIds = slotUnlocked.isEmpty ? StartingPerk.defaultUnlockedIDs : slotUnlocked
+        let activeIds = currentSlot?.activePassivePerks.map { $0.id } ?? []
         let selectionIds = forgeSelection.map { $0.id }
-        if let newPerk = PerkEngine.perkPool.filter({ !selectionIds.contains($0.id) }).randomElement() {
+        
+        let forgePool = PerkEngine.perkPool.filter { perk in
+            unlockedIds.contains(perk.id) && !activeIds.contains(perk.id) && !selectionIds.contains(perk.id)
+        }
+        
+        if let newPerk = forgePool.randomElement() {
             SaveManager.shared.addPassivePerk(slotId: slotId, perk: newPerk)
         }
         

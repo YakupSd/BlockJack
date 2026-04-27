@@ -70,11 +70,18 @@ class WorldMapViewModel: ObservableObject {
     }
 
     func startLevel(_ level: WorldLevel) {
-        // Tıklanan seviyeye göre yeni bir ChapterMap oluşturup oyunu başlatır.
-        // Trial Character (günlük 1): run gerçekten başlarken tüket.
         let cid = SaveManager.shared.slots.first(where: { $0.id == slotId })?.characterId
             ?? userEnv.selectedCharacterID
         userEnv.consumeTrialRunIfNeeded(selectedCharacterId: cid)
+
+        // Aynı chapter için tamamlanmamış kayıtlı map varsa yeniden kullan —
+        // progress sıfırlanmaz.
+        if let existing = SaveManager.shared.slots.first(where: { $0.id == slotId })?.currentChapterMap,
+           existing.chapterIndex == level.id,
+           !existing.isCleared {
+            MainViewsRouter.shared.pushToMap(slotId: slotId)
+            return
+        }
 
         let map = ChapterMapGenerator.generate(chapterIndex: level.id)
         SaveManager.shared.updateMapState(slotId: slotId, map: map, completedNodes: [])

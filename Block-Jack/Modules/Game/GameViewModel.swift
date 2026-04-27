@@ -15,7 +15,6 @@ enum GamePhase {
     case bossIntro      // Boss round öncesi özel banner
     case bossDialogue   // BOSS DIALOGUE (NEW)
     case roundComplete  // Round bitti, mağaza
-    case chapterComplete // Bölüm bitti (5. round kazanıldı)
     case shopping
     case gameOver
 }
@@ -196,18 +195,36 @@ final class GameViewModel: ObservableObject {
             self.run.currentRound = slot.currentRound
             self.run.currentScore = slot.currentScore
             
-            if let savedGrid = slot.grid {
-                // Dimension validation: Ensure saved grid matches current BoardViewModel.size (12x12)
-                if savedGrid.count == BoardViewModel.size && (savedGrid.first?.count ?? 0) == BoardViewModel.size {
-                    self.board.grid = savedGrid
-                } else {
-                    // Mismatch: Reset grid to prevent Index out of range crashes
-                    self.board.resetGrid()
-                    addPopup(text: "SYNC: GRID RESET", color: ThemeColors.neonOrange)
+            let isSameNode = (slot.activeBattleNodeId == userEnv.pendingMapNodeId) && (userEnv.pendingMapNodeId != nil)
+
+            if isSameNode {
+                var loadedValidGrid = false
+                if let savedGrid = slot.grid {
+                    // Dimension validation: Ensure saved grid matches current BoardViewModel.size (12x12)
+                    if savedGrid.count == BoardViewModel.size && (savedGrid.first?.count ?? 0) == BoardViewModel.size {
+                        self.board.grid = savedGrid
+                        loadedValidGrid = true
+                    } else {
+                        // Mismatch: Reset grid to prevent Index out of range crashes
+                        self.board.resetGrid()
+                        addPopup(text: "SYNC: GRID RESET", color: ThemeColors.neonOrange)
+                    }
                 }
-            }
-            if let savedTray = slot.trayBlocks {
-                self.blockTray = savedTray
+                
+                if loadedValidGrid {
+                    if let savedTray = slot.trayBlocks {
+                        self.blockTray = savedTray
+                    }
+                    self.setupRoundTargetAndModifiers()
+                    let totalTime = self.calculateInitialTime()
+                    self.timer.setup(seconds: totalTime)
+                    if let savedTime = slot.timeLeft {
+                        self.timer.timeRemaining = savedTime
+                    }
+                    self.phase = .playing
+                }
+            } else {
+                self.board.resetGrid()
             }
             
             self.run.activePassivePerks = slot.activePassivePerks
@@ -215,11 +232,14 @@ final class GameViewModel: ObservableObject {
             self.run.gold = slot.gold
             self.run.lives = slot.lives
             
-            // PHASE 11 FIX: World level daha önce hiç set edilmiyordu → boss registry
-            // ve target scaling her zaman level 1'de sanıyordu. Bu yüzden ilerleyen
-            // bölümlerde bile hep Viper X çıkıyor ve hedef skorlar world scaling'i
-            // uygulamıyordu. Artık slot.unlockedWorldLevel'den alıyoruz.
-            self.run.worldLevel = max(1, slot.unlockedWorldLevel)
+            // PHASE 11 FIX: World level scaling should follow the current map's chapter, 
+            // not the global maximum unlocked level. Otherwise replaying Stage 1 
+            // becomes as hard as the latest unlocked stage.
+            if let map = slot.currentChapterMap {
+                self.run.worldLevel = map.chapterIndex
+            } else {
+                self.run.worldLevel = max(1, slot.unlockedWorldLevel)
+            }
             
             // Cüzdan senkronizasyonu: meta UI (Dashboard/Shop) UserEnvironment.gold'u
             // okuyor; slot aktif olduğunda iki havuzu eşitle.
@@ -240,8 +260,8 @@ final class GameViewModel: ObservableObject {
     func addRunGold(_ amount: Int) {
         guard amount != 0 else { return }
         run.gold = max(0, run.gold + amount)
+        // Yalnızca lifetime istatistiğini artır, cüzdanı (diski) hemen güncelleme (savescumming'i önle)
         UserEnvironment.shared.addGoldEarned(max(0, amount))
-        SaveManager.shared.setGold(slotId: activeSlotId, total: run.gold)
     }
 
     // MARK: - Game Control
@@ -252,24 +272,7 @@ final class GameViewModel: ObservableObject {
         startRound()
     }
 
-    func startRound() {
-        board.resetGrid() // FORCE RESET (Reset Bug Fix)
-
-        // MARK: - Modifier Escalation (world level'a göre)
-        //
-        // Boşlukları doldurmak için: erken bölümler vanilya kalır, geç
-        // bölümler modifier çeşitlenmesi ile karakter seçimini anlamlı
-        // hale getirir. Her modifier bir karaktere avantaj sağlar:
-        //   fog    → Time Bender (streak & süre yönetimi)
-        //   weight → Titan (heavy cell +0.5×)
-        //   phantom→ Ghost / phantom siphon perki
-        //   glitch → Architect / Alchemist (alan temizliği)
-        //
-        // Eşikler:
-        //   W 1–4  : yalnızca boss'ta modifier (vanilya)
-        //   W 5–9  : boss + elite'te modifier
-        //   W 10–14: normal round'larda %50 modifier şansı
-        //   W 15+ : her round modifier + boss'lar için "difficulty bump"
+    func setupRoundTargetAndModifiers() {
         let worldLevel = run.worldLevel
 
         if nodeType == .boss {
@@ -323,6 +326,12 @@ final class GameViewModel: ObservableObject {
             }
             run.currentRoundTargetScore = RoundData.makeTarget(for: run.currentRound, worldLevel: worldLevel)
         }
+    }
+
+    func startRound() {
+        board.resetGrid() // FORCE RESET (Reset Bug Fix)
+
+        self.setupRoundTargetAndModifiers()
         
         // Her round başlangıcında hamle ve streak sayaçlarını sıfırla
         run.movesUsed = 0
@@ -359,43 +368,7 @@ final class GameViewModel: ObservableObject {
             addPopup(text: "+\(goldBonus) GOLD MAGNET", color: ThemeColors.electricYellow)
         }
         
-        // Timer: nodeType'a göre süre ayarla
-        var initialTime = run.round.timeLimit
-        if nodeType == .elite {
-            initialTime = max(120.0, initialTime - 30.0) // Elite: -30sn, minimum 120sn
-        } else if nodeType == .challenge {
-            initialTime = max(105.0, initialTime - 45.0) // Challenge: daha kısa süre, minimum 105sn
-        }
-        
-        // Kalıcı Geliştirme: Iron Will kontrolü
-        if userEnv.unlockedUpgradeIDs.contains(MetaUpgrade.ironWill.rawValue) {
-            initialTime += 10.0
-        }
-
-        // Starting Item (Loadout) — 1 kez / run
-        if !run.startingItemApplied {
-            let id = UserEnvironment.shared.runConfig?.startingItemId ?? ""
-            switch id {
-            case "life_plus1":
-                run.gainLife()
-                addPopup(text: "+1 LIFE", color: ThemeColors.neonCyan)
-                run.startingItemApplied = true
-            case "time_plus30":
-                initialTime += 30.0
-                addPopup(text: "+30s START", color: ThemeColors.neonCyan)
-                run.startingItemApplied = true
-            case "overdrive_50":
-                overdriveCharge = max(overdriveCharge, 1.5)
-                addPopup(text: "OVERDRIVE +50%", color: ThemeColors.neonCyan)
-                run.startingItemApplied = true
-            case "bomb_block":
-                pendingStartingBombBlock = true
-                addPopup(text: "START BOMB", color: ThemeColors.neonCyan)
-                run.startingItemApplied = true
-            default:
-                break
-            }
-        }
+        let initialTime = calculateInitialTime()
         
         timer.setup(seconds: initialTime)
         
@@ -509,6 +482,38 @@ final class GameViewModel: ObservableObject {
         guard phase == .playing else { return }
         timer.pause()
         phase = .paused
+    }
+
+    // MARK: - Helpers
+
+    func calculateInitialTime() -> Double {
+        var initialTime = run.round.timeLimit
+        if nodeType == .elite {
+            initialTime = max(120.0, initialTime - 30.0) // Elite: -30sn, minimum 120sn
+        } else if nodeType == .challenge {
+            initialTime = max(105.0, initialTime - 45.0) // Challenge: daha kısa süre, minimum 105sn
+        }
+        
+        // Kalıcı Geliştirme: Iron Will kontrolü
+        if userEnv.unlockedUpgradeIDs.contains(MetaUpgrade.ironWill.rawValue) {
+            initialTime += 10.0
+        }
+
+        // Starting Item (Loadout) — 1 kez / run
+        if !run.startingItemApplied {
+            let id = UserEnvironment.shared.runConfig?.startingItemId ?? ""
+            switch id {
+            case "time_plus30":
+                initialTime += 30.0
+            default:
+                break
+            }
+        }
+        return initialTime
+    }
+
+    func shouldShowTutorial() -> Bool {      
+        return run.currentRound == 1 && !userEnv.tutorialCompleted
     }
 
     func resumeGame() {
@@ -1072,9 +1077,11 @@ final class GameViewModel: ObservableObject {
                     AudioManager.shared.playSFX(.coin)
                     addPopup(text: "GOLDEN FEVER +15G", color: ThemeColors.electricYellow)
                 } else if hasMidas {
-                    addRunGold(5)
+                    let tier = run.perkTier("midas_touch")
+                    let amount = 5 * tier
+                    addRunGold(amount)
                     AudioManager.shared.playSFX(.coin)
-                    addPopup(text: "MIDAS TOUCH +5G", color: ThemeColors.electricYellow)
+                    addPopup(text: "MIDAS TOUCH LV.\(tier) +\(amount)G", color: ThemeColors.electricYellow)
                 }
             }
             
@@ -1082,10 +1089,18 @@ final class GameViewModel: ObservableObject {
             if scoreResult.clearedRows + scoreResult.clearedCols >= 2 {
                 let hasRecycler = run.hasPerk("recycler")
                 let hasCycle = activeSynergies.contains(where: { $0.synergyName == SynergyID.eternalCycle })
-                let chance = hasCycle ? 0.4 : (hasRecycler ? 0.2 : 0.0)
-                if Double.random(in: 0...1) < chance {
+                var chance = 0.0
+                if hasCycle {
+                    chance = 0.4
+                } else if hasRecycler {
+                    let tier = run.perkTier("recycler")
+                    chance = 0.2 + (Double(tier - 1) * 0.1)
+                }
+                
+                if chance > 0 && Double.random(in: 0...1) < chance {
                     refillBlockTray()
-                    addPopup(text: "TRAY RECYCLED!", color: ThemeColors.neonCyan)
+                    let msg = hasCycle ? "ETERNAL CYCLE!" : "RECYCLED LV.\(run.perkTier("recycler"))!"
+                    addPopup(text: msg, color: ThemeColors.neonCyan)
                     haptic.play(.success)
                 }
             }
@@ -1159,19 +1174,23 @@ final class GameViewModel: ObservableObject {
         
         // Double Down
         if run.movesRemaining == 0 && scoreResult.totalScore > 0 && run.hasPerk("double_down") {
-            run.movesUsed -= 3 // Geriye alarak +3 hamle kazandırır
-            addPopup(text: "DOUBLE DOWN! +3 MOVES", color: ThemeColors.neonPurple)
+            let tier = run.perkTier("double_down")
+            let movesGained = 1 + (tier * 2) // Tier 1: 3, Tier 2: 5, Tier 3: 7
+            run.movesUsed -= movesGained // Geriye alarak hamle kazandırır
+            addPopup(text: "DOUBLE DOWN LV.\(tier)! +\(movesGained) MOVES", color: ThemeColors.neonPurple)
             haptic.play(.success)
         }
         
         // Vampiric Core
         if run.hasPerk("vampiric_core") && scoreResult.totalScore > 0 {
-            let lastMilestone = (run.currentScore - scoreResult.totalScore) / 5000
-            let currentMilestone = run.currentScore / 5000
+            let tier = run.perkTier("vampiric_core")
+            let targetScore = max(1000, 5000 - ((tier - 1) * 500))
+            let lastMilestone = (run.currentScore - scoreResult.totalScore) / targetScore
+            let currentMilestone = run.currentScore / targetScore
             if currentMilestone > lastMilestone {
                 if Double.random(in: 0...1) < 0.25 { // %25 şans
                     run.gainLife()
-                    addPopup(text: "VAMPIRIC LUCK! +1 ❤️", color: ThemeColors.neonPink)
+                    addPopup(text: "VAMPIRIC LV.\(tier)! +1 ❤️", color: ThemeColors.neonPink)
                     haptic.play(.success)
                 }
             }
@@ -1395,6 +1414,10 @@ final class GameViewModel: ObservableObject {
         
         // Round zaferi: müzik yumuşasın, kazanım SFX'i çalsın.
         AudioManager.shared.playSFX(.roundWin)
+        
+        // ÖNEMLİ: Sonraki round'a geçişi burada yap, skor/round sıfırlansın.
+        run.nextRound()
+        
         phase = .roundComplete
 
         // Skor/round'u diske persist et — Slot seçim ekranı ve Hub'ın "Round X
@@ -1414,28 +1437,8 @@ final class GameViewModel: ObservableObject {
 #endif
     }
 
-    func proceedToNextRound() {
-        let wasBossRound = run.round.isBossRound
-        run.nextRound()
-        board.resetGrid()
-        
-        // Flow routing based on new round state
-        if wasBossRound {
-            // We just finished a boss round (e.g. going from 5 to 6) -> Chapter complete
-            phase = .chapterComplete
-        } else if run.round.isBossRound {
-            // The next round is a boss round (e.g. going from 4 to 5) -> Boss intro
-            phase = .bossIntro
-        } else {
-            // Normal round
-            startRound()
-        }
-    }
     
-    func startChapter() {
-        // Called from ChapterCompleteOverlay "Devam Et" button
-        startRound()
-    }
+    
     
     func startBossRound() {
         // Called from BossIntroOverlay "Savaş" button -> Moves to Dialogue
@@ -1576,6 +1579,7 @@ final class GameViewModel: ObservableObject {
         slot.gold = run.gold
         slot.lives = run.lives
         slot.lastSaved = Date()
+        slot.activeBattleNodeId = userEnv.pendingMapNodeId
         
         if let index = SaveManager.shared.slots.firstIndex(where: { $0.id == activeSlotId }) {
             SaveManager.shared.slots[index] = slot
@@ -1595,8 +1599,8 @@ final class GameViewModel: ObservableObject {
 
         // 1. SYNERGY: UNDYING RAGE (One-time save with 5s immortality)
         let hasUndyingRage = activeSynergies.contains(where: { $0.synergyName == SynergyID.undyingRage })
-        if hasUndyingRage && run.lives == 1 && !run.lastStandUsed {
-            run.lastStandUsed = true 
+        if hasUndyingRage && run.lives == 1 && run.lastStandUses == 0 {
+            run.lastStandUses += 1 
             run.gainLife()
             run.undyingRageActive = true
             timer.pause()
@@ -1612,12 +1616,15 @@ final class GameViewModel: ObservableObject {
         }
 
         // 2. PERK: Last Stand (Basic save)
-        if run.hasPerk("last_stand") && !run.lastStandUsed {
-            run.lastStandUsed = true
-            run.lives = max(1, run.lives)
-            addPopup(text: "LAST STAND! ❤️", color: ThemeColors.neonCyan)
-            haptic.play(.heavy)
-            return
+        if run.hasPerk("last_stand") {
+            let tier = run.perkTier("last_stand")
+            if run.lastStandUses < tier {
+                run.lastStandUses += 1
+                run.lives = max(1, run.lives)
+                addPopup(text: "LAST STAND LV.\(tier)! ❤️ (\(run.lastStandUses)/\(tier))", color: ThemeColors.neonCyan)
+                haptic.play(.heavy)
+                return
+            }
         }
 
         // --- ACTUAL GAME OVER / LIFE LOSS ---

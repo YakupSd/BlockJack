@@ -220,12 +220,10 @@ struct DashboardView: View {
         Button {
             HapticManager.shared.play(.heavy)
             userEnv.loadFromSlot(slot)
-            // Aktif run varsa haritaya, yoksa WorldSelection'a
-            if let map = slot.currentChapterMap, !map.isCleared {
-                MainViewsRouter.shared.pushToMap(slotId: slot.id)
-            } else {
-                MainViewsRouter.shared.pushToSlotHub(slotId: slot.id)
-            }
+            // Her zaman SlotHub'a git — oradan
+            // "SEFERE DEVAM" (aktif map varsa) veya
+            // "SEFERE BAŞLA" (yoksa) secilir.
+            MainViewsRouter.shared.pushToSlotHub(slotId: slot.id)
         } label: {
             HStack(spacing: 14) {
                 // Karakter portresi

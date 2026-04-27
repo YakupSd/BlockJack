@@ -65,8 +65,8 @@ class SaveManager: ObservableObject {
         
         // Phase 11: World Map & Upgrades
         newSlot.unlockedWorldLevel = 1
-        newSlot.goldUpgradeLevels = [:]
-        newSlot.unlockedMetaUpgradeIDs = []
+        newSlot.goldUpgradeLevels = UserEnvironment.shared.goldUpgradeLevels
+        newSlot.unlockedMetaUpgradeIDs = UserEnvironment.shared.unlockedUpgradeIDs
         newSlot.bestScore = 0
         newSlot.bestWorldLevel = 1
         newSlot.recentRuns = []
@@ -88,7 +88,24 @@ class SaveManager: ObservableObject {
         slots[index].lastSaved = Date()
         saveToDisk()
     }
-    
+
+    // MARK: - Perk Shop
+    /// Perk'i slot'a kalıcı olarak açar. Gold'u slot üzerinden düşürür.
+    /// Başarılıysa true döner.
+    @discardableResult
+    func unlockPerk(slotId: Int, perk: StartingPerk) -> Bool {
+        guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return false }
+        guard !slots[index].unlockedPerkIDs.contains(perk.id) else { return true } // zaten açık
+        guard slots[index].gold >= perk.goldCost else { return false }             // yetersiz gold
+        slots[index].gold -= perk.goldCost
+        slots[index].unlockedPerkIDs.append(perk.id)
+        slots[index].lastSaved = Date()
+        saveToDisk()
+        // UserEnvironment gold'unu senkronize et
+        UserEnvironment.shared.gold = slots[index].gold
+        return true
+    }
+
     // Phase 9: Map State saving
     func updateMapState(slotId: Int, map: ChapterMap, completedNodes: [UUID]) {
         guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }

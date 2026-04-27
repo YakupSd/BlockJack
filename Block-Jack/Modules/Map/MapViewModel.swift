@@ -110,13 +110,17 @@ class MapViewModel: ObservableObject {
     }
 
     /// Map açılışında ekranın fokuslanacağı node.
-    /// Öncelik:
-    /// 1) son tamamlanan node (run devam)
-    /// 2) erişilebilir ilk node
-    /// 3) start node
+    /// lastCompletedNodeId başka chapter'ın node UUID'si olabilir;
+    /// önce geçerli map'te varlığını doğruluyoruz.
     var preferredFocusNodeId: UUID? {
-        if let lastCompletedNodeId { return lastCompletedNodeId }
-        if let accessible = currentMap.nodes.first(where: { $0.isAccessible })?.id { return accessible }
+        if let lastId = lastCompletedNodeId,
+           currentMap.nodes.contains(where: { $0.id == lastId }) {
+            return lastId
+        }
+        // Son tamamlanan yoksa: erişilebilir ilk node
+        if let accessible = currentMap.nodes.first(where: { $0.isAccessible })?.id {
+            return accessible
+        }
         return currentMap.startNodeId
     }
 
@@ -127,23 +131,21 @@ class MapViewModel: ObservableObject {
     /// - Bölüm bitmediyse: eski davranış — Slot Hub'a dön (run'a devam edilebilir).
     func handleExitPressed() {
         HapticManager.shared.play(.buttonTap)
-        // Replay-safe exit:
-        // Kullanıcı daha önce geçtiği bir stage'e test için girerse (ör. 5'ten 2'ye),
-        // bu map state slot'u "aktif run" gibi kilitlemesin. Çıkışta WorldMap'e dön.
-        if currentMap.chapterIndex < UserEnvironment.shared.unlockedWorldLevel {
+
+        // Eğer bölüm bitmişse: her zaman World Map'e dön ve map'i temizle.
+        if isChapterCleared {
             SaveManager.shared.clearChapterMap(slotId: slotId)
             MainViewsRouter.shared.popToWorldMap(slotId: slotId)
             return
         }
 
-        if isChapterCleared {
-            // Haritayı diskten temizle → SlotHub artık "SEFERE BAŞLA" gösterir.
-            SaveManager.shared.clearChapterMap(slotId: slotId)
-            MainViewsRouter.shared.popToWorldMap(slotId: slotId)
-        } else {
-            SaveManager.shared.updateMapState(slotId: slotId, map: currentMap, completedNodes: [])
-            MainViewsRouter.shared.popToSlotHub(slotId: slotId)
-        }
+        // Eğer bölüm bitmemişse ve bu bir REPLAY ise:
+        // Kullanıcı Hub'a dönüp sonra tekrar Map'e girebilsin (run devam etsin).
+        // Sadece World Map'e manuel gitmek isterse (isChapterCleared true iken) map silinir.
+        
+        // Mevcut map durumunu kaydet — SlotHub "SEFERE DEVAM" gösterir
+        SaveManager.shared.updateMapState(slotId: slotId, map: currentMap, completedNodes: [])
+        MainViewsRouter.shared.popToSlotHub(slotId: slotId)
     }
     
     func canReplay(_ node: MapNode) -> Bool {

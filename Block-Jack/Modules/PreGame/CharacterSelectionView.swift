@@ -294,21 +294,9 @@ struct CharacterSelectionView: View {
     private func handleConfirm(char: GameCharacter) {
         switch mode {
         case .firstSetup:
-            // TODO 6: Starting perk seçimi kaldırıldı — perk run içinde kazanılır.
-            // Slot’u "none" perk ile hemen oluştur, WorldSelection'a gönder.
-            SaveManager.shared.createNewSave(in: slotId, characterId: char.id, perkId: "none")
-            if let newSlot = SaveManager.shared.slots.first(where: { $0.id == slotId }) {
-                userEnv.loadFromSlot(newSlot)
-            }
-            userEnv.setRunConfig(RunConfig(
-                slotId: slotId,
-                characterId: char.id,
-                startingPerkId: "none",
-                worldId: 1,
-                startingItemId: nil
-            ))
+            // Kullanıcı başlangıç perk'i seçmek istiyor. O yüzden PerkSelectionView'e yolla.
             MainViewsRouter.shared.push(
-                WorldSelectionView(slotId: slotId).environmentObject(UserEnvironment.shared)
+                PerkSelectionView(slotId: slotId, characterId: char.id).environmentObject(userEnv)
             )
         case .changeInHub:
             SaveManager.shared.setCharacter(slotId: slotId, characterID: char.id)

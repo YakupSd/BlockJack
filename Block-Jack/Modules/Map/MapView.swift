@@ -35,79 +35,70 @@ struct MapView: View {
             }
         }
     }
-    
+    // Haritanın sabit içerik yüksekliği — node pozisyonları bu sabitle normalize edilir.
+    // GeometryReader.size.height ScrollView içinde güvenilmez.
+    private let mapHeight: CGFloat = 980
+
     var body: some View {
         ZStack {
-            // 1. Architectural Surface Background
-            ThemeColors.surface
-                .ignoresSafeArea()
-            
-            // Subtle Grid Pattern (Luminescent Style)
+            ThemeColors.surface.ignoresSafeArea()
             GridPattern()
                 .stroke(ThemeColors.outlineVariant.opacity(0.15), lineWidth: 1)
                 .ignoresSafeArea()
-            
-            // Scanning Line Overlay (Tech Detail)
-            ScanningLine()
-                .ignoresSafeArea()
-            
+            ScanningLine().ignoresSafeArea()
+
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     GeometryReader { geometry in
                         let width = geometry.size.width
-                        let height = geometry.size.height
-                        
-                        // 2. Ethereal Connection Lines
-                        drawConnections(width: width, height: height)
-                        
-                        // 3. Tech Nodes
-                        drawNodes(width: width, height: height)
+                        // Yukseklik: sabit mapHeight kullan, geometry.size.height degil
+                        drawConnections(width: width, height: mapHeight)
+                        drawNodes(width: width, height: mapHeight)
                     }
-                    // Map alanı: node’lar normalized olduğundan burada sabit bir
-                    // içerik yüksekliği veriyoruz ki scroll/focus mümkün olsun.
-                    .frame(height: 980)
+                    .frame(height: mapHeight)
                     .padding(.top, 100)
                     .padding(.bottom, 60)
                 }
+                // Start node y=0.92 (alt) oldugu icin ScrollView alttan baslar
+                .defaultScrollAnchor(.bottom)
                 .onAppear {
-                    // Map açılışında kullanıcı hangi stage’deyse oraya fokuslan.
-                    // İlk layout’un oturması için kısa bir gecikme veriyoruz.
+                    AudioManager.shared.playMusic(.menu)
+                    // Aktif node'a scroll
                     let target = viewModel.preferredFocusNodeId
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        guard let id = target else { return }
-                        withAnimation(.easeOut(duration: 0.45)) {
+                    guard let id = target else { return }
+                    proxy.scrollTo(id, anchor: .center)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        withAnimation(.easeOut(duration: 0.4)) {
                             proxy.scrollTo(id, anchor: .center)
                         }
                     }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        proxy.scrollTo(id, anchor: .center)
+                    }
                 }
             }
-            
-            // 4. Pearl HUD
+
             VStack {
                 statsHeaderHUD
                 Spacer()
             }
-            
-            // 5. Selection Panel (Pearl/Glass container)
+
             if let selected = viewModel.selectedNode {
                 nodeSelectionPanel(for: selected)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(2)
             }
-            
-            // 6. Navigation
+
             VStack {
                 Spacer()
                 HStack {
-                    Button(action: {
-                        viewModel.handleExitPressed()
-                    }) {
+                    Button(action: { viewModel.handleExitPressed() }) {
                         HStack {
                             Image(systemName: viewModel.isChapterCleared ? "map.fill" : "chevron.left")
                             Text(
                                 viewModel.isChapterCleared
-                                ? userEnv.localizedString("DÜNYA HARİTASI", "WORLD MAP")
-                                : userEnv.localizedString("ANA MENÜ", "MAIN MENU")
+                                ? userEnv.localizedString("DUNYA HARITASI", "WORLD MAP")
+                                : userEnv.localizedString("ANA MENU", "MAIN MENU")
                             )
                         }
                         .font(.setCustomFont(name: .ManropeBold, size: 14))
@@ -128,14 +119,27 @@ struct MapView: View {
                 .padding(.bottom, 20)
             }
         }
-        .onAppear {
-            AudioManager.shared.playMusic(.menu)
-        }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.selectedNode?.id)
-    }
-    
+        // iOS geri gesture veya herhangi bir navigasyonla çıkılsa da
+        // mevcut map durumu kaydedilir — ANA MENÜ basma zorunluluğu kalkar.
+        .onDisappear {
+            guard !viewModel.isChapterCleared else { return }
+            SaveManager.shared.updateMapState(
+                slotId: viewModel.slotId,
+                map: viewModel.currentMap,
+                completedNodes: []
+            )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("mapOverlayDidDismiss"))) { _ in
+            if let nodeId = userEnv.pendingMapNodeId {
+                userEnv.pendingMapNodeId = nil
+                viewModel.markNodeCompleted(nodeId)
+            }
+        }
+    }  // end body
+
     // MARK: - Subcomponents
-    
+
     private var statsHeaderHUD: some View {
         VStack(spacing: 0) {
             HStack {
@@ -274,7 +278,11 @@ struct MapView: View {
                 }
                 
                 Button(action: {
-                    viewModel.markNodeCompleted(node.id)
+                    // markNodeCompleted BURADA DEĞİL.
+                    // Oyun kazanılıp HARİTAYA DÖN'e basılınca onAppear'da çağrılır.
+                    // Force-close: onDisappear map'i accessible halde kaydeder,
+                    // pending in-memory kaybolur → kullanıcı tekrar oynayabilir.
+                    userEnv.pendingMapNodeId = node.id
                     onNodeSelected?(node)
                 }) {
                     Text(node.isReplayable

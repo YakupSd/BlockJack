@@ -7,12 +7,19 @@ import SwiftUI
 
 struct PerkSelectionView: View {
     @EnvironmentObject var userEnv: UserEnvironment
+    @StateObject private var saveManager = SaveManager.shared
     
     let slotId: Int
     let characterId: String
     
-    @State private var selectedPerkId: String = "none"
-    
+    @State private var selectedPerkId: String = "golden_stamp"
+
+    /// Sadece bu slotta açık olan perkler
+    private var availablePerks: [StartingPerk] {
+        let unlocked = saveManager.slots.first(where: { $0.id == slotId })?.unlockedPerkIDs ?? StartingPerk.defaultUnlockedIDs
+        return StartingPerk.available.filter { unlocked.contains($0.id) }
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             ThemeColors.backgroundGradient.ignoresSafeArea()
@@ -46,12 +53,26 @@ struct PerkSelectionView: View {
                 // Perk List
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 16) {
-                        ForEach(StartingPerk.available) { perk in
+                        ForEach(availablePerks) { perk in
                             perkRow(perk)
+                        }
+                        // Kilitli perkler hakkında bilgi
+                        let lockedCount = StartingPerk.available.count - availablePerks.count
+                        if lockedCount > 0 {
+                            HStack(spacing: 8) {
+                                Image(systemName: "lock.fill")
+                                Text(userEnv.localizedString(
+                                    "\(lockedCount) perk kilitli — Perk Dükkanı’ndan aç",
+                                    "\(lockedCount) perks locked — unlock in Perk Shop"
+                                ))
+                                .font(.setCustomFont(name: .InterMedium, size: 12))
+                            }
+                            .foregroundStyle(ThemeColors.textMuted)
+                            .padding(.top, 8)
                         }
                     }
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 120) // spacing for start button
+                    .padding(.bottom, 120)
                 }
             }
             

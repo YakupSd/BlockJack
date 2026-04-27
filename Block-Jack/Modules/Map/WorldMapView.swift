@@ -41,19 +41,21 @@ struct WorldMapView: View {
                         .padding(.top, 80)      // üst HUD altı
                         .padding(.bottom, 110)  // alt bar üstü
                 }
-                // Oyuncunun mevcut sektörüne fokuslan. İki aşamalı scroll:
-                // - .task ilk yüklemede (layout hazır olana kadar 350ms bekle)
-                // - playerLevelId değişirse (yeni bölüm kilidi açıldıysa) tekrar
-                // Anchor id'i önce specific ("level_X") sonra generic ("playerNode")
-                // olarak dener; böylece absolute-positioned node'larda
-                // ScrollViewReader'ın kararsız davranışı üçlü fallback ile tolere
-                // edilir.
+                // defaultScrollAnchor(.bottom): ScrollView ilk açılışta
+                // en alta konumlanır. Bu sayede Level 1 (haritanin en altı)
+                // hemen görünür, el ile scroll gerekmez.
+                .defaultScrollAnchor(.bottom)
+                // Oyuncunun mevcut sektörüne fokuslan (multi-step retry).
+                // defaultScrollAnchor ilk görünümü çözer; .task ise
+                // Level 1+ ilerledikten sonra doğru node'a kaydırır.
                 .task(id: vm.playerLevelId) {
-                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    // Hemen dene (genellikle layout hazır)
+                    await focusOnPlayer(proxy: proxy, animated: false)
+                    // Layout yerleşene kadar bekle
+                    try? await Task.sleep(nanoseconds: 200_000_000)
                     await focusOnPlayer(proxy: proxy)
-                    // Bazı cihazlarda ilk scroll layout tamamlanmadan önce
-                    // kaybolabiliyor; ikinci bir retry ile garantileyelim.
-                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    // Bazı cihazlarda bir retry daha gerekiyor
+                    try? await Task.sleep(nanoseconds: 300_000_000)
                     await focusOnPlayer(proxy: proxy, animated: false)
                     didInitialScroll = true
                 }

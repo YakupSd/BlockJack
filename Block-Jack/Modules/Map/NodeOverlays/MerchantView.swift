@@ -225,6 +225,7 @@ struct MerchantView: View {
     private var footerSection: some View {
         Button(action: {
             HapticManager.shared.play(.buttonTap)
+            NotificationCenter.default.post(name: NSNotification.Name("mapOverlayDidDismiss"), object: nil)
             dismiss()
         }) {
             Text(userEnv.localizedString("HARİTAYA DÖN", "BACK TO MAP"))

@@ -21,12 +21,11 @@ struct RestSiteView: View {
     @State private var message = ""
     @State private var safeHouseToastVisible = false
 
-    /// Oyuncu "safe_house" perkine sahip mi?
-    private var hasSafeHouse: Bool {
+    private var safeHouseTier: Int {
         guard let slot = SaveManager.shared.slots.first(where: { $0.id == slotId }) else {
-            return false
+            return 0
         }
-        return slot.activePassivePerks.contains { $0.id == "safe_house" }
+        return slot.activePassivePerks.first(where: { $0.id == "safe_house" })?.tier ?? 0
     }
 
     var body: some View {
@@ -50,7 +49,10 @@ struct RestSiteView: View {
                     }
                 },
                 footer: {
-                    Button(action: { dismiss() }) {
+                    Button(action: {
+                        NotificationCenter.default.post(name: NSNotification.Name("mapOverlayDidDismiss"), object: nil)
+                        dismiss()
+                    }) {
                         Text(hasActed ? "AYRIL" : "ŞİMDİLİK DEĞİL")
                             .font(.headline)
                             .frame(maxWidth: .infinity)
@@ -206,7 +208,7 @@ struct RestSiteView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "shield.lefthalf.filled")
                         .foregroundColor(ThemeColors.electricYellow)
-                    Text(userEnv.localizedString("SAFE HOUSE bonusu: +100 Altın", "SAFE HOUSE bonus: +100 Gold"))
+                    Text(userEnv.localizedString("SAFE HOUSE (L\(safeHouseTier)) bonusu: +\(50 + (safeHouseTier * 50)) Altın", "SAFE HOUSE (L\(safeHouseTier)) bonus: +\(50 + (safeHouseTier * 50)) Gold"))
                         .font(.footnote.weight(.bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
@@ -230,11 +232,15 @@ struct RestSiteView: View {
     // MARK: - Safe House bonusu
 
     private func checkSafeHouseBonus() {
-        guard hasSafeHouse else { return }
+        let tier = safeHouseTier
+        guard tier > 0 else { return }
+        
+        let bonusAmount = 50 + (tier * 50)
+        
         // Gecikmeli olarak uygula, kullanıcı ekranı tanısın
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             HapticManager.shared.play(.success)
-            SaveManager.shared.updateGold(slotId: slotId, amount: 100)
+            SaveManager.shared.updateGold(slotId: slotId, amount: bonusAmount)
             withAnimation { safeHouseToastVisible = true }
 
             // 2.2s sonra toast'u kapat

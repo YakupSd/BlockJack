@@ -59,10 +59,14 @@ struct TreasureRoomView: View {
     
     private func generateOptions() {
         guard let slot = currentSlot else { return }
-        let currentPerkIds = Set(slot.activePassivePerks.map { $0.id })
+        let unlockedIds = Set(slot.unlockedPerkIDs.isEmpty ? StartingPerk.defaultUnlockedIDs : slot.unlockedPerkIDs)
         
-        // Mevcut olmayanlar arasından 3 rastgele seç
-        let pool = PerkEngine.perkPool.filter { !currentPerkIds.contains($0.id) }
+        // Havuz: Sadece slot'ta kilitleri açılmış (unlocked) perkler.
+        // Mevcut perkleri de dahil et (seviye atlamak için), ama tier 3+ olanları ele.
+        let pool = PerkEngine.perkPool.filter { perk in
+            unlockedIds.contains(perk.id) && 
+            (slot.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 0) < 3
+        }
         self.options = Array(pool.shuffled().prefix(3))
     }
     
@@ -131,46 +135,58 @@ struct TreasureRoomView: View {
 
     private var perkOptionsSection: some View {
         VStack(spacing: 14) {
-            ForEach(options) { perk in
-                Button(action: {
-                    SaveManager.shared.addPassivePerk(slotId: slotId, perk: perk)
-                    withAnimation { selectedPerk = perk }
-                    HapticManager.shared.play(.success)
-                }) {
-                    HStack(spacing: 14) {
-                        Text(perk.icon)
-                            .font(.system(size: 34))
-                            .frame(width: 60, height: 60)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+            if options.isEmpty {
+                Text(userEnv.localizedString("Tüm açık özel güçleri topladın!", "You've collected all unlocked powers!"))
+                    .font(.headline)
+                    .foregroundColor(ThemeColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            } else {
+                ForEach(options) { perk in
+                    let currentTier = currentSlot?.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 0
+                    let isOwned = currentTier > 0
+                    
+                    Button(action: {
+                        SaveManager.shared.addPassivePerk(slotId: slotId, perk: perk)
+                        withAnimation { selectedPerk = perk }
+                        HapticManager.shared.play(.success)
+                    }) {
+                        HStack(spacing: 14) {
+                            Text(perk.icon)
+                                .font(.system(size: 34))
+                                .frame(width: 60, height: 60)
+                                .background(Color.white.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(perk.name)
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                            Text(perk.desc)
-                                .font(.caption)
-                                .foregroundColor(ThemeColors.textSecondary)
-                                .lineLimit(3)
-                                .minimumScaleFactor(0.85)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(isOwned ? "LEVEL UP: \(perk.name)" : perk.name)
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                                Text(isOwned 
+                                     ? userEnv.localizedString("L\(currentTier) -> L\(currentTier + 1) seviyesine yükselt.", "Upgrade from L\(currentTier) to L\(currentTier + 1).")
+                                     : perk.desc)
+                                    .font(.caption)
+                                    .foregroundColor(ThemeColors.textSecondary)
+                                    .lineLimit(3)
+                                    .minimumScaleFactor(0.85)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(ThemeColors.neonGreen.opacity(0.4), lineWidth: 1)
+                        )
                     }
-                    .padding(12)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(ThemeColors.neonGreen.opacity(0.4), lineWidth: 1)
-                    )
-                    .shadow(color: ThemeColors.neonGreen.opacity(0.18), radius: 8)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-            }
+            } // close else block
         }
         .padding(.horizontal, 20)
         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -194,7 +210,10 @@ struct TreasureRoomView: View {
     }
 
     private var footerSection: some View {
-        Button(action: { dismiss() }) {
+        Button(action: {
+            NotificationCenter.default.post(name: NSNotification.Name("mapOverlayDidDismiss"), object: nil)
+            dismiss()
+        }) {
             Text(selectedPerk != nil ? "DEVAM ET" : "ATLA")
                 .font(.headline)
                 .frame(maxWidth: .infinity)

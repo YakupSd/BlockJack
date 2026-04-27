@@ -9,6 +9,7 @@ struct GameView: View {
     @StateObject private var vm: GameViewModel
     @EnvironmentObject var userEnv: UserEnvironment
     @Environment(\.dismiss) var dismiss
+    @Environment(\.scenePhase) var scenePhase
 
     // Grid placement için coordinate space
     @State private var gridOrigin: CGPoint = .zero
@@ -249,9 +250,6 @@ struct GameView: View {
             if vm.phase == .bossIntro {
                 BossIntroOverlay(vm: vm)
             }
-            if vm.phase == .chapterComplete {
-                ChapterCompleteOverlay(vm: vm)
-            }
             
             // Tutorial Overlay (independent of phase, but pauses game)
             if vm.showTutorial {
@@ -296,6 +294,8 @@ struct GameView: View {
             vm.gridSpaceConverter = self.gridPosition(from:)
             if vm.phase == .menu {
                 vm.startRound()
+            } else if vm.phase == .playing {
+                vm.resumeGame()
             }
         }
         .onChange(of: vm.particleBurst) { oldValue, event in
@@ -319,6 +319,14 @@ struct GameView: View {
                 let cx = CGFloat(centerCol) * step + cellSize / 2
                 let cy = CGFloat(centerRow) * step + cellSize / 2
                 particleManager.emitOverdriveBoom(centerX: cx, centerY: cy)
+            }
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            if newPhase == .inactive || newPhase == .background {
+                if vm.phase == .playing {
+                    vm.pauseGame()
+                }
+                vm.saveGameState()
             }
         }
         .navigationBarHidden(true)

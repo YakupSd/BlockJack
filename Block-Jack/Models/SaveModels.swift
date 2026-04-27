@@ -143,58 +143,90 @@ struct StartingPerk: Codable, Identifiable, Hashable {
     let icon: String
     let descTR: String
     let descEN: String
-    
+    /// 1 = ücretsiz (slot açılınca gelir), 2/3/4 = gold ile satın alınır
+    var tier: Int = 1
+    /// Tier 1 perkler için 0. Diğerlerinde gold maliyeti.
+    var goldCost: Int = 0
+
+    /// Slot yeni oluşturulduğunda varsayılan açık perk ID'leri (tier 1).
+    static let defaultUnlockedIDs: [String] = ["golden_stamp", "overkill", "safe_house"]
+
     static let available: [StartingPerk] = [
-        StartingPerk(id: "none", nameTR: "Hiçbiri", nameEN: "None", icon: "🚫",
-                    descTR: "Temel başlangıç, güçlendirme yok.", descEN: "Basic start. No bonus."),
-        StartingPerk(id: "blue_pill", nameTR: "Blue Pill", nameEN: "Blue Pill", icon: "item_blue_pill",
-                    descTR: "Mavi bloklar ×2 Chips verir", descEN: "Blue blocks grant ×2 Chips."),
+        // ---- TIER 1: Ücretsiz (3 adet) ----
         StartingPerk(id: "golden_stamp", nameTR: "Golden Stamp", nameEN: "Golden Stamp", icon: "item_golden_stamp",
-                    descTR: "Hedef skor -%15", descEN: "Target score -15%."),
-        StartingPerk(id: "lucky_clover", nameTR: "Lucky Clover", nameEN: "Lucky Clover", icon: "🍀",
-                    descTR: "Streak maxı +10 artırır", descEN: "Streak cap +10."),
-        
-        // Yeni Perkler
-        StartingPerk(id: "momentum", nameTR: "Momentum", nameEN: "Momentum", icon: "⚡",
-                    descTR: "4. seride çift puan verip komboyu sıfırlar", descEN: "On 4th streak: double score and reset combo."),
-        StartingPerk(id: "glass_cannon", nameTR: "Glass Cannon", nameEN: "Glass Cannon", icon: "🔮",
-                    descTR: "Can 1 iken tüm puanlar ×1.5 artar", descEN: "When at 1 life: all scores ×1.5."),
+                    descTR: "Hedef skor -%15", descEN: "Target score -15%.",
+                    tier: 1, goldCost: 0),
         StartingPerk(id: "overkill", nameTR: "Overkill", nameEN: "Overkill", icon: "💥",
-                    descTR: "Kalan puanları bir sonraki tura aktarır", descEN: "Carry leftover score into the next round."),
-        StartingPerk(id: "last_stand", nameTR: "Last Stand", nameEN: "Last Stand", icon: "🛡️",
-                    descTR: "Öldüğünde 1 kereliğine ücretsiz canlanma sunar", descEN: "Revive once for free when you die."),
+                    descTR: "Kalan puanları bir sonraki tura aktarır", descEN: "Carry leftover score into the next round.",
+                    tier: 1, goldCost: 0),
         StartingPerk(id: "safe_house", nameTR: "Safe House", nameEN: "Safe House", icon: "🏕️",
-                    descTR: "Dinlenme alanlarında otomatik +2 Altın", descEN: "Rest sites grant +2 Gold automatically."),
-        StartingPerk(id: "echoes", nameTR: "Echoes", nameEN: "Echoes", icon: "🔊",
-                    descTR: "Tur sonu, en iyi hamlenin puanını tekrar ekler", descEN: "End of round: repeat your best move score."),
-        StartingPerk(id: "wide_load", nameTR: "Wide Load", nameEN: "Wide Load", icon: "📦",
-                    descTR: "Blok haznesine ekstra 4. bir slot açar", descEN: "Unlock an extra 4th tray slot."),
-        StartingPerk(id: "clockwork", nameTR: "Clockwork", nameEN: "Clockwork", icon: "🕰️",
-                    descTR: "Kazanılan süre ilerledikçe bonus çarpan ekler", descEN: "Time gained gradually adds a bonus multiplier."),
-        StartingPerk(id: "sculptor", nameTR: "Sculptor", nameEN: "Sculptor", icon: "🔨",
-                    descTR: "Turda 2 kez bloğu çevirme hakkı verir", descEN: "Rotate blocks up to 2 times per round."),
-        
-        // --- NEW PHASE B PERKS ---
+                    descTR: "Dinlenme alanlarında otomatik +2 Altın", descEN: "Rest sites grant +2 Gold automatically.",
+                    tier: 1, goldCost: 0),
+
+        // ---- TIER 2: 200 Gold ----
+        StartingPerk(id: "blue_pill", nameTR: "Blue Pill", nameEN: "Blue Pill", icon: "item_blue_pill",
+                    descTR: "Mavi bloklar ×2 Chips verir", descEN: "Blue blocks grant ×2 Chips.",
+                    tier: 2, goldCost: 200),
         StartingPerk(id: "lead_pill", nameTR: "Lead Pill", nameEN: "Lead Pill", icon: "item_green_pill",
-                    descTR: "Yeşil bloklar ×2 Chips verir", descEN: "Green blocks grant ×2 Chips."),
+                    descTR: "Yeşil bloklar ×2 Chips verir", descEN: "Green blocks grant ×2 Chips.",
+                    tier: 2, goldCost: 200),
+        StartingPerk(id: "lucky_clover", nameTR: "Lucky Clover", nameEN: "Lucky Clover", icon: "🍀",
+                    descTR: "Streak maxı +10 artırır", descEN: "Streak cap +10.",
+                    tier: 2, goldCost: 200),
+        StartingPerk(id: "momentum", nameTR: "Momentum", nameEN: "Momentum", icon: "⚡",
+                    descTR: "4. seride çift puan verip komboyu sıfırlar", descEN: "On 4th streak: double score and reset combo.",
+                    tier: 2, goldCost: 200),
         StartingPerk(id: "midas_touch", nameTR: "Midas Touch", nameEN: "Midas Touch", icon: "💰✨",
-                    descTR: "Her Flush (Renkli Temizlik) +5 Altın verir", descEN: "Each Flush grants +5 Gold."),
-        StartingPerk(id: "vampiric_core", nameTR: "Vampiric Core", nameEN: "Vampiric Core", icon: "🧛",
-                    descTR: "Her 5000 puanda bir +1 Can şansı verir", descEN: "Every 5000 score: chance to gain +1 Life."),
+                    descTR: "Her Flush (Renkli Temizlik) +5 Altın verir", descEN: "Each Flush grants +5 Gold.",
+                    tier: 2, goldCost: 200),
+
+        // ---- TIER 3: 400 Gold ----
+        StartingPerk(id: "glass_cannon", nameTR: "Glass Cannon", nameEN: "Glass Cannon", icon: "🔮",
+                    descTR: "Can 1 iken tüm puanlar ×1.5 artar", descEN: "When at 1 life: all scores ×1.5.",
+                    tier: 3, goldCost: 400),
+        StartingPerk(id: "last_stand", nameTR: "Last Stand", nameEN: "Last Stand", icon: "🛡️",
+                    descTR: "Öldüğünde 1 kerelik ücretsiz canlanma", descEN: "Revive once for free when you die.",
+                    tier: 3, goldCost: 400),
+        StartingPerk(id: "wide_load", nameTR: "Wide Load", nameEN: "Wide Load", icon: "📦",
+                    descTR: "Blok haznesine ekstra 4. bir slot açar", descEN: "Unlock an extra 4th tray slot.",
+                    tier: 3, goldCost: 400),
+        StartingPerk(id: "sculptor", nameTR: "Sculptor", nameEN: "Sculptor", icon: "🔨",
+                    descTR: "Turda 2 kez bloğu çevirme hakkı verir", descEN: "Rotate blocks up to 2 times per round.",
+                    tier: 3, goldCost: 400),
         StartingPerk(id: "recycler", nameTR: "Recycler", nameEN: "Recycler", icon: "♻️",
-                    descTR: "2+ satır silindiğinde %20 hazne yenileme şansı", descEN: "On 2+ line clear: 20% chance to refresh tray."),
+                    descTR: "2+ satır silinince %20 hazne yenileme şansı", descEN: "On 2+ line clear: 20% chance to refresh tray.",
+                    tier: 3, goldCost: 400),
+
+        // ---- TIER 4: 600 Gold ----
+        StartingPerk(id: "echoes", nameTR: "Echoes", nameEN: "Echoes", icon: "🔊",
+                    descTR: "Tur sonu, en iyi hamlenin puanını tekrar ekler", descEN: "End of round: repeat your best move score.",
+                    tier: 4, goldCost: 600),
+        StartingPerk(id: "clockwork", nameTR: "Clockwork", nameEN: "Clockwork", icon: "🕰️",
+                    descTR: "Kazanılan süre ilerledikçe bonus çarpan ekler", descEN: "Time gained gradually adds a bonus multiplier.",
+                    tier: 4, goldCost: 600),
+        StartingPerk(id: "vampiric_core", nameTR: "Vampiric Core", nameEN: "Vampiric Core", icon: "🧛",
+                    descTR: "Her 5000 puanda bir +1 Can şansı", descEN: "Every 5000 score: chance to gain +1 Life.",
+                    tier: 4, goldCost: 600),
         StartingPerk(id: "chain_pulse", nameTR: "Chain Pulse", nameEN: "Chain Pulse", icon: "📡",
-                    descTR: "Temizlik sonrası komşu kareleri kontrol eder", descEN: "After a clear: checks adjacent squares."),
-        StartingPerk(id: "heavy_duty", nameTR: "Heavy Duty", nameEN: "Heavy Duty", icon: "🏗️",
-                    descTR: "Ağır (Heavy) bloklar ×3 çarpan katkısı sağlar", descEN: "Heavy cells contribute ×3 to multiplier."),
-        StartingPerk(id: "phantom_siphon", nameTR: "Phantom Siphon", nameEN: "Phantom Siphon", icon: "👻🧪",
-                    descTR: "Phantom kare yanına yerleşim +2s kazandırır", descEN: "Placing next to Phantom cell grants +2s."),
-        StartingPerk(id: "double_down", nameTR: "Double Down", nameEN: "Double Down", icon: "✖️2",
-                    descTR: "Son hamlede temizlik yapılırsa +3 hamle verir", descEN: "If you clear on your last move: +3 moves."),
+                    descTR: "Temizlik sonrası komşu kareleri kontrol eder", descEN: "After a clear: checks adjacent squares.",
+                    tier: 4, goldCost: 600),
         StartingPerk(id: "static_charge", nameTR: "Static Charge", nameEN: "Static Charge", icon: "🔌",
-                    descTR: "Static kareler overdrive barını hızla doldurur", descEN: "Static cells rapidly charge overdrive."),
+                    descTR: "Static kareler overdrive barını hızla doldurur", descEN: "Static cells rapidly charge overdrive.",
+                    tier: 4, goldCost: 600),
+
+        // ---- TIER 5: 800 Gold (En Güçlü) ----
+        StartingPerk(id: "heavy_duty", nameTR: "Heavy Duty", nameEN: "Heavy Duty", icon: "🏗️",
+                    descTR: "Ağır (Heavy) bloklar ×3 çarpan katkısı", descEN: "Heavy cells contribute ×3 to multiplier.",
+                    tier: 5, goldCost: 800),
+        StartingPerk(id: "phantom_siphon", nameTR: "Phantom Siphon", nameEN: "Phantom Siphon", icon: "👻🧪",
+                    descTR: "Phantom kare yanına yerleşim +2s kazandırır", descEN: "Placing next to Phantom cell grants +2s.",
+                    tier: 5, goldCost: 800),
+        StartingPerk(id: "double_down", nameTR: "Double Down", nameEN: "Double Down", icon: "✖️2",
+                    descTR: "Son hamlede temizlik yapılırsa +3 hamle verir", descEN: "If you clear on your last move: +3 moves.",
+                    tier: 5, goldCost: 800),
         StartingPerk(id: "tactical_lens", nameTR: "Tactical Lens", nameEN: "Tactical Lens", icon: "🔍",
-                    descTR: "En iyi yerleşimi 10sn aralıkla vurgular", descEN: "Highlights best placement every 10s.")
+                    descTR: "En iyi yerleşimi 10sn aralıkla vurgular", descEN: "Highlights best placement every 10s.",
+                    tier: 5, goldCost: 800),
     ]
     
     func displayName(lang: AppLanguage) -> String {
@@ -211,7 +243,7 @@ struct StartingPerk: Codable, Identifiable, Hashable {
             name: displayName(lang: lang),
             icon: self.icon,
             desc: displayDesc(lang: lang),
-            tier: 1,
+            tier: self.tier,
             synergyPartnerIds: []
         )
     }
@@ -331,6 +363,7 @@ struct SaveSlot: Codable, Identifiable {
     // Phase 9: Persistent Map and Run State Data
     var currentChapterMap: ChapterMap?
     var completedNodeIds: [UUID] = []
+    var activeBattleNodeId: UUID? = nil
     var activePassivePerks: [PassivePerk] = []
     var inventory: [ConsumableItem] = []
     var gold: Int = 0
@@ -350,6 +383,10 @@ struct SaveSlot: Codable, Identifiable {
     var recentRuns: [SlotRunEntry] = []
     var lastRunSummary: LastRunSummary? = nil
     
+    // Perk Shop: slot bazında kilit açılmış perk ID'leri.
+    // Yeni kayıtta defaultUnlockedIDs ile başlar, yeni kayıtta sıfırlanır.
+    var unlockedPerkIDs: [String] = StartingPerk.defaultUnlockedIDs
+
     var character: GameCharacter? {
         GameCharacter.roster.first(where: { $0.id == characterId })
     }

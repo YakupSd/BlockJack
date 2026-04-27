@@ -75,8 +75,17 @@ struct MysteryEventView: View {
                 desc: "Yerde tozlu bir kutu buldun. İçinden bir şeyler fısıldıyor.",
                 outcomeDesc: "Rastgele bir Pasif Perk kazandın!",
                 action: { id in
-                    if let perk = PerkEngine.perkPool.randomElement() {
-                        SaveManager.shared.addPassivePerk(slotId: id, perk: perk)
+                    if let slot = SaveManager.shared.slots.first(where: { $0.id == id }) {
+                        let unlockedIds = Set(slot.unlockedPerkIDs.isEmpty ? StartingPerk.defaultUnlockedIDs : slot.unlockedPerkIDs)
+                        let activeIds = Set(slot.activePassivePerks.map { $0.id })
+                        
+                        let availablePerks = PerkEngine.perkPool.filter { perk in
+                            unlockedIds.contains(perk.id) && 
+                            (slot.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 0) < 3
+                        }
+                        if let perk = availablePerks.randomElement() {
+                            SaveManager.shared.addPassivePerk(slotId: id, perk: perk)
+                        }
                     }
                 }
             ),
@@ -184,7 +193,10 @@ struct MysteryEventView: View {
     }
 
     private var footerSection: some View {
-        Button(action: { dismiss() }) {
+        Button(action: {
+            NotificationCenter.default.post(name: NSNotification.Name("mapOverlayDidDismiss"), object: nil)
+            dismiss()
+        }) {
             Text(eventRevealed ? "KABUL ET VE DEVAM ET" : "UZAKLAŞ")
                 .font(.headline)
                 .frame(maxWidth: .infinity)

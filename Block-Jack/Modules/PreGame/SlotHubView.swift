@@ -68,6 +68,9 @@ struct SlotHubView: View {
                         .padding(.top, 10)
                 }
 
+                perkShopButton
+                    .padding(.top, 10)
+
                 Spacer(minLength: 12)
 
                 hubPills
@@ -414,6 +417,50 @@ struct SlotHubView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
                             .stroke(ThemeColors.neonCyan.opacity(0.35), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 32)
+    }
+
+    private var perkShopButton: some View {
+        Button {
+            HapticManager.shared.play(.selection)
+            MainViewsRouter.shared.push(
+                PerkShopView(slotId: slotId).environmentObject(UserEnvironment.shared)
+            )
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .bold))
+                Text(userEnv.localizedString("PERK DÜKKANI", "PERK SHOP"))
+                    .font(.setCustomFont(name: .InterBold, size: 14))
+                    .tracking(3)
+                Spacer()
+                // Kilitli perk sayısı badge
+                let locked = StartingPerk.available.filter {
+                    $0.tier > 1 && !(slot?.unlockedPerkIDs.contains($0.id) ?? false)
+                }.count
+                if locked > 0 {
+                    Text("\(locked) kilitli")
+                        .font(.setCustomFont(name: .InterBold, size: 10))
+                        .foregroundStyle(ThemeColors.electricYellow)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(ThemeColors.electricYellow.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+            .foregroundStyle(ThemeColors.electricYellow)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(ThemeColors.electricYellow.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(ThemeColors.electricYellow.opacity(0.35), lineWidth: 1)
                     )
             )
         }

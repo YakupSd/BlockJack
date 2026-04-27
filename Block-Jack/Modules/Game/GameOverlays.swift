@@ -53,6 +53,8 @@ struct GameOverOverlay: View {
                     // Tüm canlar bitti → Özet ekranı göster, sonra Dashboard'a dön
                     Button {
                         HapticManager.shared.play(.buttonTap)
+                        // Run bitti → pending node'u iptal et (oynamadı, gerekmiyor)
+                        UserEnvironment.shared.pendingMapNodeId = nil
                         if let summary = SaveManager.shared.slots
                             .first(where: { $0.id == vm.activeSlotId })?.lastRunSummary {
                             MainViewsRouter.shared.push(
@@ -230,6 +232,8 @@ struct PauseOverlay: View {
                 footer: {
                     Button {
                         HapticManager.shared.play(.buttonTap)
+                        // Hub'a dönülce pending node iptal — kullanıcı tekrar oynayabilir
+                        UserEnvironment.shared.pendingMapNodeId = nil
                         vm.saveGameState()
                         MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
                     } label: {
@@ -354,65 +358,7 @@ struct BossIntroOverlay: View {
     }
 }
 
-// MARK: - Chapter Complete Overlay
-struct ChapterCompleteOverlay: View {
-    @ObservedObject var vm: GameViewModel
-    @EnvironmentObject var userEnv: UserEnvironment
-    
-    var chapterNumber: Int {
-        // Round 6 başlıyorsa Chapter 2'ye geçiliyor demektir
-        (vm.run.currentRound - 1) / 5 + 1
-    }
-    
-    var body: some View {
-        ZStack {
-            ThemeColors.backgroundGradient.ignoresSafeArea()
-            Color.black.opacity(0.6).ignoresSafeArea()
-            
-            VStack(spacing: 24) {
-                Text(userEnv.localizedString("BÖLÜM TAMAMLANDI", "CHAPTER CLEARED"))
-                    .font(.setCustomFont(name: .InterBlack, size: 28))
-                    .foregroundStyle(ThemeColors.success)
-                    .tracking(4)
-                
-                Text(userEnv.localizedString("Bölüm \(chapterNumber - 1) bitti.", "Chapter \(chapterNumber - 1) complete."))
-                    .font(.setCustomFont(name: .InterMedium, size: 18))
-                    .foregroundStyle(ThemeColors.textSecondary)
-                
-                Spacer().frame(height: 20)
-                
-                VStack(spacing: 8) {
-                    Text(userEnv.localizedString("SONRAKİ DURAK:", "NEXT STOP:"))
-                        .font(.setCustomFont(name: .InterBold, size: 14))
-                        .foregroundStyle(ThemeColors.textMuted)
-                    
-                    Text(userEnv.localizedString("BÖLÜM \(chapterNumber)", "CHAPTER \(chapterNumber)"))
-                        .font(.setCustomFont(name: .InterBlack, size: 40))
-                        .foregroundStyle(ThemeColors.neonCyan)
-                        .shadow(color: ThemeColors.neonCyan, radius: 10)
-                }
-                
-                Spacer().frame(height: 40)
-                
-                Button {
-                    // Post-run standard: chapter bitti → mini map state’i temizle,
-                    // WorldMap’e dön ve bir sonraki level’ı oradan seç.
-                    SaveManager.shared.clearChapterMap(slotId: vm.activeSlotId)
-                    MainViewsRouter.shared.popToWorldMap(slotId: vm.activeSlotId)
-                } label: {
-                    Text(userEnv.localizedString("DEVAM ET", "CONTINUE"))
-                        .font(.setCustomFont(name: .InterExtraBold, size: 24))
-                        .foregroundStyle(ThemeColors.cosmicBlack)
-                        .frame(height: 60)
-                        .padding(.horizontal, 40)
-                        .background(ThemeColors.neonCyanGradient)
-                        .clipShape(Capsule())
-                        .shadow(color: ThemeColors.neonCyan.opacity(0.6), radius: 10)
-                }
-            }
-        }
-    }
-}
+
 
 // MARK: - Tutorial Overlay
 struct TutorialOverlay: View {

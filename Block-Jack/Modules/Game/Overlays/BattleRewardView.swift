@@ -54,7 +54,10 @@ struct BattleRewardView: View {
                 },
                 footer: {
                     if hasClaimed {
-                        Button(action: onClaim) {
+                        Button(action: {
+                            NotificationCenter.default.post(name: NSNotification.Name("mapOverlayDidDismiss"), object: nil)
+                            onClaim()
+                        }) {
                             Text(userEnv.localizedString("DEVAM ET", "CONTINUE"))
                                 .font(.custom("Outfit-Bold", size: 18))
                                 .frame(maxWidth: .infinity)
@@ -146,8 +149,13 @@ struct BattleRewardView: View {
                 }
             ))
         } else {
-            if let perk = PerkEngine.perkPool.randomElement() {
-                let slot = SaveManager.shared.slots.first(where: { $0.id == slotId })
+            let slot = SaveManager.shared.slots.first(where: { $0.id == slotId })
+            let unlockedIds = Set(slot?.unlockedPerkIDs.isEmpty == false ? slot!.unlockedPerkIDs : StartingPerk.defaultUnlockedIDs)
+            
+            // Sadece açık olan perkler havuzda
+            let availablePerks = PerkEngine.perkPool.filter { unlockedIds.contains($0.id) }
+            
+            if let perk = availablePerks.randomElement() {
                 let isOwned = slot?.activePassivePerks.contains { $0.id == perk.id } ?? false
                 let tier = slot?.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 1
 
