@@ -235,6 +235,20 @@ class UserEnvironment: ObservableObject {
             syncWithSlot()
         }
     }
+    
+    // MARK: - Core Perk Upgrade Levels (Phase 13)
+    @Published var perkUpgradeLevels: [String: Int] {
+        didSet {
+            savePerkUpgrades()
+        }
+    }
+    
+    // MARK: - Owned One-Time Perks (Tier 2-3) (Phase 13)
+    @Published var ownedPerkIDs: Set<String> {
+        didSet {
+            saveOwnedPerks()
+        }
+    }
 
     // MARK: - Phase 8: Retention (Daily Reward / Achievements / Leaderboard)
 
@@ -376,6 +390,25 @@ class UserEnvironment: ObservableObject {
         } else {
             self.goldUpgradeLevels = [:]
         }
+        
+        if let data = UserDefaults.standard.data(forKey: "perkUpgradeLevels"),
+           let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
+            self.perkUpgradeLevels = decoded
+        } else {
+            self.perkUpgradeLevels = [
+                "golden_stamp": 1,
+                "overkill": 1,
+                "safe_house": 1
+            ]
+        }
+        
+        if let data = UserDefaults.standard.data(forKey: "ownedPerkIDs"),
+           let decoded = try? JSONDecoder().decode(Set<String>.self, from: data) {
+            self.ownedPerkIDs = decoded
+        } else {
+            // Tier 1 perks are owned by default
+            self.ownedPerkIDs = ["golden_stamp", "overkill", "safe_house"]
+        }
 
         // Phase 8 retention state
         self.lastDailyClaimTimestamp = UserDefaults.standard.double(forKey: "lastDailyClaimTimestamp")
@@ -434,8 +467,13 @@ class UserEnvironment: ObservableObject {
         self.trialRunUsedToday = UserDefaults.standard.object(forKey: "trialRunUsedToday") as? Bool ?? false
 
         // 2. Perform post-init logic (Testing Boost etc.)
+        if self.gold < 10000 {
+            self.gold = 10000
+            UserDefaults.standard.set(10000, forKey: "playerGold")
+        }
         if self.diamonds < 50000 {
             self.diamonds = 50000
+            UserDefaults.standard.set(50000, forKey: "playerDiamonds")
         }
     }
 
@@ -504,6 +542,18 @@ class UserEnvironment: ObservableObject {
         goldUpgradeLevels[upgrade.rawValue] = nextLevel
         syncWithSlot()
         return true
+    }
+    
+    func savePerkUpgrades() {
+        if let data = try? JSONEncoder().encode(perkUpgradeLevels) {
+            UserDefaults.standard.set(data, forKey: "perkUpgradeLevels")
+        }
+    }
+    
+    func saveOwnedPerks() {
+        if let data = try? JSONEncoder().encode(ownedPerkIDs) {
+            UserDefaults.standard.set(data, forKey: "ownedPerkIDs")
+        }
     }
 
     // MARK: - Phase C Discovery Helpers

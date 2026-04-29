@@ -102,11 +102,18 @@ struct RoundData {
             let bump = 1.6 + Double(bossIndex) * 0.22
             finalTarget *= bump
         } else {
-            finalTarget *= 2.4
+            finalTarget *= 2.1 // Pacing fix: reduced from 2.4 for better accessibility
         }
 
         // Alt sınır: round 1 bile “tek patlatma ile bitmesin”
-        return max(4500, Int(finalTarget.rounded()))
+        var target = max(4500, Int(finalTarget.rounded()))
+        
+        // Phase 13: Golden Stamp reduction
+        let perkLevel = UserEnvironment.shared.perkUpgradeLevels["golden_stamp"] ?? 1
+        let reduction = PerkUpgradeRegistry.tierData(for: .goldenStamp, tier: perkLevel).effectValue
+        target = Int(Double(target) * (1.0 - reduction))
+        
+        return target
     }
 
     static func make(round: Int, worldLevel: Int = 1, modifier: BossModifier? = nil) -> RoundData {
@@ -135,6 +142,7 @@ struct RunState {
     
     // NEW PHASE 1 VARIABLES
     var activePassivePerks: [PassivePerk] = []
+    var activeSynergies: [PerkSynergy] = []
     var inventory: [ConsumableItem] = []
     var currentOverdriveTier: OverdriveTier = .none
     var tensionCount: Int = 0
@@ -142,16 +150,17 @@ struct RunState {
     var currentChapterMap: ChapterMap? = nil
     var completedNodeIds: Set<UUID> = []
     var overkillCarryover: Int = 0
-    var sculptorUses: Int = 0
     var worldLevel: Int = 1 // New: Current world level for scaling
 
-    // Pre-run loadout (1 kez / run)
+    // PRE-RUN LOADOUT (1 kez / run)
     var startingItemApplied: Bool = false
     
     // NEW PERK FLAGS
     var maxTraySlots: Int = 3
     var lastStandUses: Int = 0
     var undyingRageActive: Bool = false
+    var maxRotationUses: Int = 0
+    var currentRotationUses: Int = 0
     
     // MARK: - Lives System (Balatro tarzı)
     var lives: Int = 3
@@ -181,6 +190,7 @@ struct RunState {
         movesUsed = 0
         streak = 0
         halfBonusGiven = false
+        currentRotationUses = maxRotationUses // Reset rotations
         
         if currentRound % 5 == 0 {
             activeModifier = BossModifier.allCases.randomElement()

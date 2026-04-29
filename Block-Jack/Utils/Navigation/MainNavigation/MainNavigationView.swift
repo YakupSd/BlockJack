@@ -308,7 +308,12 @@ extension MainViewsRouter {
     }
     
     func popToMap(slotId: Int) {
-        if let nav = nav, let mapVC = nav.viewControllers.first(where: { String(describing: type(of: $0)).contains("MapView") || String(describing: type(of: $0)).contains("MapHost") }) {
+        // 'WorldMapView' ismi de 'MapView' içerdiği için first(where:) en alttaki (dünya) haritaya atıyordu.
+        // Tersten (last) arayarak ve WorldMapView'ı dışlayarak yerel MapView'ı buluyoruz.
+        if let nav = nav, let mapVC = nav.viewControllers.last(where: { 
+            let name = String(describing: type(of: $0))
+            return (name.contains("MapView") && !name.contains("WorldMapView")) || name.contains("MapHost")
+        }) {
             nav.popToViewController(mapVC, animated: true)
         } else {
             pushToMap(slotId: slotId)

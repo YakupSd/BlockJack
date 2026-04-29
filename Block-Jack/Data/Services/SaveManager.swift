@@ -22,7 +22,14 @@ class SaveManager: ObservableObject {
     func loadSlots() {
         if let data = UserDefaults.standard.data(forKey: defaultsKey),
            let decoded = try? JSONDecoder().decode([SaveSlot].self, from: data) {
-            self.slots = decoded
+            var updatedSlots = decoded
+            // Testing Boost: Existing slots get 5000 gold
+            for i in 0..<updatedSlots.count {
+                if !updatedSlots[i].isEmpty && updatedSlots[i].gold < 5000 {
+                    updatedSlots[i].gold = 5000
+                }
+            }
+            self.slots = updatedSlots
         } else {
             // Initialize 3 empty slots if none exist
             self.slots = [

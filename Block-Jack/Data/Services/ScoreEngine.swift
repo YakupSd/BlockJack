@@ -116,9 +116,9 @@ struct ScoreEngine {
     ) -> ScoreResult {
 
         // --- BASE SCORE ---
-        let cellPoints = clearedCells.count * 40      // Her temizlenen hücre 40 puan
-        let lineClearBonus = (clearedRows + clearedCols) * 350
-        let zoneClearBonus = clearedZones * 500       // Zone artık "bonus", tek başına run taşımasın
+        let cellPoints = clearedCells.count * 65      // Her temizlenen hücre 65 puan (buffed from 40)
+        let lineClearBonus = (clearedRows + clearedCols) * 600 // (buffed from 350)
+        let zoneClearBonus = clearedZones * 800       // (buffed from 500)
         
         let baseScore = cellPoints + lineClearBonus + zoneClearBonus
         
@@ -144,8 +144,13 @@ struct ScoreEngine {
         // Flush detection (Renk uyumu)
         let flush = detectFlush(cells: clearedCells)
         
-        // Streak bonus: her 2 combo +0.75 mult, max +8.0 (daha gurur verici streak)
-        let streakBonus = min(Double(streak / 2) * 0.75, 8.0)
+        // Streak bonus logic: Lucky Clover affects the limit
+        let luckyCloverTier = UserEnvironment.shared.perkUpgradeLevels["lucky_clover"] ?? 0
+        let cloverBonus = PerkUpgradeRegistry.tierData(for: .luckyClover, tier: luckyCloverTier).effectValue
+        let baseStreakLimit = 8.0
+        let finalStreakLimit = baseStreakLimit + (luckyCloverTier > 0 ? cloverBonus * 0.2 : 0) // Scaling limit slightly
+        
+        let streakBonus = min(Double(streak / 2) * 0.75, finalStreakLimit)
         
         // Final multiplier
         let hasAnyClear = totalLines > 0 || clearedZones > 0
@@ -193,13 +198,13 @@ struct ScoreEngine {
     static func timeBonusSeconds(clearCombo: ClearCombo, isFlush: Bool, streakCount: Int) -> Double {
         var bonus: Double
         switch clearCombo {
-        case .single: bonus = 2.0
-        case .double: bonus = 5.0
-        case .triple: bonus = 10.0
-        case .cross:  bonus = 8.0
+        case .single: bonus = 4.0
+        case .double: bonus = 8.0
+        case .triple: bonus = 15.0
+        case .cross:  bonus = 12.0
         // Zone'lar zaten hücre bazında çok değerli; ekstra süre bonusunu da düşür.
-        case .zoneBlast: bonus = 6.0
-        case .megaZone: bonus = 8.0
+        case .zoneBlast: bonus = 10.0
+        case .megaZone: bonus = 12.0
         }
         if isFlush { bonus += 4.0 }
         if streakCount >= 5 { bonus += 3.0 }

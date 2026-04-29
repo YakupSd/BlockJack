@@ -35,8 +35,13 @@ final class GameViewModel: ObservableObject {
     let timer = TimerManager()
 
     var currentMultiplier: Double {
-        // Ambient multiplier based on current streak and joker bonuses
-        let streakBonus = min(Double(run.streak / 3) * 0.5, 3.0)
+        // Streak bonus logic: Lucky Clover affects the limit
+        let luckyCloverTier = run.perkTier("lucky_clover")
+        let cloverBonus = PerkUpgradeRegistry.tierData(for: .luckyClover, tier: luckyCloverTier).effectValue
+        let baseStreakLimit = 8.0
+        let finalStreakLimit = baseStreakLimit + (luckyCloverTier > 0 ? cloverBonus * 0.2 : 0) // Scaling limit slightly
+        
+        let streakBonus = min(Double(run.streak / 2) * 0.75, finalStreakLimit)
         return 1.0 + streakBonus + jokerMultBonus
     }
 
@@ -329,6 +334,7 @@ final class GameViewModel: ObservableObject {
     }
 
     func startRound() {
+        applyMetaPerks()
         board.resetGrid() // FORCE RESET (Reset Bug Fix)
 
         self.setupRoundTargetAndModifiers()
@@ -382,7 +388,7 @@ final class GameViewModel: ObservableObject {
             run.overkillCarryover = 0
         }
         
-        run.sculptorUses = 0 // Reset Sculptor charges
+        run.currentRotationUses = run.maxRotationUses // Reset Sculptor charges
         
         maxRoundScore = 0 // Sıfırla (Echoes Perk)
         
@@ -837,35 +843,44 @@ final class GameViewModel: ObservableObject {
         AudioManager.shared.playSFX(.lineClear)
 
         // 3. Multiplier Calculation
+        let levels = userEnv.perkUpgradeLevels
         var characterMult = jokerMultBonus + run.clockworkBonus
         
         // Lucky Clover Scaling: +0.5 per tier
-        if run.hasPerk("lucky_clover") {
-            let tier = run.perkTier("lucky_clover")
-            characterMult += (0.5 * Double(tier))
+        if let luckyCloverTier = levels["lucky_clover"], luckyCloverTier > 0 {
+            characterMult += (0.5 * Double(luckyCloverTier))
         }
         
-        // Momentum Scaling: x(Tier+1) on 4th streak
-        if run.hasPerk("momentum") && run.tensionCount >= 3 {
-            let tier = run.perkTier("momentum")
-            let bonus = Double(tier + 1)
-            characterMult += bonus
-            run.tensionCount = 0 // Reset
-            addPopup(text: "MOMENTUM LV.\(tier)! +\(Int(bonus))x", color: ThemeColors.electricYellow)
+        // Momentum Scaling: Milestone logic
+        if let momentumTier = levels["momentum"], momentumTier > 0 {
+            let data = PerkUpgradeRegistry.tierData(for: .momentum, tier: momentumTier)
+            let milestone: Int
+            switch momentumTier {
+            case 1: milestone = 3
+            case 2, 3: milestone = 4
+            case 4, 5: milestone = 5
+            default: milestone = 999
+            }
             
-            // SYNERGY: TIME LAPSE (Momentum + Clockwork)
-            if activeSynergies.contains(where: { $0.synergyName == SynergyID.timeLapse }) {
-                timer.addTime(5.0)
-                addPopup(text: "TIME LAPSE! +5s", color: ThemeColors.neonPurple)
+            if run.streak >= milestone {
+                characterMult += data.effectValue
+                run.streak = 0
+                addPopup(text: "MOMENTUM! +\(Int(data.effectValue * 100))% & RESET", color: ThemeColors.electricYellow)
+                haptic.play(.success)
+                
+                // SYNERGY: TIME LAPSE (Momentum + Clockwork)
+                if activeSynergies.contains(where: { $0.synergyName == SynergyID.timeLapse }) {
+                    timer.addTime(5.0)
+                    addPopup(text: "TIME LAPSE! +5s", color: ThemeColors.neonPurple)
+                }
             }
         }
         
         // Glass Cannon Scaling: +0.5 multiplier step per tier
-        if run.hasPerk("glass_cannon") && run.lives == 1 {
-            let tier = run.perkTier("glass_cannon")
-            let bonus = 0.5 + (Double(tier - 1) * 0.5)
+        if let gcTier = levels["glass_cannon"], gcTier > 0 && run.lives == 1 {
+            let bonus = 0.5 + (Double(gcTier - 1) * 0.5)
             characterMult += bonus
-            addPopup(text: "GLASS CANNON LV.\(tier) ACTIVE", color: ThemeColors.neonPink)
+            addPopup(text: "GLASS CANNON ACTIVE", color: ThemeColors.neonPink)
         }
         
         // Heavy Duty (hayalet perk bağlantısı): Temizlikte yer alan her heavy hücre
@@ -958,13 +973,16 @@ final class GameViewModel: ObservableObject {
         let blueCount = clearedCells.filter { if case .filled(let c) = $0.state { return c == .blue } else { return false } }.count
         let greenCount = clearedCells.filter { if case .filled(let c) = $0.state { return c == .green } else { return false } }.count
         
-        if run.hasPerk("blue_pill") && blueCount > 0 {
-            let tier = run.perkTier("blue_pill")
-            chipBonus *= Double(tier + 1)
+        // Blue Pill: Multi-tier multiplier
+        if let tier = levels["blue_pill"], tier > 0, blueCount > 0 {
+            let data = PerkUpgradeRegistry.tierData(for: .bluePill, tier: tier)
+            chipBonus *= (1.0 + data.effectValue)
         }
-        if run.hasPerk("lead_pill") && greenCount > 0 {
-            let tier = run.perkTier("lead_pill")
-            chipBonus *= Double(tier + 1)
+        
+        // Lead Pill: Multi-tier multiplier
+        if let tier = levels["lead_pill"], tier > 0, greenCount > 0 {
+            let data = PerkUpgradeRegistry.tierData(for: .leadPill, tier: tier)
+            chipBonus *= (1.0 + data.effectValue)
         }
         
         // SYNERGY: RAINBOW DOSAGE
@@ -1076,30 +1094,30 @@ final class GameViewModel: ObservableObject {
                     addRunGold(15)
                     AudioManager.shared.playSFX(.coin)
                     addPopup(text: "GOLDEN FEVER +15G", color: ThemeColors.electricYellow)
-                } else if hasMidas {
-                    let tier = run.perkTier("midas_touch")
-                    let amount = 5 * tier
+                } else if let midasTier = levels["midas_touch"], midasTier > 0 {
+                    let data = PerkUpgradeRegistry.tierData(for: .midasTouch, tier: midasTier)
+                    let amount = Int(data.effectValue)
                     addRunGold(amount)
                     AudioManager.shared.playSFX(.coin)
-                    addPopup(text: "MIDAS TOUCH LV.\(tier) +\(amount)G", color: ThemeColors.electricYellow)
+                    addPopup(text: "MIDAS TOUCH +\(amount)G", color: ThemeColors.electricYellow)
                 }
             }
             
             // Recycler
             if scoreResult.clearedRows + scoreResult.clearedCols >= 2 {
-                let hasRecycler = run.hasPerk("recycler")
                 let hasCycle = activeSynergies.contains(where: { $0.synergyName == SynergyID.eternalCycle })
                 var chance = 0.0
+                
                 if hasCycle {
-                    chance = 0.4
-                } else if hasRecycler {
-                    let tier = run.perkTier("recycler")
-                    chance = 0.2 + (Double(tier - 1) * 0.1)
+                    chance = 0.45 // Synergy bonus
+                } else if let recyclerTier = levels["recycler"], recyclerTier > 0 {
+                    let data = PerkUpgradeRegistry.tierData(for: .recycler, tier: recyclerTier)
+                    chance = data.effectValue
                 }
                 
                 if chance > 0 && Double.random(in: 0...1) < chance {
                     refillBlockTray()
-                    let msg = hasCycle ? "ETERNAL CYCLE!" : "RECYCLED LV.\(run.perkTier("recycler"))!"
+                    let msg = hasCycle ? "ETERNAL CYCLE!" : "RECYCLER!"
                     addPopup(text: msg, color: ThemeColors.neonCyan)
                     haptic.play(.success)
                 }
@@ -1351,14 +1369,13 @@ final class GameViewModel: ObservableObject {
         
         // Overkill Scaling: Percent carryover increases with tier
         if run.hasPerk("overkill") {
-            let tier = run.perkTier("overkill")
-            // Level 1: 30%, Level 2: 45%, Level 3: 60%...
-            let percentage = 0.30 + (Double(tier - 1) * 0.15)
+            let globalTier = UserEnvironment.shared.perkUpgradeLevels["overkill"] ?? 1
+            let percentage = PerkUpgradeRegistry.tierData(for: .overkill, tier: globalTier).effectValue
             let rawOverflow = max(0, run.currentScore - run.currentRoundTargetScore)
             let overflow = Int(Double(rawOverflow) * percentage)
             
             run.overkillCarryover = overflow
-            addPopup(text: "OVERKILL LV.\(tier) +\(overflow) NEXT", color: ThemeColors.neonPink)
+            addPopup(text: "OVERKILL LV.\(globalTier) +\(overflow) NEXT", color: ThemeColors.neonPink)
             
             // SYNERGY: ENDLESS RESERVES (Overkill + Echoes)
             if activeSynergies.contains(where: { $0.synergyName == SynergyID.endlessReserves }) {
@@ -1486,32 +1503,32 @@ final class GameViewModel: ObservableObject {
     func rotateSelectedBlock() {
         guard let block = selectedBlock else { return }
         
-        // Sculptor Kontrolü
-        let hasSculptor = run.activePassivePerks.contains(where: { $0.id == "sculptor" })
-        guard hasSculptor else { return }
+        // Sculptor Kontrolü: Multi-tier logic
+        let hasUnlimited = run.maxRotationUses >= 999
+        guard run.maxRotationUses > 0 else { return }
         
         // SYNERGY: MASTER BUILDER (Wide Load + Sculptor)
         let isMasterBuilder = activeSynergies.contains(where: { $0.synergyName == SynergyID.masterBuilder })
         let isFourthSlot = blockTray.firstIndex(where: { $0.id == block.id }) == 3
         
         // Kullanım Sınırı Kontrolü (Master Builder ise 4. slot ücretsiz)
-        let tier = run.perkTier("sculptor")
-        let maxUses = tier * 2
-        if !isMasterBuilder || !isFourthSlot {
-            guard run.sculptorUses < maxUses else {
-                addPopup(text: "HAKKIN BİTTİ (\(maxUses)/\(maxUses))!", color: ThemeColors.neonPink)
+        if !hasUnlimited && (!isMasterBuilder || !isFourthSlot) {
+            guard run.currentRotationUses > 0 else {
+                addPopup(text: userEnv.localizedString("ROTASYON SINIRI!", "ROTATE LIMIT!"), color: ThemeColors.neonPink)
                 return
             }
-            run.sculptorUses += 1
+            run.currentRotationUses -= 1
         } else if isMasterBuilder && isFourthSlot {
             addPopup(text: "FREE ROTATE!", color: ThemeColors.neonPurple)
+        } else if hasUnlimited {
+            addPopup(text: "UNLIMITED!", color: ThemeColors.neonPurple)
         }
         
         if let index = blockTray.firstIndex(where: { $0.id == block.id }) {
             blockTray[index].rotate()
             selectedBlock = blockTray[index]
             haptic.play(.selection)
-            addPopup(text: "DÖNDÜRÜLDÜ!", color: ThemeColors.neonCyan)
+            addPopup(text: userEnv.localizedString("DÖNDÜRÜLDÜ!", "ROTATED!"), color: ThemeColors.neonCyan)
         }
     }
 
@@ -1697,7 +1714,31 @@ final class GameViewModel: ObservableObject {
         guard let index = blockTray.firstIndex(where: { $0.id == id }) else { return }
         var block = blockTray[index]
         
-        if block.isRotatable {
+        // Sculptor Perk Check: Multi-tier logic
+        let hasUnlimited = run.maxRotationUses >= 999
+        
+        if run.maxRotationUses > 0 {
+            if !hasUnlimited && run.currentRotationUses <= 0 {
+                haptic.play(.error)
+                addPopup(text: userEnv.localizedString("ROTASYON SINIRI!", "ROTATE LIMIT!"), color: ThemeColors.textMuted)
+                return
+            }
+            
+            if block.isRotatable {
+                block.rotate()
+                blockTray[index] = block
+                
+                if !hasUnlimited {
+                    run.currentRotationUses -= 1
+                    addPopup(text: "SCULPTOR (\(run.currentRotationUses))", color: ThemeColors.neonCyan)
+                } else {
+                    addPopup(text: "UNLIMITED!", color: ThemeColors.neonPurple)
+                }
+                
+                haptic.play(.buttonTap)
+            }
+        } else if block.isRotatable {
+            // Standart rotasyon (bazı özel bloklar için)
             block.rotate()
             blockTray[index] = block
             haptic.play(.buttonTap)
@@ -2060,6 +2101,50 @@ final class GameViewModel: ObservableObject {
         enemyTrayUnlockTimer = nil
         enemy.isTrayLocked = false
         showEnemyAttackWarning = false
+    }
+
+    private func applyMetaPerks() {
+        // Clear previous injections to prevent stacking if this is called multiple times
+        run.activePassivePerks.removeAll { perk in
+            PerkEngine.perkCatalog.map { $0.id }.contains(perk.id)
+        }
+        
+        let levels = userEnv.perkUpgradeLevels
+        
+        // --- HARD-WIRED MECHANIC PERKS ---
+        
+        // Wide Load: Increases tray capacity
+        let wideLoadTier = levels["wide_load"] ?? 0
+        let wideLoadData = PerkUpgradeRegistry.tierData(for: .wideLoad, tier: wideLoadTier)
+        run.maxTraySlots = Int(wideLoadData.effectValue)
+        
+        // Sculptor: Rotation uses per round
+        let sculptorTier = levels["sculptor"] ?? 0
+        let sculptorData = PerkUpgradeRegistry.tierData(for: .sculptor, tier: sculptorTier)
+        run.maxRotationUses = Int(sculptorData.effectValue)
+        run.currentRotationUses = run.maxRotationUses
+        
+        // Last Stand: Revive uses
+        let lastStandTier = levels["last_stand"] ?? 0
+        if lastStandTier > 0 {
+            run.lastStandUses = 1 // Basic Last Stand is non-upgradeable binary for now
+        } else {
+            run.lastStandUses = 0
+        }
+        
+        // --- PASSIVE PERKS INJECTION ---
+        // Inject all owned perks into the run with their current tiers
+        for (perkID, tier) in levels where tier > 0 {
+            // These are already handled as hard-wired or special logic in game loop:
+            // wide_load, last_stand, sculptor. 
+            // We still inject them as passives for UI/Synergy purposes.
+            if let perk = PerkEngine.perk(for: perkID, lang: userEnv.language, tier: tier) {
+                run.activePassivePerks.append(perk)
+            }
+        }
+        
+        // Re-evaluate synergies based on newly injected perks
+        run.activeSynergies = PerkEngine.evaluateSynergies(perks: run.activePassivePerks)
     }
 }
 

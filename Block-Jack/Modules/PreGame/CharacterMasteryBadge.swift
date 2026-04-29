@@ -35,10 +35,11 @@ struct CharacterMasteryBadge: View {
                     shadow: ThemeColors.electricYellow.opacity(0.9)
                 )
             } else {
-                // Ch5/10/15 katmanlı rozet + yanında current chapter
+                // Chapter badge
+                let chapterLabel = userEnv.localizedString("BÖLÜM", "CHAPTER")
                 masteryBadge(
                     icon: tier.icon,
-                    text: "\(tier.label) • CH \(chapter)",
+                    text: "\(tier.label) • \(chapterLabel) \(chapter)",
                     foreground: tier.color,
                     background: LinearGradient(
                         colors: [tier.color.opacity(0.18), tier.color.opacity(0.06)],
@@ -87,11 +88,12 @@ enum CharacterMasteryTier: Int, CaseIterable {
     }
 
     var label: String {
+        let isTR = UserEnvironment.shared.language == .turkish
         switch self {
-        case .bronze: return "BRONZE"
-        case .silver: return "SILVER"
-        case .gold: return "GOLD"
-        case .master: return "MASTER"
+        case .bronze: return isTR ? "BRONZ" : "BRONZE"
+        case .silver: return isTR ? "GÜMÜŞ" : "SILVER"
+        case .gold: return isTR ? "ALTIN" : "GOLD"
+        case .master: return isTR ? "USTA" : "MASTER"
         case .none: return ""
         }
     }

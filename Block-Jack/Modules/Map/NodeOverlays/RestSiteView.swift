@@ -22,10 +22,8 @@ struct RestSiteView: View {
     @State private var safeHouseToastVisible = false
 
     private var safeHouseTier: Int {
-        guard let slot = SaveManager.shared.slots.first(where: { $0.id == slotId }) else {
-            return 0
-        }
-        return slot.activePassivePerks.first(where: { $0.id == "safe_house" })?.tier ?? 0
+        // Phase 13: Meta-upgraded tier
+        return userEnv.perkUpgradeLevels["safe_house"] ?? 1
     }
 
     var body: some View {
@@ -208,7 +206,8 @@ struct RestSiteView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "shield.lefthalf.filled")
                         .foregroundColor(ThemeColors.electricYellow)
-                    Text(userEnv.localizedString("SAFE HOUSE (L\(safeHouseTier)) bonusu: +\(50 + (safeHouseTier * 50)) Altın", "SAFE HOUSE (L\(safeHouseTier)) bonus: +\(50 + (safeHouseTier * 50)) Gold"))
+                    let bonus = Int(PerkUpgradeRegistry.tierData(for: .safeHouse, tier: safeHouseTier).effectValue)
+                    Text(userEnv.localizedString("SAFE HOUSE (L\(safeHouseTier)) bonusu: +\(bonus) Altın", "SAFE HOUSE (L\(safeHouseTier)) bonus: +\(bonus) Gold"))
                         .font(.footnote.weight(.bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
@@ -233,9 +232,13 @@ struct RestSiteView: View {
 
     private func checkSafeHouseBonus() {
         let tier = safeHouseTier
-        guard tier > 0 else { return }
+        // Check if the perk is actually active for this run
+        guard let slot = SaveManager.shared.slots.first(where: { $0.id == slotId }),
+              slot.selectedPerkId == "safe_house" || slot.activePassivePerks.contains(where: { $0.id == "safe_house" }) else {
+            return
+        }
         
-        let bonusAmount = 50 + (tier * 50)
+        let bonusAmount = Int(PerkUpgradeRegistry.tierData(for: .safeHouse, tier: tier).effectValue)
         
         // Gecikmeli olarak uygula, kullanıcı ekranı tanısın
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
