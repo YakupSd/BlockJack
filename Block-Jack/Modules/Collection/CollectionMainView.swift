@@ -109,7 +109,7 @@ struct CollectionMainView: View {
             
             // Percentage
             VStack(alignment: .trailing, spacing: 2) {
-                let totalItems = PerkEngine.perkPool.count + BossRegistry.shared.bossesSnapshot.count
+                let totalItems = PerkEngine.getPerkPool(lang: userEnv.language).count + BossRegistry.shared.bossesSnapshot.count
                 let discovered = userEnv.discoveredPerkIDs.count + userEnv.discoveredBossIDs.count
                 let percent = totalItems > 0 ? (discovered * 100 / totalItems) : 0
                 
@@ -161,7 +161,7 @@ struct CollectionMainView: View {
     // MARK: - Tab Content
     
     private var perksTab: some View {
-        let allPerks = PerkEngine.perkPool
+        let allPerks = PerkEngine.getPerkPool(lang: userEnv.language)
         let columns = [GridItem(.adaptive(minimum: 80), spacing: 16)]
         
         return LazyVGrid(columns: columns, spacing: 20) {
@@ -387,7 +387,7 @@ struct CollectionMainView: View {
             StatRow(title: userEnv.localizedString("Toplam Altın Kazancı", "Total Gold Earned"), value: "\(userEnv.totalGoldEarned.formatted())", icon: "dollarsign.circle.fill", color: ThemeColors.electricYellow)
             StatRow(title: userEnv.localizedString("Temizlenen Satırlar", "Lines Cleared"), value: "\(userEnv.totalLinesCleared.formatted())", icon: "trapezoid.and.line.horizontal", color: ThemeColors.neonCyan)
             StatRow(title: userEnv.localizedString("Yenilen Bosslar", "Bosses Defeated"), value: "\(userEnv.totalBossesDefeated.formatted())", icon: "shield.fill", color: ThemeColors.neonPink)
-            StatRow(title: userEnv.localizedString("Keşfedilen Perkler", "Perks Discovered"), value: "\(userEnv.discoveredPerkIDs.count) / \(PerkEngine.perkPool.count)", icon: "sparkles", color: ThemeColors.neonPurple)
+            StatRow(title: userEnv.localizedString("Keşfedilen Perkler", "Perks Discovered"), value: "\(userEnv.discoveredPerkIDs.count) / \(PerkEngine.getPerkPool(lang: userEnv.language).count)", icon: "sparkles", color: ThemeColors.neonPurple)
             StatRow(title: userEnv.localizedString("Giriş Serisi", "Login Streak"), value: "\(userEnv.dailyStreak) \(userEnv.localizedString("gün", "days"))", icon: "calendar.badge.checkmark", color: ThemeColors.neonCyan)
         }
     }

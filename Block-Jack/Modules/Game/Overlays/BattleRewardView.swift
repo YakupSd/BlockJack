@@ -154,7 +154,7 @@ struct BattleRewardView: View {
             let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
             
             // Sadece açık olan perkler havuzda
-            let availablePerks = PerkEngine.perkPool.filter { unlockedIds.contains($0.id) }
+            let availablePerks = PerkEngine.getPerkPool(lang: userEnv.language).filter { unlockedIds.contains($0.id) }
             
             if let perk = availablePerks.randomElement() {
                 let isOwned = slot?.activePassivePerks.contains { $0.id == perk.id } ?? false

@@ -774,6 +774,29 @@ final class GameViewModel: ObservableObject {
         SaveManager.shared.updateSave(slotId: activeSlotId, score: run.currentScore, round: run.currentRound)
     }
 
+    func syncPerksWithSlot() {
+        guard let slot = SaveManager.shared.slots.first(where: { $0.id == activeSlotId }) else { return }
+        
+        // Slot'taki güncel aktif perkleri RunState'e aktar
+        self.run.activePassivePerks = slot.activePassivePerks
+        
+        // Sinerjileri tekrar hesapla
+        self.activeSynergies = PerkEngine.evaluateSynergies(perks: self.run.activePassivePerks)
+        self.run.activeSynergies = self.activeSynergies
+        
+        // ÖNEMLİ: Eğer Golden Stamp gibi target etkileyen bir perk güncellendiyse
+        // hedef skoru anında revize et (oyun devam ederken etki etmesi için).
+        setupRoundTargetAndModifiers()
+        
+        // Wide Load gibi slot kapasitesini değiştiren perkler için:
+        if run.hasPerk("wide_load") {
+            let tier = run.perkTier("wide_load")
+            run.maxTraySlots = Int(PerkUpgradeRegistry.tierData(for: .wideLoad, tier: tier).effectValue)
+        }
+        
+        objectWillChange.send()
+    }
+
     // MARK: - Timed Multiplier Logic
     
     private func startMultiplierTimer() {

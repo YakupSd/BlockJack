@@ -28,9 +28,20 @@ enum PerkUpgradeID: String, Codable, CaseIterable {
     case sculptor = "sculptor"
     case glassCannon = "glass_cannon"
     
-    // Special (One-Time)
+    // Category 3: Special (One-Time)
     case lastStand = "last_stand"
     case recycler = "recycler"
+    
+    // Category 4: Elite (Tier 1 must be PURCHASED)
+    case echoes = "echoes"
+    case clockwork = "clockwork"
+    case vampiricCore = "vampiric_core"
+    case chainPulse = "chain_pulse"
+    case staticCharge = "static_charge"
+    case heavyDuty = "heavy_duty"
+    case phantomSiphon = "phantom_siphon"
+    case doubleDown = "double_down"
+    case tacticalLens = "tactical_lens"
 }
 
 enum PerkCategory: String, CaseIterable, Codable {
@@ -132,6 +143,51 @@ struct PerkUpgradeRegistry {
             
         case .recycler:
             return PerkUpgradeTierData(tier: 1, goldCost: 450, diamondCost: 45, effectValue: 0.25)
+            
+        case .echoes:
+            let values = [0: 0.0, 1: 1.0, 2: 1.25, 3: 1.5, 4: 1.75, 5: 2.0]
+            let gold = [1: 600, 2: 700, 3: 850, 4: 1100, 5: 1500]
+            return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: 0, effectValue: values[safeTier] ?? 0.0)
+            
+        case .clockwork:
+            let values = [0: 0.0, 1: 0.05, 2: 0.10, 3: 0.15, 4: 0.20, 5: 0.30]
+            let gold = [1: 600, 2: 700, 3: 850, 4: 1100, 5: 1500]
+            return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: 0, effectValue: values[safeTier] ?? 0.0)
+            
+        case .vampiricCore:
+            let values = [0: 0.0, 1: 0.10, 2: 0.15, 3: 0.20, 4: 0.25, 5: 0.40]
+            let gold = [1: 600, 2: 700, 3: 850, 4: 1100, 5: 1500]
+            return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: 0, effectValue: values[safeTier] ?? 0.0)
+            
+        case .chainPulse:
+            let values = [0: 0.0, 1: 0.20, 2: 0.30, 3: 0.40, 4: 0.50, 5: 0.75]
+            let gold = [1: 600, 2: 700, 3: 850, 4: 1100, 5: 1500]
+            return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: 0, effectValue: values[safeTier] ?? 0.0)
+            
+        case .staticCharge:
+            let values = [0: 0.0, 1: 1.0, 2: 1.2, 3: 1.5, 4: 1.8, 5: 2.5]
+            let gold = [1: 600, 2: 700, 3: 850, 4: 1100, 5: 1500]
+            return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: 0, effectValue: values[safeTier] ?? 0.0)
+            
+        case .heavyDuty:
+            let values = [0: 0.0, 1: 1.5, 2: 2.0, 3: 2.5, 4: 3.5, 5: 5.0]
+            let gold = [1: 800, 2: 950, 3: 1100, 4: 1400, 5: 2000]
+            return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: 0, effectValue: values[safeTier] ?? 0.0)
+            
+        case .phantomSiphon:
+            let values = [0: 0.0, 1: 2.0, 2: 3.0, 3: 4.0, 4: 6.0, 5: 10.0]
+            let gold = [1: 800, 2: 950, 3: 1100, 4: 1400, 5: 2000]
+            return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: 0, effectValue: values[safeTier] ?? 0.0)
+            
+        case .doubleDown:
+            let values = [0: 0.0, 1: 1.0, 2: 2.0, 3: 3.0, 4: 4.0, 5: 5.0]
+            let gold = [1: 800, 2: 950, 3: 1100, 4: 1400, 5: 2000]
+            return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: 0, effectValue: values[safeTier] ?? 0.0)
+            
+        case .tacticalLens:
+            let values = [0: 0.0, 1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0, 5: 1.0]
+            let gold = [1: 800, 2: 950, 3: 1100, 4: 1400, 5: 2000]
+            return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: 0, effectValue: values[safeTier] ?? 0.0)
         }
     }
     
@@ -156,6 +212,15 @@ struct PerkUpgradeRegistry {
             else { return "HP<=3 -> x\(v.formatted()) Score" }
         case .lastStand: return "One free revive per run"
         case .recycler: return "\(Int(v * 100))% chance to refresh storage"
+        case .echoes: return "Repeat best move score (x\(v.formatted()))"
+        case .clockwork: return "Time bonus adds multiplier (+\(Int(v * 100))%)"
+        case .vampiricCore: return "\(Int(v * 100))% chance for +1 Life every 5k pts"
+        case .chainPulse: return "\(Int(v * 100))% chance for chain reaction"
+        case .staticCharge: return "Static cells charge overdrive x\(v.formatted())"
+        case .heavyDuty: return "Heavy cells multiplier x\(v.formatted())"
+        case .phantomSiphon: return "Phantom cells grant +\(Int(v))s time"
+        case .doubleDown: return "Clear on last move: +\(Int(v)) extra moves"
+        case .tacticalLens: return "Highlights the best placement on grid"
         }
     }
     

@@ -203,6 +203,7 @@ struct TreasureRoomView: View {
     }
 
     private var rewardClaimedSection: some View {
+        VStack(spacing: 20) {
             if let icon = selectedPerk?.icon, icon.hasPrefix("perk_") || icon.hasPrefix("item_") {
                 Image(icon)
                     .resizable()

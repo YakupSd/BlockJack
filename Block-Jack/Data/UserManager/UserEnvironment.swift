@@ -559,13 +559,13 @@ class UserEnvironment: ObservableObject {
     func loadFromSlot(_ slot: SaveSlot) {
         self.activeSlotId = slot.id
         self.unlockedWorldLevel = slot.unlockedWorldLevel
-        // Meta ve Gold upgradeleri global kalmalı, slot'tan yüklenmemeli!
-        // Aksi halde yeni save açıldığında hepsi sıfırlanır.
+        
+        // Slot bazlı geliştirmeler:
+        self.goldUpgradeLevels = slot.goldUpgradeLevels
+        self.unlockedUpgradeIDs = slot.unlockedMetaUpgradeIDs
+        
         self.gold = slot.gold
-        // Slot bazlı karakter: Hub ve ekranlar aktif slot'un karakterini
-        // okuyabilsin diye global `selectedCharacterID`'yi slot değerine
-        // senkron ediyoruz. Slot'ta karakter yoksa (eski kayıt) mevcut
-        // global değer korunur.
+        // Slot bazlı karakter senkronizasyonu
         if let cid = slot.characterId, !cid.isEmpty {
             self.selectedCharacterID = cid
         }

@@ -80,7 +80,7 @@ struct MysteryEventView: View {
                         let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
                         let activeIds = Set(slot.activePassivePerks.map { $0.id })
                         
-                        let availablePerks = PerkEngine.perkPool.filter { perk in
+                        let availablePerks = PerkEngine.getPerkPool(lang: userEnv.language).filter { perk in
                             unlockedIds.contains(perk.id) && 
                             (slot.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 0) < 3
                         }

@@ -172,8 +172,8 @@ struct PerkSelectionView: View {
                         .multilineTextAlignment(.leading)
                     
                     // Synergy Hint (New Phase B)
-                    if let partnerId = PerkEngine.perkPool.first(where: { $0.id == perk.id })?.synergyPartnerIds.first,
-                       let partnerName = PerkEngine.perkPool.first(where: { $0.id == partnerId })?.name {
+                    if let partnerId = PerkEngine.getPerkPool(lang: userEnv.language).first(where: { $0.id == perk.id })?.synergyPartnerIds.first,
+                       let partnerName = PerkEngine.getPerkPool(lang: userEnv.language).first(where: { $0.id == partnerId })?.name {
                         HStack(spacing: 4) {
                             Image(systemName: "link")
                             Text(userEnv.localizedString("Sinerji: \(partnerName)", "Synergy: \(partnerName)"))

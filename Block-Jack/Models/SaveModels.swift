@@ -234,7 +234,18 @@ struct StartingPerk: Codable, Identifiable, Hashable {
     }
 
     func displayDesc(lang: AppLanguage) -> String {
-        lang == .turkish ? descTR : descEN
+        // Mismatch Fix: Always check PerkUpgradeRegistry first if the perk is upgradeable
+        if let upgradeId = PerkUpgradeID(rawValue: id) {
+            // Get the description from registry for the user's current meta level
+            // In PerkSelectionView, we want to show the current level's effect.
+            // If the user hasn't unlocked it yet, show Level 1 values as a preview.
+            let slotId = UserEnvironment.shared.activeSlotId ?? 1
+            let currentMetaLevel = SaveManager.shared.slots.first(where: { $0.id == slotId })?.perkLevels[id] ?? 1
+            let safeLevel = max(1, currentMetaLevel)
+            
+            return PerkUpgradeRegistry.effectDescription(for: upgradeId, tier: safeLevel)
+        }
+        return lang == .turkish ? descTR : descEN
     }
 
     func toPassivePerk(lang: AppLanguage, tier overrideTier: Int? = nil) -> PassivePerk {

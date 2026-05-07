@@ -70,10 +70,10 @@ class SaveManager: ObservableObject {
         newSlot.gold = 0
         newSlot.lives = 3 // Starting lives
         
-        // Phase 11: World Map & Upgrades
+        // Phase 11: World Map & Upgrades (Slot-based)
         newSlot.unlockedWorldLevel = 1
-        newSlot.goldUpgradeLevels = UserEnvironment.shared.goldUpgradeLevels
-        newSlot.unlockedMetaUpgradeIDs = UserEnvironment.shared.unlockedUpgradeIDs
+        newSlot.goldUpgradeLevels = [:]
+        newSlot.unlockedMetaUpgradeIDs = []
         newSlot.bestScore = 0
         newSlot.bestWorldLevel = 1
         newSlot.recentRuns = []

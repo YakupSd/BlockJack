@@ -11,6 +11,7 @@ class MerchantViewModel: ObservableObject {
     @Published var forgeSelection: [PassivePerk] = []
     
     let slotId: Int
+    let lang: AppLanguage
     
     struct ShopItem: Identifiable {
         let id = UUID()
@@ -27,10 +28,11 @@ class MerchantViewModel: ObservableObject {
     
     init(slotId: Int, lang: AppLanguage = .turkish) {
         self.slotId = slotId
-        generateStock(lang: lang)
+        self.lang = lang
+        generateStock()
     }
     
-    func generateStock(lang: AppLanguage) {
+    func generateStock() {
         var items: [ShopItem] = []
         
         let perkLevels = currentSlot?.perkLevels ?? [:]
@@ -109,7 +111,7 @@ class MerchantViewModel: ObservableObject {
         let activeIds = currentSlot?.activePassivePerks.map { $0.id } ?? []
         let selectionIds = forgeSelection.map { $0.id }
         
-        let forgePool = PerkEngine.perkPool.filter { perk in
+        let forgePool = PerkEngine.getPerkPool(lang: lang).filter { perk in
             unlockedIds.contains(perk.id) && !activeIds.contains(perk.id) && !selectionIds.contains(perk.id)
         }
         
