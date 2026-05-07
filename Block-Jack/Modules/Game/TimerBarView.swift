@@ -8,10 +8,14 @@ import SwiftUI
 struct TimerBarView: View {
     let ratio: Double       // 0.0 – 1.0
     let isFogMode: Bool     // Boss: Fog modifier
+    var isFrenzy: Bool = false // NEW
 
     @State private var pulse = false
 
-    var barColor: Color { ThemeColors.timerColor(ratio: ratio) }
+    var barColor: Color { 
+        if isFrenzy { return ThemeColors.neonOrange }
+        return ThemeColors.timerColor(ratio: ratio) 
+    }
     var isCritical: Bool { ratio < 0.1 }
 
     var body: some View {
@@ -29,11 +33,11 @@ struct TimerBarView: View {
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(barColor)
-                            .frame(width: geo.size.width * max(0, ratio))
+                            .frame(width: geo.size.width * max(0, CGFloat(ratio)))
                         
                         // Data Flow animation
                         FlowOverlay(color: .white.opacity(0.3))
-                            .frame(width: geo.size.width * max(0, ratio))
+                            .frame(width: geo.size.width * max(0, CGFloat(ratio)))
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                     .animation(.linear(duration: 0.05), value: ratio)
@@ -41,7 +45,7 @@ struct TimerBarView: View {
                     // Glow efekti
                     RoundedRectangle(cornerRadius: 4)
                         .fill(barColor.opacity(0.3))
-                        .frame(width: geo.size.width * max(0, ratio))
+                        .frame(width: geo.size.width * max(0, CGFloat(ratio)))
                         .blur(radius: 4)
                         .animation(.linear(duration: 0.05), value: ratio)
                 }
@@ -50,10 +54,10 @@ struct TimerBarView: View {
         }
         .frame(height: 8)
         .overlay {
-            // Kritik: kırmızı kenar pulse
-            if isCritical && !isFogMode {
+            // Kritik veya Frenzy: kenar pulse
+            if (isCritical || isFrenzy) && !isFogMode {
                 RoundedRectangle(cornerRadius: 4)
-                    .stroke(ThemeColors.neonPink.opacity(pulse ? 0.8 : 0.2), lineWidth: 2)
+                    .stroke((isFrenzy ? ThemeColors.neonOrange : ThemeColors.neonPink).opacity(pulse ? 0.8 : 0.2), lineWidth: 2)
                     .animation(.easeInOut(duration: 0.4).repeatForever(), value: pulse)
             }
         }

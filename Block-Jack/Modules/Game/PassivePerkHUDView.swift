@@ -28,7 +28,6 @@ struct PassivePerkHUDView: View {
                     .font(.setCustomFont(name: .InterMedium, size: 9))
                     .foregroundColor(ThemeColors.textMuted)
                     .lineLimit(1)
-                Spacer(minLength: 0)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
@@ -43,9 +42,43 @@ struct PassivePerkHUDView: View {
                     .padding(.trailing, 4)
                 }
             }
+            
+            Spacer(minLength: 0)
+            
+            // Sinerji Listesi (HUD'un sağ tarafında, perklerin yanında)
+            if !vm.activeSynergies.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(vm.activeSynergies) { synergy in
+                        SynergyPill(synergy: synergy)
+                    }
+                }
+                .padding(.leading, 8)
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
         }
         .padding(.horizontal, GameLayout.horizontalPadding)
         .frame(height: GameLayout.perkStripHeight)
+    }
+}
+
+// MARK: - Synergy Pill
+struct SynergyPill: View {
+    let synergy: PerkSynergy
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 8))
+            Text(synergy.synergyName.uppercased())
+                .font(.setCustomFont(name: .InterBlack, size: 8))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(ThemeColors.neonPurple.opacity(0.15))
+        .foregroundStyle(ThemeColors.neonPurple)
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(ThemeColors.neonPurple.opacity(0.4), lineWidth: 1))
+        .shadow(color: ThemeColors.neonPurple.opacity(0.3), radius: 2)
     }
 }
 
@@ -59,7 +92,7 @@ struct PerkHUDIcon: View {
     @State private var showDetails = false
     
     var hasSynergy: Bool {
-        vm.activeSynergies.contains(where: { $0.requiredPerkIds.contains(perk.id) })
+        vm.run.activeSynergies.contains(where: { $0.requiredPerkIds.contains(perk.id) })
     }
     
     var body: some View {
@@ -94,7 +127,7 @@ struct PerkHUDIcon: View {
                 }
                 
                 ZStack {
-                    // TECH CHIP BACKGROUND (UI Revize: daha kompakt 32pt)
+                    // TECH CHIP BACKGROUND
                     RoundedRectangle(cornerRadius: 10)
                         .fill(ThemeColors.perkBg)
                         .frame(width: 32, height: 32)
@@ -113,15 +146,16 @@ struct PerkHUDIcon: View {
                         )
                         .frame(width: 32, height: 32)
 
-                    if perk.icon.hasPrefix("item_") || perk.icon.hasPrefix("port_") {
+                    if perk.icon.hasPrefix("item_") || perk.icon.hasPrefix("port_") || perk.icon.hasPrefix("perk_") {
                         Image(perk.icon)
                             .resizable()
                             .scaledToFit()
                             .frame(width: 20, height: 20)
                             .scaleEffect(isAnimating ? 1.2 : 1.0)
                     } else {
-                        Text(perk.icon)
-                            .font(.system(size: 16))
+                        Image(systemName: perk.icon)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
                             .scaleEffect(isAnimating ? 1.2 : 1.0)
                     }
                 }
@@ -158,7 +192,16 @@ struct PerkHUDIcon: View {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(ThemeColors.surfaceMid)
                             .frame(width: 54, height: 54)
-                        Text(perk.icon).font(.title2)
+                        if perk.icon.hasPrefix("item_") || perk.icon.hasPrefix("port_") || perk.icon.hasPrefix("perk_") {
+                             Image(perk.icon)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 36, height: 36)
+                        } else {
+                            Image(systemName: perk.icon)
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundStyle(ThemeColors.neonCyan)
+                        }
                     }
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(ThemeColors.neonCyan.opacity(0.5), lineWidth: 1))
                     
@@ -205,7 +248,16 @@ struct PerkHUDIcon: View {
                             ForEach(perk.synergyPartnerIds, id: \.self) { partnerId in
                                 if let partner = PerkEngine.perk(for: partnerId, lang: userEnv.language, tier: 1) {
                                     HStack(spacing: 4) {
-                                        Text(partner.icon)
+                                        if partner.icon.hasPrefix("item_") || partner.icon.hasPrefix("port_") || partner.icon.hasPrefix("perk_") {
+                                            Image(partner.icon)
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(width: 14, height: 14)
+                                        } else {
+                                            Image(systemName: partner.icon)
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundStyle(ThemeColors.neonPurple)
+                                        }
                                         Text(partner.name)
                                             .font(.setCustomFont(name: .InterBold, size: 10))
                                     }

@@ -9,95 +9,58 @@ struct GameOverOverlay: View {
     @ObservedObject var vm: GameViewModel
     @EnvironmentObject var userEnv: UserEnvironment
 
-    var isRunOver: Bool { vm.run.lives <= 0 }
-
     var body: some View {
         ZStack {
             Color.black.opacity(0.85).ignoresSafeArea()
 
             VStack(spacing: 20) {
                 // Başlık
-                Text(isRunOver
-                     ? userEnv.localizedString("RUN BİTTİ", "RUN OVER")
-                     : userEnv.localizedString("ROUND KAYBEDILDI", "ROUND LOST"))
+                Text(userEnv.localizedString("ROUND KAYBEDİLDİ", "ROUND LOST"))
                     .font(.setCustomFont(name: .InterBlack, size: 34))
                     .foregroundStyle(ThemeColors.neonPink)
                     .shadow(color: ThemeColors.neonPink, radius: 12)
 
-                // Kalan Can Göstergesi
-                HStack(spacing: 6) {
-                    ForEach(1...vm.run.maxLives, id: \.self) { i in
-                        Image(systemName: i <= vm.run.lives ? "heart.fill" : "heart")
-                            .font(.system(size: 18))
-                            .foregroundStyle(i <= vm.run.lives ? ThemeColors.neonPink : ThemeColors.gridDark)
-                    }
-                }
-
                 VStack(spacing: 4) {
-                    Text(isRunOver
-                         ? userEnv.localizedString("Tüm canlarını kaybettin.", "You've lost all your lives.")
-                         : userEnv.localizedString("Grid sıkıştı veya süren bitti.", "Grid locked or time ran out."))
+                    Text(userEnv.localizedString("Grid sıkıştı veya süren bitti.", "Grid locked or time ran out."))
                         .font(.setCustomFont(name: .InterMedium, size: 14))
                         .foregroundStyle(ThemeColors.textSecondary)
                         .multilineTextAlignment(.center)
-
-                    if !isRunOver {
-                        Text(userEnv.localizedString("Kalan: \(vm.run.lives) can", "Lives remaining: \(vm.run.lives)"))
-                            .font(.setCustomFont(name: .InterBold, size: 12))
-                            .foregroundStyle(ThemeColors.neonPink.opacity(0.8))
-                    }
                 }
                 .padding(.horizontal, 32)
 
-                if isRunOver {
-                    // Tüm canlar bitti → Özet ekranı göster, sonra Dashboard'a dön
-                    Button {
-                        HapticManager.shared.play(.buttonTap)
-                        // Run bitti → pending node'u iptal et (oynamadı, gerekmiyor)
-                        UserEnvironment.shared.pendingMapNodeId = nil
-                        if let summary = SaveManager.shared.slots
-                            .first(where: { $0.id == vm.activeSlotId })?.lastRunSummary {
-                            MainViewsRouter.shared.push(
-                                RunSummaryView(summary: summary, slotId: vm.activeSlotId)
-                                    .environmentObject(UserEnvironment.shared)
-                            )
-                        } else {
-                            MainViewsRouter.shared.popToDashboard()
-                        }
-                    } label: {
-                        Text(userEnv.localizedString("ÖZETİ GÖR", "VIEW SUMMARY"))
-                            .font(.setCustomFont(name: .InterExtraBold, size: 20))
-                            .foregroundStyle(ThemeColors.cosmicBlack)
-                            .padding(.vertical, 16)
-                            .padding(.horizontal, 32)
-                            .background(ThemeColors.neonPink)
-                            .clipShape(Capsule())
-                    }
-                } else {
-                    // Kalan can var → retry
-                    Button {
-                        HapticManager.shared.play(.buttonTap)
-                        vm.board.resetGrid()
-                        vm.startRound()
-                    } label: {
-                        Text(userEnv.localizedString("TEKRAR DENE (\(vm.run.lives) CAN)", "RETRY (\(vm.run.lives) LIVES)"))
-                            .font(.setCustomFont(name: .InterExtraBold, size: 20))
-                            .foregroundStyle(ThemeColors.cosmicBlack)
-                            .padding(.vertical, 16)
-                            .padding(.horizontal, 32)
-                            .background(ThemeColors.electricYellow)
-                            .clipShape(Capsule())
-                    }
+                // Her durumda Retry (Artık can mantığı yok)
+                Button {
+                    HapticManager.shared.play(.buttonTap)
+                    vm.resetToSectorStart()
+                } label: {
+                    Text(userEnv.localizedString("TEKRAR DENE", "RETRY"))
+                        .font(.setCustomFont(name: .InterExtraBold, size: 20))
+                        .foregroundStyle(ThemeColors.cosmicBlack)
+                        .padding(.vertical, 16)
+                        .padding(.horizontal, 32)
+                        .background(ThemeColors.electricYellow)
+                        .clipShape(Capsule())
+                }
 
-                    Button {
-                        HapticManager.shared.play(.buttonTap)
+                // Pes Etme (Özeti gör ve Dashboard'a dön)
+                Button {
+                    HapticManager.shared.play(.buttonTap)
+                    // Run'ı manuel sonlandır
+                    UserEnvironment.shared.pendingMapNodeId = nil
+                    if let summary = SaveManager.shared.slots
+                        .first(where: { $0.id == vm.activeSlotId })?.lastRunSummary {
+                        MainViewsRouter.shared.push(
+                            RunSummaryView(summary: summary, slotId: vm.activeSlotId)
+                                .environmentObject(UserEnvironment.shared)
+                        )
+                    } else {
                         MainViewsRouter.shared.popToDashboard()
-                    } label: {
-                        Text(userEnv.localizedString("PES ET", "GIVE UP"))
-                            .font(.setCustomFont(name: .InterBold, size: 16))
-                            .foregroundStyle(ThemeColors.textMuted)
-                            .padding(.vertical, 12)
                     }
+                } label: {
+                    Text(userEnv.localizedString("PES ET / ÖZETİ GÖR", "GIVE UP / VIEW SUMMARY"))
+                        .font(.setCustomFont(name: .InterBold, size: 16))
+                        .foregroundStyle(ThemeColors.textMuted)
+                        .padding(.vertical, 12)
                 }
             }
         }
@@ -121,13 +84,6 @@ struct RoundCompleteOverlay: View {
                         .shadow(color: ThemeColors.success, radius: 10)
                     
                     HStack(spacing: 16) {
-                        HStack(spacing: 3) {
-                            ForEach(1...vm.run.maxLives, id: \.self) { i in
-                                Image(systemName: i <= vm.run.lives ? "heart.fill" : "heart")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(i <= vm.run.lives ? ThemeColors.neonPink : ThemeColors.gridDark)
-                            }
-                        }
                         HStack(spacing: 4) {
                             Image("icon_gold").resizable().frame(width: 16, height: 16)
                             Text("\(userEnv.gold)")
@@ -207,12 +163,11 @@ struct PauseOverlay: View {
                         }
                         
                         actionButton(
-                            title: userEnv.localizedString("ROUND'U YENİDEN BAŞLAT", "RESTART ROUND"),
+                            title: userEnv.localizedString("SEKTÖRÜ YENİDEN BAŞLAT", "RESTART SECTOR"),
                             color: ThemeColors.electricYellow
                         ) {
                             HapticManager.shared.play(.buttonTap)
-                            vm.board.resetGrid()
-                            vm.startRound()
+                            vm.resetToSectorStart()
                         }
                         
                         actionButton(

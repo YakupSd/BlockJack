@@ -22,8 +22,8 @@ struct RestSiteView: View {
     @State private var safeHouseToastVisible = false
 
     private var safeHouseTier: Int {
-        // Phase 13: Meta-upgraded tier
-        return userEnv.perkUpgradeLevels["safe_house"] ?? 1
+        let slot = SaveManager.shared.slots.first(where: { $0.id == slotId })
+        return slot?.perkLevels["safe_house"] ?? 1
     }
 
     var body: some View {

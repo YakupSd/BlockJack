@@ -275,7 +275,7 @@ struct SlotHubView: View {
                 telemetryBox(title: userEnv.localizedString("EN YÜKSEK SKOR", "MAX SECTOR"), value: "W\(slot.bestWorldLevel)", color: ThemeColors.neonPurple, icon: "map.fill")
                 telemetryBox(title: userEnv.localizedString("ALTIN", "CREDITS"), value: "\(slot.gold)", color: ThemeColors.electricYellow, icon: "bitcoinsign.circle.fill")
                 telemetryBox(title: userEnv.localizedString("STABİLİTE", "STABILITY"), value: "R\(slot.currentRound)", color: ThemeColors.neonCyan, icon: "waveform.path.ecg")
-                telemetryBox(title: userEnv.localizedString("MODÜLLER", "MODULES"), value: "\(slot.unlockedPerkIDs.count)", color: ThemeColors.neonPink, icon: "cpu.fill")
+                telemetryBox(title: userEnv.localizedString("MODÜLLER", "MODULES"), value: "\(slot.perkLevels.filter { $0.value >= 1 }.count)", color: ThemeColors.neonPink, icon: "cpu.fill")
             }
 
             // Run Logs

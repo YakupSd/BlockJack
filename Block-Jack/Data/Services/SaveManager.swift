@@ -97,18 +97,25 @@ class SaveManager: ObservableObject {
     }
 
     // MARK: - Perk Shop
-    /// Perk'i slot'a kalıcı olarak açar. Gold'u slot üzerinden düşürür.
-    /// Başarılıysa true döner.
+    /// Meta-Perk seviyesini yükseltir. Maliyetleri slot üzerinden düşer.
     @discardableResult
-    func unlockPerk(slotId: Int, perk: StartingPerk) -> Bool {
+    func upgradeMetaPerk(slotId: Int, perkId: String, goldCost: Int, diamondCost: Int) -> Bool {
         guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return false }
-        guard !slots[index].unlockedPerkIDs.contains(perk.id) else { return true } // zaten açık
-        guard slots[index].gold >= perk.goldCost else { return false }             // yetersiz gold
-        slots[index].gold -= perk.goldCost
-        slots[index].unlockedPerkIDs.append(perk.id)
+        let current = slots[index].perkLevels[perkId] ?? 0
+        guard current < 5 else { return false }
+        
+        // Maliyet kontrolü (Altın slot'tan, elmas globalden - elmas tüm slotlarda ortak)
+        guard slots[index].gold >= goldCost else { return false }
+        guard UserEnvironment.shared.diamonds >= diamondCost else { return false }
+        
+        slots[index].gold -= goldCost
+        UserEnvironment.shared.diamonds -= diamondCost
+        
+        slots[index].perkLevels[perkId] = current + 1
         slots[index].lastSaved = Date()
         saveToDisk()
-        // UserEnvironment gold'unu senkronize et
+        
+        // Sync UserEnv gold
         UserEnvironment.shared.gold = slots[index].gold
         return true
     }

@@ -16,8 +16,11 @@ struct PerkSelectionView: View {
 
     /// Sadece bu slotta açık olan perkler
     private var availablePerks: [StartingPerk] {
-        let unlocked = saveManager.slots.first(where: { $0.id == slotId })?.unlockedPerkIDs ?? StartingPerk.defaultUnlockedIDs
-        return StartingPerk.available.filter { unlocked.contains($0.id) }
+        let slot = saveManager.slots.first(where: { $0.id == slotId })
+        let perkLevels = slot?.perkLevels ?? [:]
+        // Seviyesi >= 1 olan tüm perkler seçilebilir
+        let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
+        return StartingPerk.available.filter { unlockedIds.contains($0.id) }
     }
 
     var body: some View {
@@ -141,15 +144,17 @@ struct PerkSelectionView: View {
         } label: {
             HStack(spacing: 16) {
                 ZStack {
-                    if perk.icon.contains("item_") {
+                    if perk.icon.contains("item_") || perk.icon.contains("perk_") {
                         Image(perk.icon)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(width: 48, height: 48)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
-                        Text(perk.icon)
-                            .font(.system(size: 32))
+                        // SF Symbol or Emoji
+                        Image(systemName: perk.icon)
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(isSelected ? ThemeColors.electricYellow : .white)
                     }
                 }
                 .frame(width: 60, height: 60)

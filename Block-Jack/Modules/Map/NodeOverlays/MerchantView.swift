@@ -14,7 +14,7 @@ struct MerchantView: View {
     
     init(slotId: Int) {
         self.slotId = slotId
-        self._viewModel = StateObject(wrappedValue: MerchantViewModel(slotId: slotId))
+        self._viewModel = StateObject(wrappedValue: MerchantViewModel(slotId: slotId, lang: UserEnvironment.shared.language))
     }
     
     var body: some View {
@@ -259,8 +259,16 @@ struct MerchantItemView: View {
                         .frame(width: 80, height: 80)
                     
                     if let perk = item.perk {
-                        Text(perk.icon)
-                            .font(.system(size: 40))
+                        if perk.icon.hasPrefix("perk_") || perk.icon.hasPrefix("item_") {
+                            Image(perk.icon)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 50, height: 50)
+                        } else {
+                            Image(systemName: perk.icon)
+                                .font(.system(size: 34, weight: .bold))
+                                .foregroundStyle(ThemeColors.electricYellow)
+                        }
                     } else if let consumable = item.consumableType {
                         if consumable == .lifeRestoration {
                             Image(systemName: "heart.fill")
@@ -324,8 +332,16 @@ struct ForgeSelectionCard: View {
     var body: some View {
         Button(action: action) {
             VStack {
-                Text(perk.icon)
-                    .font(.title)
+                if perk.icon.hasPrefix("perk_") || perk.icon.hasPrefix("item_") {
+                    Image(perk.icon)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 40, height: 40)
+                } else {
+                    Image(systemName: perk.icon)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(isSelected ? ThemeColors.neonPurple : .white)
+                }
                 Text(perk.name)
                     .font(.caption2)
                     .foregroundColor(.white)

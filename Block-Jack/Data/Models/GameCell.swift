@@ -82,6 +82,11 @@ struct GameCell: Identifiable, Equatable, Codable {
         return false
     }
 
+    var isHeavy: Bool {
+        if case .heavy = state { return true }
+        return false
+    }
+
     var color: BlockDisplayColor? {
         if case .filled(let c) = state { return c }
         if case .heavy = state { return .yellow }

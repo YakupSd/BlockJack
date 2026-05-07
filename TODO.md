@@ -1,21 +1,24 @@
-# Block-Jack — TODO
+# 🃏 Block-Jack Geliştirme Listesi
 
-> Son güncelleme: **2026-04-24**
+## ✅ TAMAMLANANLAR
+- [x] **Generous Scoring Sistemi:** Puan kazanımı 2.5x arttırıldı, renk bonusları ve hibrit streak entegre edildi.
+- [x] Satın aldığım perkerl oyunun haritalarıdna sandıklarda vs çıkmıyor. (FIXED: Pool logic updated to use slot.perkLevels)
+- [x] Perk yükseltmesi etki etmiyor overkill mesela %25 oldu şuan fulledim ama hala %15 ? (FIXED: GameViewModel now syncs with PerkUpgradeRegistry tiers)
+- [x] Aynı şekidle perklerin level mantığı kayıt bazlı olacak. Bir kayıdımda 4 level ise diğer kayıdımda 4 level olmyacak. (FIXED: perkLevels moved to SaveSlot)
+- [x] Oyun Dengeleme
+- [x] Ses Tasarımı
+- [x] Performans
 
+## 🚀 SONRAKİ ADIMLAR
+(Tüm öncelikli teknik borçlar ve perk sistemi stabilizasyonu tamamlandı.)
 
-## 🚨 Kritik — Kayıt Sistemi (Save/Load) & Yaşam Döngüsü Açıkları
+## 🛠 MİMARİ VE TEKNİK İYİLEŞTİRMELER (Gelecek)
+- [ ] **Event-Driven Perk Sistemi:** Perkleri tek tek `if` bloklarıyla kontrol etmek yerine, `onLineCleared` gibi global olayları dinleyen bağımsız sınıflara dönüştür.
+- [ ] **Seed-Based RNG:** Tüm sandık ve blok içeriklerini `runSeed` üzerinden üreterek "Save-Scumming" hilesini engelle ve tutarlı bir oyun deneyimi sun.
+- [ ] **SwiftData / CoreData Geçişi:** Kayıt dosyalarının güvenliği ve hızı için `UserDefaults` yerine modern bir veritabanı yapısına geç.
 
-### 11) Arka Plana Atıldığında Otomatik Kayıt Yokluğu (ScenePhase)
-- **Sorun:** Savaş ortasında uygulama arka plana atılıp iOS tarafından sonlandırılırsa tahta (grid) ve süre durumu kaybediliyor. Oyuncu o anki ilerlemesini yitiriyor.
-- **Hedef:** `GameView` içine `@Environment(\.scenePhase)` ekleyerek, `.inactive` veya `.background` durumunda oyunu otomatik duraklatıp (`vm.pauseGame()`) anında `vm.saveGameState()` fonksiyonunu çağırmak.
-- **Nerede:** `GameView.swift`
-
-### 12) Altın İstismarı (Savescumming) ve Sınırsız Altın Bug'ı
-- **Sorun:** Oyun içinde kazanılan altınlar (`addRunGold`), anında `SaveManager` ile kalıcı cüzdana yazılıyor. Oyuncu savaştayken altın kazanıp oyunu zorla (force quit) kapatırsa, harita ilerlemediği için aynı savaşı baştan oynayıp aynı altını defalarca kazanabiliyor (sınırsız altın açığı). Aynı zamanda ölmeden önce çıkıp can (Life) kaybını önleyebiliyor.
-- **Hedef:** Savaş sırasında kazanılan altınlar "pending (bekleyen)" olarak tutulmalı ve sadece savaş bittiğinde diske yazılmalı. Veya yarım bırakılmış oyundan çıkıp tekrar aynı yere girme istismarını önlemek için düğümler (Node) kilitlenmeli.
-- **Nerede:** `GameViewModel.swift` (`addRunGold` ve `saveGameState` fonksiyonları)
-
-### 13) Yarım Kalan Savaşın Farklı Düğüme Taşınması (State Leak)
-- **Sorun:** `SaveManager`, savaş grid'ini (`slot.grid`) diskte tutuyor ancak bu grid'in hangi Node'a ait olduğunu kaydetmiyor. Oyuncu Node A'da oyunu kapatıp haritada Node B'ye tıklarsa, Node A'nın yarım kalan tahtası Node B'ye yükleniyor.
-- **Hedef:** `SaveSlot`'a `activeBattleNodeId: UUID?` eklenmeli. `GameViewModel` başlatılırken bu ID kontrol edilmeli; eğer girilen Node ID'siyle eşleşmiyorsa eski tahta (grid) temizlenmeli.
-- **Nerede:** `SaveModels.swift`, `SaveManager.swift`, `GameViewModel.swift`
+## 🎮 OYUN DENEYİMİ VE UX (Gelecek)
+- [ ] **Block Discard / Reroll:** Deadlock (kilitlenme) durumlarında altın karşılığı blok çöpe atma veya yenileme mekaniği ekle.
+- [ ] **Yeni Bölüm: Ocean Depths:** Su altı temalı yeni map ve özel mekanikler.
+- [ ] **Daha Fazla Boss Varyasyonu:** Her dünya için farklı saldırı kalıplarına sahip bosslar.
+- [ ] **Günlük Meydan Okuma (Daily Challenge):** Sabit seed ile tüm oyuncuların yarıştığı günlük mod.

@@ -37,8 +37,8 @@ class OverdriveEngine {
         case "architect":
             switch tier {
             case .tier1: return "3×3 Alan Yıkımı"
-            case .tier2: return "5×5 Alan Yıkımı"
-            case .tier3: return "7×7 Mega Yıkım +1500"
+            case .tier2: return "3×3 Yıkım +500"
+            case .tier3: return "3×3 Mega Yıkım +1500"
             default: return ""
             }
         case "timebender":
@@ -182,7 +182,9 @@ class OverdriveEngine {
             clearedPositions: res.clearedPositions,
             rowsCleared: rowsCleared,
             colsCleared: colsCleared,
-            zonesCleared: 0
+            zonesCleared: 0,
+            rowCells: [],
+            colCells: []
         ))
         vm.clearFlashPositions = res.clearedPositions
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -198,8 +200,8 @@ class OverdriveEngine {
         let bonusScore: Int
         switch tier {
         case .tier1: radius = 1; bonusScore = 0    // 3×3
-        case .tier2: radius = 2; bonusScore = 0    // 5×5
-        case .tier3: radius = 3; bonusScore = 1500 // 7×7 + bonus
+        case .tier2: radius = 1; bonusScore = 500  // 3×3 + 500
+        case .tier3: radius = 1; bonusScore = 1500 // 3×3 + 1500
         default: return
         }
 
@@ -223,7 +225,8 @@ class OverdriveEngine {
             vm.handleClear(result: BoardViewModel.ClearResult(
                 clearedCells: res.clearedCells,
                 clearedPositions: res.clearedPositions,
-                rowsCleared: 0, colsCleared: 0, zonesCleared: 0
+                rowsCleared: 0, colsCleared: 0, zonesCleared: 0,
+                rowCells: [], colCells: []
             ))
         }
         if bonusScore > 0 {
@@ -310,7 +313,8 @@ class OverdriveEngine {
                 vm.handleClear(result: BoardViewModel.ClearResult(
                     clearedCells: res.clearedCells,
                     clearedPositions: res.clearedPositions,
-                    rowsCleared: 1, colsCleared: 0, zonesCleared: 0
+                    rowsCleared: 1, colsCleared: 0, zonesCleared: 0,
+                    rowCells: [], colCells: []
                 ))
             }
             vm.addPopup(text: "WRAITH RAMPAGE +25s!", color: ThemeColors.neonPurple)

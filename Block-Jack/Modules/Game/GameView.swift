@@ -10,6 +10,9 @@ struct GameView: View {
     @EnvironmentObject var userEnv: UserEnvironment
     @Environment(\.dismiss) var dismiss
     @Environment(\.scenePhase) var scenePhase
+    
+    // Scoring Info Overlay state
+    @State private var showScoringInfo = false
 
     // Grid placement için coordinate space
     @State private var gridOrigin: CGPoint = .zero
@@ -74,7 +77,9 @@ struct GameView: View {
 
                 // 3) SKOR SATIRI — kompakt (içinde ilerleme çubuğu da)
                 VStack(spacing: 4) {
-                    ScoreHUDView(vm: vm)
+                    ScoreHUDView(vm: vm, onInfoTap: {
+                        showScoringInfo = true
+                    })
                     progressBar
                         .padding(.horizontal, GameLayout.horizontalPadding)
                 }
@@ -284,6 +289,9 @@ struct GameView: View {
                     .animation(.spring(response: 0.3), value: vm.showEnemyAttackWarning)
             }
         }
+        .fullScreenCover(isPresented: $showScoringInfo) {
+            ScoringInfoView()
+        }
         .onAppear {
             if vm.run.round.isBossRound {
                 AudioManager.shared.playMusic(.boss)
@@ -295,6 +303,13 @@ struct GameView: View {
             if vm.phase == .menu {
                 vm.startRound()
             } else if vm.phase == .playing {
+                vm.resumeGame()
+            }
+        }
+        .onChange(of: showScoringInfo) { oldValue, newValue in
+            if newValue {
+                vm.pauseGame()
+            } else {
                 vm.resumeGame()
             }
         }

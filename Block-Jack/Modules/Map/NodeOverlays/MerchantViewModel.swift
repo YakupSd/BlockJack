@@ -25,20 +25,20 @@ class MerchantViewModel: ObservableObject {
         }
     }
     
-    init(slotId: Int) {
+    init(slotId: Int, lang: AppLanguage = .turkish) {
         self.slotId = slotId
-        generateStock()
+        generateStock(lang: lang)
     }
     
-    func generateStock() {
+    func generateStock(lang: AppLanguage) {
         var items: [ShopItem] = []
         
-        let slotUnlocked = currentSlot?.unlockedPerkIDs ?? []
-        let unlockedIds = slotUnlocked.isEmpty ? StartingPerk.defaultUnlockedIDs : slotUnlocked
+        let perkLevels = currentSlot?.perkLevels ?? [:]
+        let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
         let activeIds = currentSlot?.activePassivePerks.map { $0.id } ?? []
         
         // Sadece açık olan ve henüz alınmamış perkleri filtrele
-        let availablePerks = PerkEngine.perkPool.filter { perk in
+        let availablePerks = PerkEngine.getPerkPool(lang: lang).filter { perk in
             unlockedIds.contains(perk.id) && !activeIds.contains(perk.id)
         }.shuffled()
         
@@ -104,8 +104,8 @@ class MerchantViewModel: ObservableObject {
         
         // Yeni bir rastgele (belki daha güçlü) perk ver
         // Sadece açık olan ve seçilenler HARİCİ aktif olmayan perkler
-        let slotUnlocked = currentSlot?.unlockedPerkIDs ?? []
-        let unlockedIds = slotUnlocked.isEmpty ? StartingPerk.defaultUnlockedIDs : slotUnlocked
+        let perkLevels = currentSlot?.perkLevels ?? [:]
+        let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
         let activeIds = currentSlot?.activePassivePerks.map { $0.id } ?? []
         let selectionIds = forgeSelection.map { $0.id }
         

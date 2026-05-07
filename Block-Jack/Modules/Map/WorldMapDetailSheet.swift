@@ -2,10 +2,6 @@
 //  WorldMapDetailSheet.swift
 //  Block-Jack
 //
-//  Ana haritada bir sektöre tıklandığında açılan alt sheet.
-//  Normal seviyeler için "savaş" içeriği, boss seviyeleri için boss uyarı
-//  banner'ı ve BossRegistry'den çekilen ön izleme gösterir.
-//
 
 import SwiftUI
 
@@ -19,87 +15,121 @@ struct WorldMapDetailSheet: View {
     @EnvironmentObject var userEnv: UserEnvironment
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Sistem presentationDragIndicator zaten görünür — kendi Capsule'ümüzü
-            // çiftlemiyoruz. Üstte sadece hafif boşluk bırak.
-            Color.clear.frame(height: 14)
+        ZStack {
+            ThemeColors.mapBg.ignoresSafeArea()
+            
+            // Background ambient glow
+            Circle()
+                .fill(nodeHeaderBorder.opacity(0.12))
+                .blur(radius: 80)
+                .offset(y: -150)
 
-            header
-                .padding(.horizontal, 20)
+            VStack(spacing: 0) {
+                // Drag Indicator area
+                Capsule()
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 40, height: 4)
+                    .padding(.top, 10)
+                
+                header
+                    .padding(.horizontal, 24)
+                    .padding(.top, 24)
 
-            Rectangle()
-                .fill(ThemeColors.mapRoadDark)
-                .frame(height: 1)
-                .padding(.vertical, 12)
+                Divider()
+                    .background(Color.white.opacity(0.1))
+                    .padding(.vertical, 20)
 
-            // İçerik — type'a göre
-            Group {
-                if level.type == .boss {
-                    WorldSheetBossContent(slotId: slotId, level: level)
-                } else {
-                    WorldSheetBattleContent(level: level)
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 28) {
+                        if level.type == .boss {
+                            WorldSheetBossContent(slotId: slotId, level: level)
+                        } else {
+                            WorldSheetBattleContent(level: level)
+                        }
+                        
+                        if let hint = modifierHintText {
+                            hintView(hint)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 20)
                 }
+
+                Spacer()
+
+                WorldSheetActionButtonV2(level: level, onEnter: onEnter)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 34)
             }
-            .padding(.horizontal, 20)
-
-            Spacer(minLength: 12)
-
-            WorldSheetActionButton(level: level, onEnter: onEnter)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
         }
-        .background(ThemeColors.mapBg)
-        .foregroundColor(.white)
     }
 
     // MARK: Header
     private var header: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 20) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(nodeHeaderBg)
-                    .frame(width: 52, height: 52)
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(nodeHeaderBorder.opacity(0.1))
+                    .frame(width: 72, height: 72)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(nodeHeaderBorder, lineWidth: 1.5)
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(nodeHeaderBorder.opacity(0.4), lineWidth: 2)
                     )
-                WorldCityPixelIcon(level: level)
-                    .frame(width: 40, height: 40)
+                
+                Image(systemName: level.type == .boss ? "skull.fill" : "cpu.fill")
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundColor(nodeHeaderBorder)
+                    .shadow(color: nodeHeaderBorder.opacity(0.6), radius: 10)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(typeBadgeText)
-                    .font(.pixel(5))
-                    .foregroundColor(nodeHeaderBorder)
-                    .tracking(1)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(nodeHeaderBorder.opacity(0.14))
-                    .clipShape(RoundedRectangle(cornerRadius: 3))
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Text(typeBadgeText)
+                        .font(.setCustomFont(name: .InterBold, size: 10))
+                        .foregroundColor(nodeHeaderBorder)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(nodeHeaderBorder.opacity(0.15))
+                        .clipShape(Capsule())
+                    
+                    difficultyStarsView
+                }
 
                 Text(title)
-                    .font(.pixel(11))
+                    .font(.setCustomFont(name: .InterBlack, size: 26))
                     .foregroundColor(.white)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-
-                difficultyBar
-
-                if let hint = modifierHintText {
-                    Text(hint)
-                        .font(.pixel(5))
-                        .foregroundColor(nodeHeaderBorder.opacity(0.9))
-                        .tracking(1)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(nodeHeaderBorder.opacity(0.10))
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(nodeHeaderBorder.opacity(0.18), lineWidth: 1))
-                }
+                    .minimumScaleFactor(0.8)
             }
 
-            Spacer(minLength: 4)
+            Spacer()
         }
+    }
+
+    private var difficultyStarsView: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<5) { i in
+                Circle()
+                    .fill(i < difficultyStars ? ThemeColors.neonCyan : Color.white.opacity(0.1))
+                    .frame(width: 7, height: 7)
+            }
+        }
+    }
+
+    private func hintView(_ text: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "lightbulb.fill")
+                .foregroundColor(ThemeColors.electricYellow)
+                .font(.system(size: 14))
+            Text(text)
+                .font(.setCustomFont(name: .InterMedium, size: 13))
+                .foregroundColor(.white.opacity(0.7))
+            Spacer()
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
     }
 
     private var title: String {
@@ -112,63 +142,28 @@ struct WorldMapDetailSheet: View {
     private var typeBadgeText: String {
         switch (level.type, level.status) {
         case (.boss, _):
-            return userEnv.localizedString("BOSS", "BOSS")
+            return userEnv.localizedString("KRİTİK HEDEF", "CRITICAL TARGET")
         case (_, .completed):
-            // Replay: daha önce geçilmiş sektör. Kullanıcı test için giriyorsa net etiket ver.
-            if level.id < userEnv.unlockedWorldLevel {
-                return userEnv.localizedString("REPLAY", "REPLAY")
-            }
-            return userEnv.localizedString("TAMAMLANDI", "CLEARED")
+            return userEnv.localizedString("VERİ TEMİZLENDİ", "DATA PURGED")
         case (_, .locked):
-            return userEnv.localizedString("KİLİTLİ", "LOCKED")
+            return userEnv.localizedString("ERİŞİM ENGELLENDİ", "ACCESS DENIED")
         case (_, .available):
-            return userEnv.localizedString("SAVAŞ", "BATTLE")
+            return userEnv.localizedString("AKTİF SİNYAL", "ACTIVE SIGNAL")
         }
     }
 
     private var difficultyStars: Int {
-        // 20 seviyeye yayılmış yıldız — boss'larda 1 ekstra
         let base = max(1, min(5, (level.id + 3) / 4))
         return level.type == .boss ? min(5, base + 1) : base
     }
 
-    private var difficultyBar: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<5) { i in
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(i < difficultyStars ? ThemeColors.nodeCurrent : ThemeColors.nodeLocked)
-                    .frame(width: 12, height: 6)
-            }
-            Text(userEnv.localizedString("ZORLUK", "DIFFICULTY"))
-                .font(.pixel(5))
-                .foregroundColor(ThemeColors.mapHudMuted)
-                .tracking(1)
-                .padding(.leading, 2)
-        }
-    }
-
     private var modifierHintText: String? {
-        // Basit rotasyon — gerçek sistem gelene kadar “öneri” UX’i hazır dursun.
-        // Level bandı ilerledikçe farklı counter karakterler önerilir.
         let bucket = (level.id / 5) % 4
         switch bucket {
-        case 0:
-            return userEnv.localizedString("UPCOMING: WEIGHT → TITAN", "UPCOMING: WEIGHT → TITAN")
-        case 1:
-            return userEnv.localizedString("UPCOMING: FOG → TIME BENDER", "UPCOMING: FOG → TIME BENDER")
-        case 2:
-            return userEnv.localizedString("UPCOMING: PRESSURE → NEON WRAITH", "UPCOMING: PRESSURE → NEON WRAITH")
-        default:
-            return userEnv.localizedString("UPCOMING: VOID → GHOST", "UPCOMING: VOID → GHOST")
-        }
-    }
-
-    private var nodeHeaderBg: Color {
-        if level.type == .boss { return ThemeColors.nodeBgBoss }
-        switch level.status {
-        case .completed: return ThemeColors.nodeBgCompleted
-        case .available: return ThemeColors.nodeBgCurrent
-        case .locked:    return ThemeColors.nodeBgLocked
+        case 0: return userEnv.localizedString("TAVSİYE: Titan blokları ağırlık direnci gerektirir.", "ADVICE: Titan blocks require weight resistance.")
+        case 1: return userEnv.localizedString("TAVSİYE: Zaman Bükücü'ye karşı hızlı hamleler yap.", "ADVICE: Use fast moves against Time Benders.")
+        case 2: return userEnv.localizedString("TAVSİYE: Neon Hayaletler görüş alanını daraltabilir.", "ADVICE: Neon Wraiths may narrow your field of view.")
+        default: return userEnv.localizedString("TAVSİYE: Boşluk bloklarını temizlemek için kombolara odaklan.", "ADVICE: Focus on combos to clear Void blocks.")
         }
     }
 
@@ -182,61 +177,60 @@ struct WorldMapDetailSheet: View {
     }
 }
 
-// MARK: - Normal savaş içeriği
+// MARK: - Normal Battle Content
 struct WorldSheetBattleContent: View {
     let level: WorldLevel
     @EnvironmentObject var userEnv: UserEnvironment
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(ThemeColors.enemyBg)
-                        .frame(width: 44, height: 44)
-                    Text(enemyEmoji)
-                        .font(.system(size: 22))
-                }
+        VStack(spacing: 24) {
+            // Target Info
+            VStack(alignment: .leading, spacing: 12) {
+                Text(userEnv.localizedString("DÜŞMAN ANALİZİ", "ENEMY ANALYSIS"))
+                    .font(.setCustomFont(name: .InterBold, size: 10))
+                    .foregroundColor(.white.opacity(0.4))
+                    .tracking(1)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(enemyName)
-                        .font(.pixel(7))
-                        .foregroundColor(ThemeColors.nodeCurrent)
-                        .lineLimit(1)
-                    Text(enemyIntent)
-                        .font(.pixel(5))
-                        .foregroundColor(ThemeColors.mapHudMuted)
-                        .lineLimit(2)
-                }
+                HStack(spacing: 16) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.white.opacity(0.06))
+                            .frame(width: 64, height: 64)
+                        Text(enemyEmoji)
+                            .font(.system(size: 36))
+                    }
 
-                Spacer(minLength: 0)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(enemyName)
+                            .font(.setCustomFont(name: .InterBold, size: 18))
+                            .foregroundColor(ThemeColors.neonCyan)
+                        Text(enemyIntent)
+                            .font(.setCustomFont(name: .InterMedium, size: 14))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    Spacer()
+                }
+                .padding(16)
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 18))
             }
-            .padding(10)
-            .background(ThemeColors.mapHudPanel)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(ThemeColors.mapHudBorder, lineWidth: 1)
-            )
 
-            HStack(spacing: 8) {
-                WorldRewardPill(icon: "★",
-                                label: userEnv.localizedString("PUAN", "SCORE"),
-                                value: "\(estimatedScore)")
-                WorldRewardPill(icon: "◆",
-                                label: userEnv.localizedString("ALTIN", "GOLD"),
-                                value: "\(estimatedGold)",
-                                color: ThemeColors.electricYellow)
-                WorldRewardPill(icon: "⚡",
-                                label: userEnv.localizedString("PERK", "PERK"),
-                                value: userEnv.localizedString("ŞANS", "CHANCE"),
-                                color: ThemeColors.neonCyan)
+            // Rewards
+            VStack(alignment: .leading, spacing: 14) {
+                Text(userEnv.localizedString("POTANSİYEL ÖDÜL", "POTENTIAL REWARDS"))
+                    .font(.setCustomFont(name: .InterBold, size: 10))
+                    .foregroundColor(.white.opacity(0.4))
+                    .tracking(1)
+                
+                HStack(spacing: 12) {
+                    WorldRewardPillV3(icon: "star.fill", label: "SCORE", value: "\(estimatedScore)", color: ThemeColors.neonCyan)
+                    WorldRewardPillV3(icon: "bitcoinsign.circle.fill", label: "GOLD", value: "\(estimatedGold)", color: ThemeColors.electricYellow)
+                }
             }
         }
     }
 
     private var enemyEmoji: String {
-        // Seviye bandına göre değişen minik görsel aksesuar
         switch level.id {
         case 0...3:   return "🤖"
         case 4...7:   return "👾"
@@ -247,35 +241,15 @@ struct WorldSheetBattleContent: View {
     }
 
     private var enemyName: String {
-        let tr = [
-            "VERİ BEKÇİSİ", "GLITCH PROBU", "SİBER AVCI", "NEON GLADIATÖR",
-            "KOD KEMİRCİSİ", "SENTRY BIRIMI", "PHANTOM EKO", "AĞIRLIK MODÜLÜ"
-        ]
-        let en = [
-            "DATA WARDEN", "GLITCH PROBE", "CYBER HUNTER", "NEON GLADIATOR",
-            "CODE GNAWER", "SENTRY UNIT", "PHANTOM ECHO", "WEIGHT MODULE"
-        ]
+        let tr = ["VERİ BEKÇİSİ", "GLITCH PROBU", "SİBER AVCI", "NEON GLADIATÖR"]
+        let en = ["DATA WARDEN", "GLITCH PROBE", "CYBER HUNTER", "NEON GLADIATOR"]
         let idx = abs(level.id - 1) % tr.count
         return userEnv.language == .turkish ? tr[idx] : en[idx]
     }
 
     private var enemyIntent: String {
-        let tr = [
-            "Gridini kilitleyecek.",
-            "Hamle başına 2 saniye çalar.",
-            "Blokları rastgele döndürür.",
-            "Can hasarı ikiye katlanır.",
-            "Tepsini karıştırır.",
-            "Puan çarpanını düşürür."
-        ]
-        let en = [
-            "Will lock your grid.",
-            "Steals 2s per move.",
-            "Spins blocks randomly.",
-            "Life damage doubled.",
-            "Shuffles your tray.",
-            "Drops score multiplier."
-        ]
+        let tr = ["Gridini kilitleyecek.", "Hamle başına 2 saniye çalar.", "Blokları rastgele döndürür."]
+        let en = ["Will lock your grid.", "Steals 2s per move.", "Spins blocks randomly."]
         let idx = (level.id * 7) % tr.count
         return userEnv.language == .turkish ? tr[idx] : en[idx]
     }
@@ -284,13 +258,12 @@ struct WorldSheetBattleContent: View {
     private var estimatedGold: Int { 25 + level.id * 8 }
 }
 
-// MARK: - Boss içeriği
+// MARK: - Boss Content
 struct WorldSheetBossContent: View {
     let slotId: Int
     let level: WorldLevel
     @EnvironmentObject var userEnv: UserEnvironment
     @State private var warningPulse = false
-    // Intent'i bir kere yakala — her re-render'da değişip titremesin
     @State private var bossIntent: String = ""
     @State private var selectedContract: BossContract = .safe
 
@@ -299,140 +272,190 @@ struct WorldSheetBossContent: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
-                // Boss portresi (gerçek asset) + kırmızı aksan çubuğu
+        VStack(spacing: 28) {
+            // Boss Identity
+            VStack(spacing: 20) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(ThemeColors.nodeBgBoss)
-                        .frame(width: 56, height: 56)
+                    Circle()
+                        .stroke(ThemeColors.neonPink.opacity(0.3), lineWidth: 2)
+                        .frame(width: 100, height: 100)
+                        .scaleEffect(warningPulse ? 1.15 : 1.0)
+                        .opacity(warningPulse ? 0 : 1)
+                    
                     Image(boss.imageName)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 52, height: 52)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .frame(width: 90, height: 90)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(ThemeColors.neonPink, lineWidth: 2))
+                        .shadow(color: ThemeColors.neonPink.opacity(0.4), radius: 15)
                 }
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(ThemeColors.nodeBoss, lineWidth: 1.5)
-                )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(userEnv.localizedString("!! BOSS SAVAŞİ !!", "!! BOSS FIGHT !!"))
-                        .font(.pixel(7))
-                        .foregroundColor(ThemeColors.nodeBoss)
-                        .tracking(1)
-                        .opacity(warningPulse ? 0.45 : 1.0)
-                        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true),
-                                   value: warningPulse)
-                    Text(bossIntent.isEmpty ? boss.getRandomIntent() : bossIntent)
-                        .font(.pixel(6))
-                        .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(2)
-                    Text(userEnv.localizedString(
-                        "Tüm canlarını ve overdrive'nı hazırla.",
-                        "Bring every life and overdrive you've got."
-                    ))
-                    .font(.pixel(5))
-                    .foregroundColor(ThemeColors.mapHudMuted)
+                .onAppear {
+                    withAnimation(.easeOut(duration: 1.5).repeatForever(autoreverses: false)) {
+                        warningPulse = true
+                    }
                 }
 
-                Spacer(minLength: 0)
-            }
-            .padding(12)
-            .background(Color(hex: "#130808"))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(ThemeColors.nodeBoss.opacity(0.4), lineWidth: 1)
-            )
-
-            // CONTRACT ACTIVE banner — TODO 10
-            if selectedContract == .risky {
-                HStack(spacing: 6) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(ThemeColors.neonPink)
-                    Text(userEnv.localizedString("RİSKLİ CONTRACT AKTİF — EĞer kazanırsan ekstra ödül!",
-                                                 "RISKY CONTRACT ACTIVE — Extra reward if you win!"))
-                        .font(.pixel(5))
+                VStack(spacing: 6) {
+                    Text(userEnv.localizedString("KRİTİK TEHDİT TESPİT EDİLDİ", "CRITICAL THREAT DETECTED"))
+                        .font(.setCustomFont(name: .InterBold, size: 12))
                         .foregroundColor(ThemeColors.neonPink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Spacer(minLength: 0)
+                        .tracking(2)
+                    
+                    Text(bossIntent.isEmpty ? boss.getRandomIntent() : bossIntent)
+                        .font(.setCustomFont(name: .InterMedium, size: 15))
+                        .foregroundColor(.white.opacity(0.9))
+                        .multilineTextAlignment(.center)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(ThemeColors.neonPink.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6)
-                    .stroke(ThemeColors.neonPink.opacity(0.35), lineWidth: 1))
             }
-
-            HStack(spacing: 8) {
-                WorldRewardPill(icon: "★",
-                                label: userEnv.localizedString("PUAN", "SCORE"),
-                                value: "\(1000 + level.id * 120)",
-                                color: ThemeColors.nodeCurrent)
-                WorldRewardPill(icon: "◆",
-                                label: userEnv.localizedString("ALTIN", "GOLD"),
-                                value: "\(150 + level.id * 15)",
-                                color: ThemeColors.electricYellow)
-                WorldRewardPill(icon: "♦",
-                                label: userEnv.localizedString("EŞYA", "ITEM"),
-                                value: userEnv.localizedString("NADİR", "RARE"),
-                                color: ThemeColors.neonPurple)
-            }
-
-            // Boss Contract: opsiyonel risk/ödül seçimi (UI + run flag)
-            VStack(alignment: .leading, spacing: 8) {
-                Text(userEnv.localizedString("BOSS CONTRACT", "BOSS CONTRACT"))
-                    .font(.pixel(6))
-                    .foregroundColor(ThemeColors.mapHudMuted)
+            .padding(24)
+            .background(ThemeColors.neonPink.opacity(0.07))
+            .clipShape(RoundedRectangle(cornerRadius: 28))
+            .overlay(RoundedRectangle(cornerRadius: 28).stroke(ThemeColors.neonPink.opacity(0.2), lineWidth: 1))
+            
+            // Risk Analysis
+            VStack(alignment: .leading, spacing: 12) {
+                Text(userEnv.localizedString("RİSK ANALİZİ & ÖDÜLLER", "RISK ANALYSIS & REWARDS"))
+                    .font(.setCustomFont(name: .InterBold, size: 10))
+                    .foregroundColor(.white.opacity(0.4))
                     .tracking(1)
-
-                HStack(spacing: 8) {
-                    contractButton(.safe)
-                    contractButton(.risky)
+                
+                HStack(spacing: 12) {
+                    riskInfoCard(
+                        title: userEnv.localizedString("GÜVENLİ", "SAFE"),
+                        desc: userEnv.localizedString("Standart Zorluk", "Standard Difficulty"),
+                        reward: "+0%",
+                        color: ThemeColors.neonCyan,
+                        isSelected: selectedContract == .safe,
+                        onTap: { selectContract(.safe) }
+                    )
+                    
+                    riskInfoCard(
+                        title: userEnv.localizedString("RİSKLİ", "RISKY"),
+                        desc: userEnv.localizedString("+50% Boss Canı", "+50% Boss HP"),
+                        reward: "+50% GOLD",
+                        color: ThemeColors.neonPink,
+                        isSelected: selectedContract == .risky,
+                        onTap: { selectContract(.risky) }
+                    )
                 }
             }
-            .padding(10)
-            .background(ThemeColors.mapHudPanel)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(ThemeColors.mapHudBorder, lineWidth: 1)
-            )
         }
         .onAppear {
-            warningPulse = true
             if bossIntent.isEmpty { bossIntent = boss.getRandomIntent() }
-            // Contract seçimini slot'tan restore et (sheet reopen olursa)
             let saved = SaveManager.shared.slots.first(where: { $0.id == slotId })?.activeBossContractId ?? BossContract.safe.rawValue
             selectedContract = BossContract(rawValue: saved) ?? .safe
         }
     }
 
-    private func contractButton(_ c: BossContract) -> some View {
-        let isSelected = selectedContract == c
-        return Button {
-            HapticManager.shared.play(.selection)
-            selectedContract = c
-            SaveManager.shared.setBossContract(slotId: slotId, contractId: c.rawValue)
-        } label: {
-            Text(userEnv.localizedString(c.titleTR, c.titleEN))
-                .font(.pixel(6))
-                .foregroundColor(isSelected ? c.color : ThemeColors.mapHudMuted)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background((isSelected ? c.color.opacity(0.12) : Color.white.opacity(0.04)))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke((isSelected ? c.color.opacity(0.45) : ThemeColors.mapHudBorder), lineWidth: 1)
-                )
+    private func riskInfoCard(title: String, desc: String, reward: String, color: Color, isSelected: Bool, onTap: @escaping () -> Void) -> some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(title)
+                        .font(.setCustomFont(name: .InterBlack, size: 14))
+                    Spacer()
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14))
+                    }
+                }
+                
+                Text(desc)
+                    .font(.setCustomFont(name: .InterMedium, size: 10))
+                    .opacity(0.7)
+                
+                Text(reward)
+                    .font(.setCustomFont(name: .InterBold, size: 12))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(color.opacity(0.2))
+                    .clipShape(Capsule())
+            }
+            .foregroundColor(isSelected ? .black : .white)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? color : Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(isSelected ? color : Color.white.opacity(0.1), lineWidth: 1))
         }
         .buttonStyle(.plain)
+    }
+    
+    private func selectContract(_ c: BossContract) {
+        HapticManager.shared.play(.selection)
+        selectedContract = c
+        SaveManager.shared.setBossContract(slotId: slotId, contractId: c.rawValue)
+    }
+}
+
+// MARK: - Reward Pill
+struct WorldRewardPillV3: View {
+    let icon: String
+    let label: String
+    let value: String
+    var color: Color = .white
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.1))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundColor(color)
+            }
+            
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                    .font(.setCustomFont(name: .InterBold, size: 9))
+                    .foregroundColor(.white.opacity(0.4))
+                Text(value)
+                    .font(.setCustomFont(name: .InterBold, size: 16))
+                    .foregroundColor(.white)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.05), lineWidth: 1))
+    }
+}
+
+// MARK: - Action Button
+struct WorldSheetActionButtonV2: View {
+    let level: WorldLevel
+    let onEnter: () -> Void
+    @EnvironmentObject var userEnv: UserEnvironment
+
+    var body: some View {
+        Button(action: onEnter) {
+            let isAvailable = level.status != .locked
+            let accent = level.type == .boss ? ThemeColors.neonPink : ThemeColors.neonCyan
+            
+            Text(label.uppercased())
+                .font(.setCustomFont(name: .InterBlack, size: 15))
+                .tracking(2)
+                .foregroundColor(isAvailable ? .black : .white.opacity(0.2))
+                .frame(maxWidth: .infinity)
+                .frame(height: 60)
+                .background(isAvailable ? accent : Color.white.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .shadow(color: isAvailable ? accent.opacity(0.5) : .clear, radius: 15, y: 5)
+        }
+        .buttonStyle(.plain)
+        .disabled(level.status == .locked)
+    }
+
+    private var label: String {
+        switch (level.type, level.status) {
+        case (_, .locked):     return userEnv.localizedString("ERİŞİM KISITLI", "ACCESS RESTRICTED")
+        case (.boss, _):       return userEnv.localizedString("BAĞLANTIYI KUR", "INITIALIZE LINK")
+        case (_, .completed):  return userEnv.localizedString("YENİDEN BAĞLAN", "RE-CONNECT")
+        case (_, .available):  return userEnv.localizedString("SİSTEME GİRİŞ", "INITIALIZE ENTRY")
+        }
     }
 }
 
@@ -440,106 +463,10 @@ enum BossContract: String, Codable {
     case safe
     case risky
 
-    var titleTR: String {
-        switch self {
-        case .safe: return "GÜVENLİ (+0)"
-        case .risky: return "RİSKLİ (+ÖDÜL)"
-        }
-    }
-    var titleEN: String {
-        switch self {
-        case .safe: return "SAFE (+0)"
-        case .risky: return "RISKY (+REWARD)"
-        }
-    }
     var color: Color {
         switch self {
         case .safe: return ThemeColors.neonCyan
         case .risky: return ThemeColors.neonPink
         }
-    }
-}
-
-// MARK: - Ödül pill
-struct WorldRewardPill: View {
-    let icon: String
-    let label: String
-    let value: String
-    var color: Color = .white
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Text(icon).font(.system(size: 10))
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label)
-                    .font(.pixel(4))
-                    .foregroundColor(ThemeColors.mapHudMuted)
-                    .tracking(1)
-                Text(value)
-                    .font(.pixel(7))
-                    .foregroundColor(color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .frame(maxWidth: .infinity)
-        .background(ThemeColors.mapHudPanel)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(ThemeColors.mapHudBorder, lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - Aksiyon butonu
-struct WorldSheetActionButton: View {
-    let level: WorldLevel
-    let onEnter: () -> Void
-    @EnvironmentObject var userEnv: UserEnvironment
-
-    var body: some View {
-        Button(action: onEnter) {
-            Text(label)
-                .font(.pixel(9))
-                .foregroundColor(textColor)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(bg)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(border, lineWidth: 1.5)
-                )
-        }
-        .buttonStyle(.plain)
-        .disabled(level.status == .locked)
-        .opacity(level.status == .locked ? 0.55 : 1.0)
-    }
-
-    private var label: String {
-        switch (level.type, level.status) {
-        case (_, .locked):     return userEnv.localizedString("KİLİTLİ", "LOCKED")
-        case (.boss, _):       return userEnv.localizedString("!! BOSS'A MEYDAN OKU !!", "!! CHALLENGE BOSS !!")
-        case (_, .completed):  return userEnv.localizedString("TEKRAR GİR", "RE-ENTER")
-        case (_, .available):  return userEnv.localizedString("SAVAŞA GİR >", "ENTER BATTLE >")
-        }
-    }
-
-    private var bg: Color {
-        if level.status == .locked { return Color.black.opacity(0.6) }
-        return level.type == .boss ? Color(hex: "#3a0808") : Color(hex: "#0d1a2e")
-    }
-
-    private var border: Color {
-        if level.status == .locked { return ThemeColors.nodeLocked }
-        return level.type == .boss ? ThemeColors.nodeBoss : ThemeColors.pixelEye
-    }
-
-    private var textColor: Color {
-        if level.status == .locked { return ThemeColors.mapHudMuted }
-        return level.type == .boss ? ThemeColors.nodeBoss : ThemeColors.pixelEye
     }
 }

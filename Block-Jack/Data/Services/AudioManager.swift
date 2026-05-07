@@ -17,6 +17,9 @@ enum SoundEffect: String {
     case perkUnlock = "sfx_unlock"
     case buttonTap = "sfx_tap"
     case coin = "sfx_coin"
+    case powerUp = "sfx_powerup"
+    case synergy = "sfx_synergy"
+    case deadlock = "sfx_error"
 }
 
 enum MusicTrack: String {

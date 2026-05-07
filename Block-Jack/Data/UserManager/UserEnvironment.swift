@@ -236,19 +236,7 @@ class UserEnvironment: ObservableObject {
         }
     }
     
-    // MARK: - Core Perk Upgrade Levels (Phase 13)
-    @Published var perkUpgradeLevels: [String: Int] {
-        didSet {
-            savePerkUpgrades()
-        }
-    }
-    
-    // MARK: - Owned One-Time Perks (Tier 2-3) (Phase 13)
-    @Published var ownedPerkIDs: Set<String> {
-        didSet {
-            saveOwnedPerks()
-        }
-    }
+
 
     // MARK: - Phase 8: Retention (Daily Reward / Achievements / Leaderboard)
 
@@ -391,24 +379,7 @@ class UserEnvironment: ObservableObject {
             self.goldUpgradeLevels = [:]
         }
         
-        if let data = UserDefaults.standard.data(forKey: "perkUpgradeLevels"),
-           let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
-            self.perkUpgradeLevels = decoded
-        } else {
-            self.perkUpgradeLevels = [
-                "golden_stamp": 1,
-                "overkill": 1,
-                "safe_house": 1
-            ]
-        }
-        
-        if let data = UserDefaults.standard.data(forKey: "ownedPerkIDs"),
-           let decoded = try? JSONDecoder().decode(Set<String>.self, from: data) {
-            self.ownedPerkIDs = decoded
-        } else {
-            // Tier 1 perks are owned by default
-            self.ownedPerkIDs = ["golden_stamp", "overkill", "safe_house"]
-        }
+
 
         // Phase 8 retention state
         self.lastDailyClaimTimestamp = UserDefaults.standard.double(forKey: "lastDailyClaimTimestamp")
@@ -544,17 +515,7 @@ class UserEnvironment: ObservableObject {
         return true
     }
     
-    func savePerkUpgrades() {
-        if let data = try? JSONEncoder().encode(perkUpgradeLevels) {
-            UserDefaults.standard.set(data, forKey: "perkUpgradeLevels")
-        }
-    }
-    
-    func saveOwnedPerks() {
-        if let data = try? JSONEncoder().encode(ownedPerkIDs) {
-            UserDefaults.standard.set(data, forKey: "ownedPerkIDs")
-        }
-    }
+
 
     // MARK: - Phase C Discovery Helpers
     

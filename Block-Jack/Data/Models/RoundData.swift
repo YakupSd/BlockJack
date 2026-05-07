@@ -79,41 +79,32 @@ struct RoundData {
     /// tek double-clear ile ~5000 puan kazanabildiği için round çok daha
     /// tatmin edici kapanıyor.
     static func makeTarget(for round: Int, worldLevel: Int = 1) -> Int {
-        // SCORING v2 sonrası (combo/zone/flush çok daha büyük) pacing fix:
-        // Hedefi yukarı çekiyoruz ki tek bir mega-clear çoğu zaman round'u
-        // tek atışta geçirmesin; yine de 2-4 hamlede “juice” hissi sürsün.
+        // GENEROUS SCORING (V4) Pacing Fix:
+        // Puanlar ~2.5x arttığı için hedefleri de yukarı çekiyoruz.
+        // Round 1 artık ~6550 hedefiyle başlıyor.
         let r = max(1, round)
         let wl = max(1, worldLevel)
 
-        // Taban eğri: lineer + kuadratik + hafif üstel (round büyüdükçe hızlanır)
         let rr = Double(r - 1)
-        // Zone puanları nerf'lenince pacing'i korumak için hedef eğrisini orantılı arttır.
-        let base = 2500.0 + rr * 2900.0 + rr * rr * 260.0
+        // Taban eğri: Başlangıç 3120 yapıldı (3120 * 2.1 = 6552)
+        let base = 3120.0 + rr * 3200.0 + rr * rr * 350.0
 
-        // World Level çarpanı: daha agresif (W10+ modifier’larla skor da artıyor)
+        // World Level çarpanı: Her level +%35 zorluk ekler
         let worldMultiplier = 1.0 + Double(wl - 1) * 0.35
 
-        // Global pacing: her durumda hedefi yukarı çeker
         var finalTarget = base * worldMultiplier
 
-        // Boss round’lar doğal olarak daha sert
+        // Boss round’lar (R5, R10...) her zaman daha sert
         if r % 5 == 0 && r > 0 {
             let bossIndex = r / 5
-            let bump = 1.6 + Double(bossIndex) * 0.22
+            let bump = 1.7 + Double(bossIndex) * 0.25
             finalTarget *= bump
         } else {
-            finalTarget *= 2.1 // Pacing fix: reduced from 2.4 for better accessibility
+            finalTarget *= 2.1 // Pacing multiplier
         }
 
-        // Alt sınır: round 1 bile “tek patlatma ile bitmesin”
-        var target = max(4500, Int(finalTarget.rounded()))
-        
-        // Phase 13: Golden Stamp reduction
-        let perkLevel = UserEnvironment.shared.perkUpgradeLevels["golden_stamp"] ?? 1
-        let reduction = PerkUpgradeRegistry.tierData(for: .goldenStamp, tier: perkLevel).effectValue
-        target = Int(Double(target) * (1.0 - reduction))
-        
-        return target
+        // Alt sınır: Artık 6500'den aşağı round olmasın
+        return max(6500, Int(finalTarget.rounded()))
     }
 
     static func make(round: Int, worldLevel: Int = 1, modifier: BossModifier? = nil) -> RoundData {
@@ -166,9 +157,9 @@ struct RunState {
     var lives: Int = 3
     var maxLives: Int = 5
     
-    mutating func loseLife() { lives = max(0, lives - 1) }
-    mutating func gainLife() { lives = min(maxLives, lives + 1) }
-    var isGameOver: Bool { lives <= 0 }
+    mutating func loseLife() { /* No-op: Can mantığı kaldırıldı */ }
+    mutating func gainLife() { /* No-op: Can mantığı kaldırıldı */ }
+    var isGameOver: Bool { false } // Artık round kaybı run'ı bitirmez
 
     var round: RoundData { RoundData.make(round: currentRound, worldLevel: worldLevel, modifier: activeModifier) }
 

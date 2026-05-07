@@ -213,44 +213,47 @@ class PerkShopViewModel: ObservableObject {
         self.userEnv = userEnv
     }
     
+    private var activeSlot: SaveSlot? {
+        guard let slotId = userEnv.activeSlotId else { return nil }
+        return SaveManager.shared.slots.first(where: { $0.id == slotId })
+    }
+    
     func currentTier(for id: String) -> Int {
-        return userEnv.perkUpgradeLevels[id] ?? 0
+        return activeSlot?.perkLevels[id] ?? 0
     }
     
     func isOwned(_ item: PerkShopItem) -> Bool {
-        if item.category == .core { return true } // Tier 1 is free
-        return (userEnv.perkUpgradeLevels[item.id] ?? 0) >= 1 || userEnv.ownedPerkIDs.contains(item.id)
+        if item.category == .core { return true }
+        return currentTier(for: item.id) >= 1
     }
     
     func canAfford(_ item: PerkShopItem) -> Bool {
+        guard let slot = activeSlot else { return false }
         let current = currentTier(for: item.id)
         if current >= 5 { return false }
         
         let nextTier = current + 1
         let nextData = PerkUpgradeRegistry.tierData(for: PerkUpgradeID(rawValue: item.id)!, tier: nextTier)
         
-        return userEnv.gold >= nextData.goldCost && userEnv.diamonds >= nextData.diamondCost
+        return slot.gold >= nextData.goldCost && userEnv.diamonds >= nextData.diamondCost
     }
     
     func upgrade(_ item: PerkShopItem) {
-        guard canAfford(item) else { return }
-        
+        guard let slotId = userEnv.activeSlotId else { return }
         let current = currentTier(for: item.id)
         let nextTier = current + 1
         let nextData = PerkUpgradeRegistry.tierData(for: PerkUpgradeID(rawValue: item.id)!, tier: nextTier)
         
-        // Deduct
-        userEnv.gold -= nextData.goldCost
-        userEnv.diamonds -= nextData.diamondCost
+        let success = SaveManager.shared.upgradeMetaPerk(
+            slotId: slotId,
+            perkId: item.id,
+            goldCost: nextData.goldCost,
+            diamondCost: nextData.diamondCost
+        )
         
-        // Apply level
-        userEnv.perkUpgradeLevels[item.id] = nextTier
-        if nextTier == 1 && !userEnv.ownedPerkIDs.contains(item.id) {
-            userEnv.ownedPerkIDs.insert(item.id)
+        if success {
+            triggerSuccess()
         }
-        
-        userEnv.savePerkUpgrades()
-        triggerSuccess()
     }
     
     private func triggerSuccess() {

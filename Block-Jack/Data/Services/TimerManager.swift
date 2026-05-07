@@ -28,10 +28,15 @@ final class TimerManager: ObservableObject {
 
     // MARK: - Controls
     func setup(seconds: Double) {
-        didExpire = false
-        stop()
+        reset()
         totalTime = seconds
         timeRemaining = seconds
+        ratio = 1.0
+    }
+
+    func reset() {
+        stop()
+        didExpire = false
         ratio = 1.0
     }
 

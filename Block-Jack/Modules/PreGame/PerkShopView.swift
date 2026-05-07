@@ -26,7 +26,7 @@ struct PerkShopView: View {
     private var gold: Int { slot?.gold ?? 0 }
 
     private func isUnlocked(_ perk: StartingPerk) -> Bool {
-        slot?.unlockedPerkIDs.contains(perk.id) ?? false
+        return (slot?.perkLevels[perk.id] ?? 0) >= 1
     }
 
     // Tier 1..5 gruplama
@@ -286,7 +286,7 @@ struct PerkShopView: View {
     // MARK: - Actions
 
     private func attemptUnlock(_ perk: StartingPerk) {
-        let success = SaveManager.shared.unlockPerk(slotId: slotId, perk: perk)
+        let success = SaveManager.shared.upgradeMetaPerk(slotId: slotId, perkId: perk.id, goldCost: perk.goldCost, diamondCost: 0)
         if success {
             HapticManager.shared.play(.success)
             recentlyUnlocked = perk.id
@@ -305,14 +305,15 @@ struct PerkShopView: View {
 
     @ViewBuilder
     private func perkIcon(_ perk: StartingPerk) -> some View {
-        if perk.icon.hasPrefix("item_") {
+        if perk.icon.hasPrefix("item_") || perk.icon.hasPrefix("perk_") {
             Image(perk.icon)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 32, height: 32)
         } else {
-            Text(perk.icon)
-                .font(.system(size: 28))
+            Image(systemName: perk.icon)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(tierColor(perk.tier))
         }
     }
 

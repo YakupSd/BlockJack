@@ -114,32 +114,39 @@ enum EnemyAttackType: String, CaseIterable {
 
     static func random(forRound round: Int, archetype: BossArchetype?, phase: Int) -> EnemyAttackType {
         let p = max(1, min(3, phase))
-        let pool: [EnemyAttackType] = {
+        
+        // Phase bazlı zorluk havuzları
+        let phase1Pool: [EnemyAttackType] = [.scramble, .timeHeist, .curseSpreader]
+        let phase2Pool: [EnemyAttackType] = [.trayLockdown, .lastBlockErase, .timeHeist, .scramble]
+        let phase3Pool: [EnemyAttackType] = [.gridSabotage, .heavyArmor, .trayLockdown, .lastBlockErase]
+        
+        // Archetype bazlı öncelikli ataklar (her phase'de bu havuza eklenirler)
+        let archetypeBonus: [EnemyAttackType] = {
             switch archetype {
-            case .breaker:
-                return [.gridSabotage, .lastBlockErase, .scramble, .trayLockdown]
-            case .timerHunter:
-                return [.timeHeist, .trayLockdown, .curseSpreader, .scramble]
-            case .heavyKing:
-                return [.heavyArmor, .trayLockdown, .gridSabotage, .curseSpreader]
-            case .phantom:
-                return [.curseSpreader, .scramble, .lastBlockErase, .timeHeist]
-            case .none:
-                return EnemyAttackType.allCases
+            case .breaker:     return [.gridSabotage, .lastBlockErase]
+            case .timerHunter: return [.timeHeist, .trayLockdown]
+            case .heavyKing:   return [.heavyArmor, .trayLockdown]
+            case .phantom:     return [.curseSpreader, .scramble]
+            case .none:        return []
             }
         }()
 
-        // Phase 1: daha hafif subset
-        if p == 1 {
-            let mild = pool.filter { $0 != .gridSabotage && $0 != .heavyArmor } // biraz daha yumuşak
-            return (mild.isEmpty ? pool : mild).randomElement() ?? .scramble
+        let finalPool: [EnemyAttackType]
+        switch p {
+        case 1:
+            // Sadece hafif ataklar + nadiren archetype bonus
+            finalPool = phase1Pool + (Double.random(in: 0...1) < 0.3 ? archetypeBonus : [])
+        case 2:
+            // Orta zorluk + archetype bonus daha olası
+            finalPool = phase2Pool + archetypeBonus
+        case 3:
+            // En zor ataklar + archetype bonus garantili
+            finalPool = phase3Pool + archetypeBonus + archetypeBonus // Double weight for archetype
+        default:
+            finalPool = EnemyAttackType.allCases
         }
-        // Phase 3: ağır ataklar daha olası
-        if p == 3 {
-            let weighted = pool + pool + pool + [.gridSabotage, .heavyArmor, .trayLockdown]
-            return weighted.randomElement() ?? pool.randomElement() ?? .gridSabotage
-        }
-        return pool.randomElement() ?? EnemyAttackType.random(forRound: round)
+
+        return finalPool.randomElement() ?? EnemyAttackType.random(forRound: round)
     }
 }
 

@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "perk_golden_stamp.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

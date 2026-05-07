@@ -12,6 +12,7 @@ import SwiftUI
 struct ScoreHUDView: View {
     @ObservedObject var vm: GameViewModel
     @EnvironmentObject var userEnv: UserEnvironment
+    var onInfoTap: (() -> Void)? = nil
     
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -26,7 +27,21 @@ struct ScoreHUDView: View {
                     streakPill
                         .transition(.scale.combined(with: .opacity))
                 }
-                multiplierBadge
+                
+                HStack(spacing: 6) {
+                    multiplierBadge
+                    
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        onInfoTap?()
+                    } label: {
+                        Image(systemName: "info.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(ThemeColors.neonCyan)
+                            .shadow(color: ThemeColors.neonCyan.opacity(0.5), radius: 4)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         .padding(.horizontal, GameLayout.horizontalPadding)

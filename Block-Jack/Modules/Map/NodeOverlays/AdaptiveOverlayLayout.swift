@@ -43,7 +43,7 @@ struct AdaptiveOverlay<Header: View, Content: View, Footer: View>: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 24) {
                         header()
-                            .padding(.top, max(geo.safeAreaInsets.top + 4, 16))
+                            .padding(.top, max(geo.safeAreaInsets.top, 10))
 
                         content()
                             .frame(maxWidth: .infinity)
@@ -108,13 +108,13 @@ struct OverlayTitleBlock: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             Text(title)
-                .font(.custom("Outfit-Bold", size: 30, relativeTo: .largeTitle))
+                .font(.custom("Outfit-Bold", size: 24, relativeTo: .title))
                 .foregroundColor(color)
-                .shadow(color: color.opacity(0.8), radius: 8)
+                .shadow(color: color.opacity(0.8), radius: 6)
                 .lineLimit(1)
-                .minimumScaleFactor(0.55)
+                .minimumScaleFactor(0.65)
 
             if let subtitle {
                 Text(subtitle)

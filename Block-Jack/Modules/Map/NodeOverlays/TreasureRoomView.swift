@@ -59,13 +59,13 @@ struct TreasureRoomView: View {
     
     private func generateOptions() {
         guard let slot = currentSlot else { return }
-        let unlockedIds = Set(slot.unlockedPerkIDs.isEmpty ? StartingPerk.defaultUnlockedIDs : slot.unlockedPerkIDs)
         
-        // Havuz: Sadece slot'ta kilitleri açılmış (unlocked) perkler.
+        // Havuz: Sadece slot'ta seviyesi en az 1 olan (unlocked) perkler.
         // Mevcut perkleri de dahil et (seviye atlamak için), ama tier 3+ olanları ele.
-        let pool = PerkEngine.perkPool.filter { perk in
-            unlockedIds.contains(perk.id) && 
-            (slot.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 0) < 3
+        let pool = PerkEngine.getPerkPool(lang: userEnv.language).filter { perk in
+            let metaLevel = slot.perkLevels[perk.id] ?? 0
+            let currentRunTier = slot.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 0
+            return metaLevel >= 1 && currentRunTier < 3
         }
         self.options = Array(pool.shuffled().prefix(3))
     }
@@ -152,11 +152,21 @@ struct TreasureRoomView: View {
                         HapticManager.shared.play(.success)
                     }) {
                         HStack(spacing: 14) {
-                            Text(perk.icon)
-                                .font(.system(size: 34))
-                                .frame(width: 60, height: 60)
-                                .background(Color.white.opacity(0.05))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            ZStack {
+                                if perk.icon.hasPrefix("perk_") || perk.icon.hasPrefix("item_") {
+                                    Image(perk.icon)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 44, height: 44)
+                                } else {
+                                    Image(systemName: perk.icon)
+                                        .font(.system(size: 28, weight: .bold))
+                                        .foregroundStyle(ThemeColors.neonGreen)
+                                }
+                            }
+                            .frame(width: 60, height: 60)
+                            .background(Color.white.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(isOwned ? "LEVEL UP: \(perk.name)" : perk.name)
@@ -193,10 +203,18 @@ struct TreasureRoomView: View {
     }
 
     private var rewardClaimedSection: some View {
-        VStack(spacing: 18) {
-            Text(selectedPerk?.icon ?? "🎁")
-                .font(.system(size: 80))
-                .shadow(color: ThemeColors.neonGreen, radius: 20)
+            if let icon = selectedPerk?.icon, icon.hasPrefix("perk_") || icon.hasPrefix("item_") {
+                Image(icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 100, height: 100)
+                    .shadow(color: ThemeColors.neonGreen, radius: 20)
+            } else {
+                Image(systemName: selectedPerk?.icon ?? "gift.fill")
+                    .font(.system(size: 80, weight: .bold))
+                    .foregroundStyle(ThemeColors.neonGreen)
+                    .shadow(color: ThemeColors.neonGreen, radius: 20)
+            }
 
             Text("\(selectedPerk?.name ?? "") Elde Edildi!")
                 .font(.title2.weight(.bold))

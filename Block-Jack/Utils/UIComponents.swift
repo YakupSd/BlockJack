@@ -55,3 +55,33 @@ struct PulsingCircle: View {
             }
     }
 }
+
+// MARK: - Common Geometric Shapes
+struct HexagonShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width, h = rect.height
+        let cx = rect.midX, cy = rect.midY
+        let hx = w * 0.5, hy = h * 0.5, sideX = hx * 0.5
+        path.move(to: CGPoint(x: cx - hx + sideX, y: cy - hy))
+        path.addLine(to: CGPoint(x: cx + hx - sideX, y: cy - hy))
+        path.addLine(to: CGPoint(x: cx + hx, y: cy))
+        path.addLine(to: CGPoint(x: cx + hx - sideX, y: cy + hy))
+        path.addLine(to: CGPoint(x: cx - hx + sideX, y: cy + hy))
+        path.addLine(to: CGPoint(x: cx - hx, y: cy))
+        path.closeSubpath()
+        return path
+    }
+}
+
+struct DiamondShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
+        path.closeSubpath()
+        return path
+    }
+}

@@ -33,38 +33,77 @@ struct WorldSelectionView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var didAppear = false
-    @State private var hasAutoNavigated = false  // tek seferlik auto-skip guard
+    @State private var selectedWorldIndex = 0
+    @State private var hasAutoNavigated = false
     @State private var shakeWorldId: Int? = nil
 
     var body: some View {
         NavigationStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 10) {
-                    header
-                        .padding(.horizontal, 16)
-                        .padding(.top, 14)
+            ZStack {
+                // MARK: - Dynamic Background
+                DynamicBackground(palette: worldCards[selectedWorldIndex].palette)
+                    .ignoresSafeArea()
 
-                    ForEach(Array(worldCards.enumerated()), id: \.element.id) { idx, vm in
-                        WorldCard(
-                            vm: vm,
-                            isShaking: shakeWorldId == vm.worldId,
-                            onTap: { onWorldCardTap(vm: vm) }
-                        )
-                        .opacity(didAppear ? 1 : 0)
-                        .offset(y: didAppear ? 0 : 14)
-                        .animation(.easeOut(duration: 0.30).delay(Double(idx) * 0.05), value: didAppear)
+                VStack(spacing: 0) {
+                    header
+                        .padding(.horizontal, 24)
+                        .padding(.top, 20)
+
+                    Spacer()
+
+                    // MARK: - Horizontal Carousel
+                    ScrollViewReader { proxy in
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 20) {
+                                Spacer().frame(width: 20)
+                                ForEach(Array(worldCards.enumerated()), id: \.element.id) { idx, vm in
+                                    WorldCardV2(
+                                        vm: vm,
+                                        isFocused: selectedWorldIndex == idx,
+                                        isShaking: shakeWorldId == vm.worldId,
+                                        onTap: { onWorldCardTap(vm: vm, index: idx) }
+                                    )
+                                    .id(idx)
+                                    .opacity(didAppear ? 1 : 0)
+                                    .offset(x: didAppear ? 0 : 50)
+                                    .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(Double(idx) * 0.08), value: didAppear)
+                                }
+                                Spacer().frame(width: 20)
+                            }
+                            .scrollTargetLayout()
+                        }
+                        .scrollTargetBehavior(.viewAligned)
+                        .onScrollTargetVisibilityChange(idType: Int.self) { visibleIds in
+                            if let first = visibleIds.first {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    selectedWorldIndex = first
+                                }
+                            }
+                        }
                     }
+
+                    Spacer()
+
+                    // MARK: - Page Indicator
+                    HStack(spacing: 8) {
+                        ForEach(0..<worldCards.count, id: \.self) { i in
+                            Circle()
+                                .fill(i == selectedWorldIndex ? worldCards[i].palette.accentColor : Color.white.opacity(0.2))
+                                .frame(width: i == selectedWorldIndex ? 10 : 6, height: i == selectedWorldIndex ? 10 : 6)
+                        }
+                    }
+                    .padding(.bottom, 40)
                 }
-                .padding(.bottom, 28)
             }
-            .background(ThemeColors.backgroundGradient.ignoresSafeArea())
             .navigationBarHidden(true)
             .onAppear {
+                // Initialize selection to current unlocked world
+                let unlocked = max(1, userEnv.unlockedWorldLevel)
+                let currentWorldId = min(5, max(1, (unlocked - 1) / 20 + 1))
+                selectedWorldIndex = currentWorldId - 1
+                
                 didAppear = true
-                // TODO 5: Sadece 1 world açıksa (yeni oyuncu) ekran gösterme,
-                // direkt o world'e git.
-                // hasAutoNavigated flag'i sayesinde WorldMap'ten geri dönüldüğünde
-                // bu blok tekrar çalışmaz → sonsuz döngü önlenir.
+                
                 guard !hasAutoNavigated else { return }
                 let availableWorlds = worldCards.filter { $0.state != .locked }
                 if availableWorlds.count == 1, let only = availableWorlds.first {
@@ -79,55 +118,48 @@ struct WorldSelectionView: View {
 
     // MARK: - Header
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
                 Button {
                     HapticManager.shared.play(.buttonTap)
                     dismiss()
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 15, weight: .black))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(ThemeColors.gridDark)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(ThemeColors.gridStroke, lineWidth: 1)
-                        )
+                        .frame(width: 40, height: 40)
+                        .background(.white.opacity(0.05))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(.white.opacity(0.1), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
 
                 Spacer()
-            }
-
-            Text("BLOCK JACK")
-                .font(.setCustomFont(name: .InterBlack, size: 20))
-                .foregroundStyle(.white)
-                .tracking(2)
-
-            Text(userEnv.localizedString("DÜNYA SEÇİMİ · 5 DÜNYA", "WORLD SELECT · 5 WORLDS"))
-                .font(.setCustomFont(name: .InterMedium, size: 11))
-                .foregroundStyle(Color(hex: "#8888aa"))
-                .tracking(1)
-
-            HStack(spacing: 8) {
-                let completedWorlds = completedWorldCount
-                ForEach(0..<5, id: \.self) { i in
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(i < completedWorlds ? ThemeColors.neonCyan : ThemeColors.gridDark)
-                        .frame(width: 8, height: 8)
-                        .rotationEffect(.degrees(45))
+                
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(userEnv.localizedString("TOPLAM İLERLEME", "TOTAL PROGRESS"))
+                        .font(.setCustomFont(name: .InterBold, size: 9))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .tracking(1)
+                    Text("\(completedWorldCount * 20 + worldCards[min(4, completedWorldCount)].completedLevels)%")
+                        .font(.setCustomFont(name: .InterBlack, size: 16))
+                        .foregroundStyle(.white)
                 }
-                Spacer()
             }
-            .padding(.top, 2)
+
+            Text(userEnv.localizedString("SEKTÖR SEÇİMİ", "SECTOR SELECTION"))
+                .font(.setCustomFont(name: .InterBlack, size: 28))
+                .foregroundStyle(.white)
+                .padding(.top, 10)
+
+            Text(userEnv.localizedString("Giriş yapılacak bölgeyi seçin", "Select the region to initialize entry"))
+                .font(.setCustomFont(name: .InterMedium, size: 14))
+                .foregroundStyle(.white.opacity(0.5))
         }
     }
 
     // MARK: - Data
     private var completedWorldCount: Int {
-        // completed world count: unlockedLevel > worldEnd
         let wl = max(1, userEnv.unlockedWorldLevel)
         return min(5, max(0, (wl - 1) / 20))
     }
@@ -172,26 +204,21 @@ struct WorldSelectionView: View {
 
     private func worldTitle(_ wid: Int) -> String {
         switch wid {
-        case 1: return "NEON CORE"
-        case 2: return "CONCRETE RUINS"
-        case 3: return "CANDY LAB"
-        case 4: return "DEEP OCEAN"
-        default: return "VOID KERNEL"
+        case 1: return userEnv.localizedString("NEON ÇEKİRDEK", "NEON CORE")
+        case 2: return userEnv.localizedString("BETON HARABELER", "CONCRETE RUINS")
+        case 3: return userEnv.localizedString("ŞEKER LABORATUVARI", "CANDY LAB")
+        case 4: return userEnv.localizedString("DERİN OKYANUS", "DEEP OCEAN")
+        default: return userEnv.localizedString("BOŞLUK ÇEKİRDEĞİ", "VOID KERNEL")
         }
     }
 
     private func worldTwist(_ wid: Int) -> String {
         switch wid {
-        case 1:
-            return userEnv.localizedString("Eğitim dünyası · Twist yok", "Tutorial world · No twist")
-        case 2:
-            return userEnv.localizedString("Twist: Ağırlık · Bloklar düşer", "Twist: Weight · Blocks fall")
-        case 3:
-            return userEnv.localizedString("Twist: Yapışkan · Renk zincirleri", "Twist: Sticky · Color chains")
-        case 4:
-            return userEnv.localizedString("Twist: Basınç · Daha kısa süre", "Twist: Pressure · Shorter timers")
-        default:
-            return userEnv.localizedString("Twist: Boşluk · Gerçeklik bükülür", "Twist: Void · Reality bends")
+        case 1: return userEnv.localizedString("Eğitim dünyası · Twist yok", "Tutorial world · No twist")
+        case 2: return userEnv.localizedString("Ağırlık: Bloklar daha hızlı düşer", "Weight: Blocks fall faster")
+        case 3: return userEnv.localizedString("Yapışkan: Bloklar birbirine bağlanır", "Sticky: Blocks chain together")
+        case 4: return userEnv.localizedString("Basınç: Karar verme süresi azalır", "Pressure: Reduced decision time")
+        default: return userEnv.localizedString("Boşluk: Gerçeklik katmanları bükülür", "Void: Reality layers distort")
         }
     }
 
@@ -199,14 +226,20 @@ struct WorldSelectionView: View {
         switch wid {
         case 1: return "bolt.fill"
         case 2: return "building.2.fill"
-        case 3: return "sparkles"
+        case 3: return "bubbles.and.sparkles.fill"
         case 4: return "drop.fill"
-        default: return "circle.hexagongrid.fill"
+        default: return "cpu.fill"
         }
     }
 
-    // MARK: - Navigation
-    private func onWorldCardTap(vm: WorldCardViewModel) {
+    private func onWorldCardTap(vm: WorldCardViewModel, index: Int) {
+        if index != selectedWorldIndex {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                selectedWorldIndex = index
+            }
+            return
+        }
+        
         switch vm.state {
         case .locked:
             HapticManager.shared.play(.selection)
@@ -223,125 +256,148 @@ struct WorldSelectionView: View {
     }
 }
 
-// MARK: - World Card
-private struct WorldCard: View {
+// MARK: - Dynamic Background
+private struct DynamicBackground: View {
+    let palette: WorldCardPalette
+    
+    var body: some View {
+        ZStack {
+            ThemeColors.backgroundGradient
+            
+            // Large ambient glow
+            Circle()
+                .fill(palette.accentColor.opacity(0.15))
+                .blur(radius: 100)
+                .offset(x: 100, y: -200)
+            
+            Circle()
+                .fill(palette.accentColor.opacity(0.1))
+                .blur(radius: 120)
+                .offset(x: -150, y: 300)
+            
+            // Grid Overlay
+            GridPattern()
+                .stroke(palette.accentColor.opacity(0.05), lineWidth: 1)
+        }
+        .animation(.easeInOut(duration: 0.8), value: palette.accentColor)
+    }
+}
+
+// MARK: - World Card V2
+private struct WorldCardV2: View {
     let vm: WorldCardViewModel
+    let isFocused: Bool
     let isShaking: Bool
     let onTap: () -> Void
 
-    @EnvironmentObject var userEnv: UserEnvironment
     @State private var pressed: Bool = false
 
     var body: some View {
         let accent = vm.palette.accentColor
-        let scale: CGFloat = pressed ? 0.97 : 1.0
-
+        let cardWidth: CGFloat = 280
+        let cardHeight: CGFloat = 420
+        
         Button {
             onTap()
         } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    WorldIconView(icon: vm.icon, accent: accent)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("WORLD \(vm.worldId) · \(vm.levelRange)")
-                            .font(.setCustomFont(name: .InterBold, size: 10))
-                            .foregroundStyle(accent)
-                            .tracking(1.5)
-                        Text(vm.title)
-                            .font(.setCustomFont(name: .InterSemiBold, size: 14))
-                            .foregroundStyle(.white)
-                    }
-
-                    Spacer(minLength: 0)
-
-                    BadgeView(state: vm.state, accent: accent)
-                }
-
-                Text(vm.twist)
-                    .font(.setCustomFont(name: .InterMedium, size: 10))
-                    .foregroundStyle(accent.opacity(0.55))
-
-                if let hint = upcomingHintText(worldId: vm.worldId) {
-                    Text(hint)
-                        .font(.setCustomFont(name: .InterBold, size: 10))
-                        .foregroundStyle(accent.opacity(0.85))
-                        .tracking(1)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(accent.opacity(0.12))
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(accent.opacity(0.25), lineWidth: 1))
-                }
-
-                HStack(spacing: 10) {
-                    ProgressBar(progress: Double(vm.completedLevels) / Double(max(1, vm.totalLevels)), tint: accent)
-                    Text("\(vm.completedLevels) / \(vm.totalLevels)")
-                        .font(.setCustomFont(name: .InterMedium, size: 10))
-                        .foregroundStyle(Color(hex: "#8888aa"))
-                }
-
-                ActionButton(state: vm.state, accent: accent)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(vm.palette.cardBg)
+            ZStack(alignment: .bottom) {
+                // Background & Border
+                RoundedRectangle(cornerRadius: 32)
+                    .fill(vm.palette.cardBg.opacity(0.8))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(accent.opacity(0.27), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 32)
+                            .stroke(isFocused ? accent : accent.opacity(0.2), lineWidth: isFocused ? 2 : 1)
                     )
+                    .shadow(color: isFocused ? accent.opacity(0.3) : Color.clear, radius: 20)
+
+                // Large background number
+                Text("0\(vm.worldId)")
+                    .font(.system(size: 140, weight: .black))
+                    .foregroundStyle(accent.opacity(0.05))
+                    .offset(x: 40, y: -180)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    // Top: Icon and Badge
+                    HStack {
+                        WorldIconViewV2(icon: vm.icon, accent: accent)
+                        Spacer()
+                        BadgeViewV2(state: vm.state, accent: accent)
+                    }
+                    .padding(24)
+
+                    Spacer()
+
+                    // Middle: Titles
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(vm.levelRange)
+                            .font(.setCustomFont(name: .InterBold, size: 11))
+                            .foregroundStyle(accent)
+                            .tracking(2)
+                        
+                        Text(vm.title)
+                            .font(.setCustomFont(name: .InterBlack, size: 24))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                    }
+                    .padding(.horizontal, 24)
+
+                    // Bottom: Progress & Action
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(vm.twist)
+                            .font(.setCustomFont(name: .InterMedium, size: 12))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .fixedSize(horizontal: false, vertical: true)
+                        
+                        HStack(spacing: 12) {
+                            ProgressBarV2(progress: Double(vm.completedLevels) / Double(max(1, vm.totalLevels)), tint: accent)
+                            Text("\(vm.completedLevels)/\(vm.totalLevels)")
+                                .font(.setCustomFont(name: .InterBold, size: 10))
+                                .foregroundStyle(.white.opacity(0.4))
+                        }
+
+                        ActionButtonV2(state: vm.state, accent: accent)
+                    }
+                    .padding(24)
+                }
+            }
+            .frame(width: cardWidth, height: cardHeight)
+            .background(
+                // Ambient shadow behind card
+                RoundedRectangle(cornerRadius: 32)
+                    .fill(accent.opacity(0.05))
+                    .blur(radius: 20)
+                    .offset(y: 10)
             )
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .scaleEffect(scale)
+        .scaleEffect(isFocused ? 1.0 : 0.9)
+        .opacity(isFocused ? 1.0 : 0.6)
         .offset(x: isShaking ? -4 : 0)
-        .animation(isShaking ? .easeInOut(duration: 0.08).repeatCount(3, autoreverses: true) : .spring(response: 0.4, dampingFraction: 0.7), value: isShaking)
-        .onLongPressGesture(minimumDuration: 0.01, pressing: { isPressing in
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                pressed = isPressing && vm.state != .locked
-            }
-        }, perform: {})
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isFocused)
+        .animation(isShaking ? .easeInOut(duration: 0.08).repeatCount(3, autoreverses: true) : .none, value: isShaking)
         .allowsHitTesting(true)
-        .opacity(vm.state == .locked ? 0.55 : 1.0)
-    }
-
-    private func upcomingHintText(worldId: Int) -> String? {
-        switch worldId {
-        case 2:
-            return userEnv.localizedString("UPCOMING: WEIGHT → TITAN", "UPCOMING: WEIGHT → TITAN")
-        case 3:
-            return userEnv.localizedString("UPCOMING: FOG → TIME BENDER", "UPCOMING: FOG → TIME BENDER")
-        case 4:
-            return userEnv.localizedString("UPCOMING: PRESSURE → NEON WRAITH", "UPCOMING: PRESSURE → NEON WRAITH")
-        case 5:
-            return userEnv.localizedString("UPCOMING: VOID → GHOST", "UPCOMING: VOID → GHOST")
-        default:
-            return nil
-        }
     }
 }
 
-private struct WorldIconView: View {
+private struct WorldIconViewV2: View {
     let icon: String
     let accent: Color
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .fill(accent.opacity(0.12))
-            .frame(width: 36, height: 36)
-            .overlay(
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(accent)
-            )
+        ZStack {
+            Circle()
+                .fill(accent.opacity(0.15))
+                .frame(width: 56, height: 56)
+            
+            Image(systemName: icon)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(accent)
+                .shadow(color: accent.opacity(0.5), radius: 5)
+        }
     }
 }
 
-private struct BadgeView: View {
+private struct BadgeViewV2: View {
     let state: WorldState
     let accent: Color
 
@@ -349,43 +405,46 @@ private struct BadgeView: View {
         let (bg, fg, text): (Color, Color, String) = {
             switch state {
             case .active:
-                return (accent.opacity(0.12), accent, "ACTIVE")
+                return (accent.opacity(0.15), accent, "ACTIVE")
             case .completed:
-                return (Color(hex: "#00ff77").opacity(0.12), Color(hex: "#00ff77"), "DONE")
+                return (Color(hex: "#00ff77").opacity(0.15), Color(hex: "#00ff77"), "DONE")
             case .locked:
-                return (Color.white.opacity(0.06), Color(hex: "#555577"), "LOCKED")
+                return (Color.white.opacity(0.08), Color.white.opacity(0.4), "LOCKED")
             }
         }()
 
         Text(text)
             .font(.setCustomFont(name: .InterBold, size: 10))
             .foregroundStyle(fg)
-            .tracking(0.5)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
             .background(bg)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(fg.opacity(0.2), lineWidth: 1))
     }
 }
 
-private struct ProgressBar: View {
+private struct ProgressBarV2: View {
     let progress: Double
     let tint: Color
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.06))
+                Capsule().fill(Color.white.opacity(0.1))
                 Capsule()
-                    .fill(tint)
+                    .fill(
+                        LinearGradient(colors: [tint, tint.opacity(0.7)], startPoint: .leading, endPoint: .trailing)
+                    )
                     .frame(width: geo.size.width * CGFloat(min(1, max(0, progress))))
+                    .shadow(color: tint.opacity(0.5), radius: 4)
             }
         }
-        .frame(height: 4)
+        .frame(height: 6)
     }
 }
 
-private struct ActionButton: View {
+private struct ActionButtonV2: View {
     let state: WorldState
     let accent: Color
     @EnvironmentObject var userEnv: UserEnvironment
@@ -394,22 +453,23 @@ private struct ActionButton: View {
         let (bg, fg, text): (Color, Color, String) = {
             switch state {
             case .active:
-                return (accent.opacity(0.12), accent, userEnv.localizedString("DEVAM ET", "CONTINUE"))
+                return (accent, Color.white, userEnv.localizedString("SİSTEME GİRİŞ", "INITIALIZE ENTRY"))
             case .completed:
-                return (Color(hex: "#00ff77").opacity(0.12), Color(hex: "#00ff77"), userEnv.localizedString("TEKRAR OYNA", "REPLAY"))
+                return (Color.white.opacity(0.1), .white, userEnv.localizedString("TEKRAR BAĞLAN", "RE-CONNECT"))
             case .locked:
-                return (ThemeColors.gridDark, Color(hex: "#44445A"), userEnv.localizedString("🔒 Bir önceki dünyayı bitir", "🔒 Finish the previous world"))
+                return (Color.white.opacity(0.05), Color.white.opacity(0.3), userEnv.localizedString("ERİŞİM ENGELLENDİ", "ACCESS DENIED"))
             }
         }()
 
         Text(text)
-            .font(.setCustomFont(name: .InterMedium, size: 12))
+            .font(.setCustomFont(name: .InterBold, size: 12))
             .foregroundStyle(fg)
             .tracking(1)
             .frame(maxWidth: .infinity)
-            .frame(height: 34)
+            .frame(height: 44)
             .background(bg)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: state == .active ? accent.opacity(0.4) : .clear, radius: 10, y: 5)
     }
 }
 

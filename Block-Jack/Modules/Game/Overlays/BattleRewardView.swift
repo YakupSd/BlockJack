@@ -150,7 +150,8 @@ struct BattleRewardView: View {
             ))
         } else {
             let slot = SaveManager.shared.slots.first(where: { $0.id == slotId })
-            let unlockedIds = Set(slot?.unlockedPerkIDs.isEmpty == false ? slot!.unlockedPerkIDs : StartingPerk.defaultUnlockedIDs)
+            let perkLevels = slot?.perkLevels ?? [:]
+            let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
             
             // Sadece açık olan perkler havuzda
             let availablePerks = PerkEngine.perkPool.filter { unlockedIds.contains($0.id) }

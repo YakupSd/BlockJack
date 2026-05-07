@@ -76,7 +76,8 @@ struct MysteryEventView: View {
                 outcomeDesc: "Rastgele bir Pasif Perk kazandın!",
                 action: { id in
                     if let slot = SaveManager.shared.slots.first(where: { $0.id == id }) {
-                        let unlockedIds = Set(slot.unlockedPerkIDs.isEmpty ? StartingPerk.defaultUnlockedIDs : slot.unlockedPerkIDs)
+                        let perkLevels = slot.perkLevels
+                        let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
                         let activeIds = Set(slot.activePassivePerks.map { $0.id })
                         
                         let availablePerks = PerkEngine.perkPool.filter { perk in

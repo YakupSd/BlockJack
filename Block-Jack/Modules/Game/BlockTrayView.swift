@@ -44,16 +44,11 @@ struct BlockTileView: View {
 }
 
 // MARK: - BlockTrayView (UI Revize — overflow fix)
-/// Dinamik genişlik: ekran genişliğinde kaç slot varsa eşit paylaşılır.
-/// Böylece 3 veya 4 slot da ekrana sorunsuz sığar, overflow yok.
 struct BlockTrayView: View {
     @ObservedObject var vm: GameViewModel
-    /// Drag sırasında her frame çağrılır — GameView @State dragPosition günceller
     var onDragChanged: ((CGPoint) -> Void)? = nil
     
-    /// Slotlar arası boşluk
     private let slotSpacing: CGFloat = 8
-    /// Kart içi yatay iç padding (kart kenarından slotlara)
     private let innerPadding: CGFloat = 10
 
     var body: some View {
@@ -62,9 +57,7 @@ struct BlockTrayView: View {
         GeometryReader { geo in
             let available = geo.size.width - (innerPadding * 2)
             let totalGaps = slotSpacing * CGFloat(max(0, totalSlots - 1))
-            // Slot genişliği: mevcut alanı eşit böler. 3 slot için hesap: (W - 2*pad - 2*gap) / 3.
             let rawSlotWidth = (available - totalGaps) / CGFloat(totalSlots)
-            // Kare slot, ancak yükseklik 72pt ile sınırlı (dikey bütçe doğru kalsın).
             let slotSize = min(72, max(48, rawSlotWidth))
             
             HStack(spacing: slotSpacing) {
@@ -88,6 +81,44 @@ struct BlockTrayView: View {
                         .stroke(ThemeColors.trayBorder, lineWidth: 1)
                 )
         )
+        .overlay(alignment: .trailing) {
+            if vm.isDeadlocked {
+                refreshButton
+                    .padding(.trailing, 8)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+    }
+    
+    // MARK: - Refresh Button
+    @ViewBuilder
+    private var refreshButton: some View {
+        Button {
+            vm.refreshTrayWithCost()
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 14, weight: .black))
+                Text("REFRESH")
+                    .font(.setCustomFont(name: .InterBlack, size: 8))
+                Text("100 G")
+                    .font(.setCustomFont(name: .InterBold, size: 7))
+                    .opacity(0.8)
+            }
+            .foregroundColor(vm.canRefreshTray ? ThemeColors.neonOrange : .gray)
+            .frame(width: 54, height: 54)
+            .background(
+                Circle()
+                    .fill(ThemeColors.hudBg)
+                    .shadow(color: vm.canRefreshTray ? ThemeColors.neonOrange.opacity(0.4) : .clear, radius: 8)
+            )
+            .overlay(
+                Circle()
+                    .stroke(vm.canRefreshTray ? ThemeColors.neonOrange : Color.gray.opacity(0.3), lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!vm.canRefreshTray)
     }
     
     // MARK: - Empty slot
@@ -105,14 +136,10 @@ struct BlockTrayView: View {
     // MARK: - Filled slot
     @ViewBuilder
     private func traySlot(block: GameBlock, size: CGFloat) -> some View {
-        // Mini blok preview için tile boyutu — slot genişliğine göre adaptif
-        // 4 sütunluk blok bile sığsın: tileSize = (size - 16) / max(cols).
-        // Ama block boyutu değişken, sabit 10pt-14pt arası seçelim.
         let tileSize: CGFloat = max(9, min(14, (size - 24) / 5))
         let isActive = vm.draggingBlock?.id == block.id
         
         ZStack {
-            // Slot arka plan
             if block.isSpecial {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(block.ability.glowColor.opacity(0.08))
@@ -132,11 +159,9 @@ struct BlockTrayView: View {
                     )
             }
             
-            // Mini blok preview
             BlockTileView(block: block, tileSize: tileSize)
                 .opacity(isActive ? 0.25 : 1.0)
             
-            // Alt etiket
             if block.isSpecial {
                 VStack {
                     Spacer()
@@ -191,7 +216,6 @@ struct BlockTrayView: View {
                     lineWidth: 2
                 )
         )
-        // Aktif slot için hafif cyan glow (doc: "Aktif slot hafif cyan glowla vurgulanmış")
         .shadow(color: isActive ? ThemeColors.neonCyan.opacity(0.5) : .clear, radius: 8)
     }
 }

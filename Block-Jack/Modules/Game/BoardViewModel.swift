@@ -49,9 +49,23 @@ final class BoardViewModel: ObservableObject {
             let c = origin.col + dc
             guard r >= 0, r < Self.size, c >= 0, c < Self.size else { return false }
             let cell = grid[r][c]
-            if cell.isOccupied || cell.isLocked { return false }
+            // Locked hücreler (Glitch) hala yerleştirmeyi engeller.
+            // Heavy hücreler (Armor) artık yerleştirmeyi engellemez, sadece "darbe" alır.
+            if cell.isOccupied && !cell.isHeavy { return false }
+            if cell.isLocked { return false }
         }
         return true
+    }
+    
+    func canPlaceAnywhere(block: GameBlock) -> Bool {
+        for r in 0..<Self.size {
+            for c in 0..<Self.size {
+                if canPlace(block, at: GridPosition(row: r, col: c)) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     /// Bloğu grid'e yerleştir, temizlenen satır/sütun hücrelerini döndür
@@ -59,11 +73,21 @@ final class BoardViewModel: ObservableObject {
     func placeBlock(_ block: GameBlock, at origin: GridPosition) -> ClearResult? {
         guard canPlace(block, at: origin) else { return nil }
 
-        // Hücreleri doldur
+        // Hücreleri doldur veya Heavy darbesi uygula
         for (dr, dc) in block.cells {
             let r = origin.row + dr
             let c = origin.col + dc
-            grid[r][c].state = .filled(color: block.color)
+            let cell = grid[r][c]
+            
+            if case .heavy(let hits) = cell.state {
+                if hits > 1 {
+                    grid[r][c].state = .heavy(hits: hits - 1)
+                } else {
+                    grid[r][c].state = .filled(color: block.color)
+                }
+            } else if cell.isEmpty {
+                grid[r][c].state = .filled(color: block.color)
+            }
         }
 
         ghostCells = []
@@ -137,7 +161,9 @@ final class BoardViewModel: ObservableObject {
         let clearedPositions: [GridPosition]
         let rowsCleared: Int
         let colsCleared: Int
-        let zonesCleared: Int // NEW: 3x3 Area clears
+        let zonesCleared: Int
+        let rowCells: [[GameCell]] // NEW: For pattern detection
+        let colCells: [[GameCell]] // NEW: For pattern detection
     }
 
     @discardableResult
@@ -194,8 +220,11 @@ final class BoardViewModel: ObservableObject {
         }
 
         if targetPositions.isEmpty { 
-            return ClearResult(clearedCells: [], clearedPositions: [], rowsCleared: 0, colsCleared: 0, zonesCleared: 0)
+            return ClearResult(clearedCells: [], clearedPositions: [], rowsCleared: 0, colsCleared: 0, zonesCleared: 0, rowCells: [], colCells: [])
         }
+
+        let rowCells = fullRows.map { r in (0..<Self.size).map { c in grid[r][c] } }
+        let colCells = fullCols.map { c in (0..<Self.size).map { r in grid[r][c] } }
 
         // Temizlenecek hücrelerin koordinatlarını belirle (targetPositions zaten yukarıda toplandı)
         
@@ -223,8 +252,80 @@ final class BoardViewModel: ObservableObject {
             clearedPositions: Array(targetPositions),
             rowsCleared: fullRows.count,
             colsCleared: fullCols.count,
-            zonesCleared: zoneCount
+            zonesCleared: zoneCount,
+            rowCells: rowCells,
+            colCells: colCells
         )
+    }
+
+    // MARK: - Scoring Pipeline V3 Helpers
+
+    /// Komşu dolu hücre sayısını hesaplar (Orthogonal only)
+    func calculateNeighbors(for block: GameBlock, at origin: GridPosition) -> Int {
+        var count = 0
+        let blockPositions = Set(block.cells.map { GridPosition(row: origin.row + $0.0, col: origin.col + $0.1) })
+        
+        for pos in blockPositions {
+            let neighbors = [(-1,0),(1,0),(0,-1),(0,1)]
+            for (dr, dc) in neighbors {
+                let r = pos.row + dr, c = pos.col + dc
+                guard r >= 0, r < Self.size, c >= 0, c < Self.size else { continue }
+                // Eğer komşu doluysa VE yerleştirilen bloğun bir parçası değilse
+                if grid[r][c].isOccupied && !blockPositions.contains(GridPosition(row: r, col: c)) {
+                    count += 1
+                }
+            }
+        }
+        return count
+    }
+
+    /// Yerleştirilen bloğun oluşturduğu en büyük aynı renk kümesini hesaplar
+    func calculateColorCluster(for block: GameBlock, at origin: GridPosition) -> Int {
+        var maxClusterSize = 0
+        let blockColor = block.color
+        let blockPositions = Set(block.cells.map { GridPosition(row: origin.row + $0.0, col: origin.col + $0.1) })
+        
+        var visited: Set<GridPosition> = []
+        
+        for pos in blockPositions {
+            if visited.contains(pos) { continue }
+            
+            var cluster: Set<GridPosition> = []
+            var queue = [pos]
+            visited.insert(pos)
+            
+            while !queue.isEmpty {
+                let current = queue.removeFirst()
+                cluster.insert(current)
+                
+                let neighbors = [(-1,0),(1,0),(0,-1),(0,1)]
+                for (dr, dc) in neighbors {
+                    let r = current.row + dr, c = current.col + dc
+                    let neighborPos = GridPosition(row: r, col: c)
+                    
+                    guard r >= 0, r < Self.size, c >= 0, c < Self.size else { continue }
+                    if visited.contains(neighborPos) { continue }
+                    
+                    // Blok içindeki bir hücreyse veya grid'deki aynı renkli bir hücreyse
+                    let isSameColor: Bool = {
+                        if blockPositions.contains(neighborPos) { return true }
+                        if case .filled(let color) = grid[r][c].state { return color == blockColor }
+                        return false
+                    }()
+
+                    if isSameColor {
+                        visited.insert(neighborPos)
+                        queue.append(neighborPos)
+                    }
+                }
+            }
+            
+            if cluster.count >= 3 {
+                maxClusterSize = max(maxClusterSize, cluster.count)
+            }
+        }
+        
+        return maxClusterSize
     }
     
     /// Simüle ederek yerleştirildiğinde hangi hücrelerin patlayacağını söyler (HINT).
@@ -373,7 +474,8 @@ final class BoardViewModel: ObservableObject {
     func applyHeavy(count: Int) {
         let positions = allEmptyPositions().shuffled().prefix(count)
         for pos in positions {
-            grid[pos.row][pos.col].state = .heavy(hits: 2)
+            let randomHits = Int.random(in: 3...5)
+            grid[pos.row][pos.col].state = .heavy(hits: randomHits)
         }
     }
     
@@ -582,7 +684,7 @@ final class BoardViewModel: ObservableObject {
             }
         }
         grid = grid
-        return ClearResult(clearedCells: cleared, clearedPositions: posList, rowsCleared: 0, colsCleared: 0, zonesCleared: 0)
+        return ClearResult(clearedCells: cleared, clearedPositions: posList, rowsCleared: 0, colsCleared: 0, zonesCleared: 0, rowCells: [], colCells: [])
     }
 }
 

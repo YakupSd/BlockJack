@@ -180,14 +180,15 @@ struct CollectionMainView: View {
                             )
                         
                         if isDiscovered {
-                            if perk.icon.hasPrefix("item_") {
+                            if perk.icon.hasPrefix("item_") || perk.icon.hasPrefix("perk_") {
                                 Image(perk.icon)
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 44, height: 44)
                             } else {
-                                Text(perk.icon)
-                                    .font(.system(size: 32))
+                                Image(systemName: perk.icon)
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundStyle(ThemeColors.neonCyan)
                             }
                         } else {
                             Image(systemName: "questionmark")

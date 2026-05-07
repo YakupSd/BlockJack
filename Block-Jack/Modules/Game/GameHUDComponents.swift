@@ -173,6 +173,7 @@ struct TopHUDBar: View {
     private var timeBadge: some View {
         let ratio = vm.timer.ratio
         let color: Color = {
+            if vm.isFrenzyActive { return ThemeColors.neonOrange }
             if ratio < 0.2 { return ThemeColors.neonPink }
             if ratio < 0.45 { return ThemeColors.electricYellow }
             return .white
@@ -216,21 +217,11 @@ struct LifeAndTimerStrip: View {
     
     var body: some View {
         HStack(spacing: 10) {
-            // Kalpler
-            HStack(spacing: 3) {
-                ForEach(1...vm.run.maxLives, id: \.self) { i in
-                    Image(systemName: i <= vm.run.lives ? "heart.fill" : "heart")
-                        .font(.system(size: 10))
-                        .foregroundStyle(i <= vm.run.lives ? ThemeColors.neonPink : ThemeColors.gridStroke)
-                        .scaleEffect(i == vm.run.lives && vm.run.lives <= 2 ? 1.15 : 1.0)
-                        .animation(.spring(response: 0.3), value: vm.run.lives)
-                }
-            }
-            
-            // Zaman barı
+            // Zaman barı (Tam genişlik, canlar kaldırıldı)
             TimerBarView(
                 ratio: vm.timer.ratio,
-                isFogMode: vm.run.round.modifier == .fog
+                isFogMode: vm.run.round.modifier == .fog,
+                isFrenzy: vm.isFrenzyActive
             )
             .frame(height: 6)
         }
