@@ -4464,6 +4464,13 @@ class UserEnvironment: ObservableObject {
         }
     }
 
+    var labelForgeSuccessfulCaps: String {
+        switch language {
+        case .turkish: return "BİRLEŞTİRME BAŞARILI!"
+        case .english: return "FORGE SUCCESSFUL!"
+        }
+    }
+
     // MARK: - Onboarding & Login Localization Properties
     var labelWelcome: String {
         switch language {

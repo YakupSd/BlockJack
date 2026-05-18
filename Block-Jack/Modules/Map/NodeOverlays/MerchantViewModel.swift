@@ -9,6 +9,7 @@ import Combine
 class MerchantViewModel: ObservableObject {
     @Published var shopItems: [ShopItem] = []
     @Published var forgeSelection: [PassivePerk] = []
+    @Published var forgedPerkResult: PassivePerk? = nil
     
     let slotId: Int
     let lang: AppLanguage
@@ -125,6 +126,7 @@ class MerchantViewModel: ObservableObject {
         
         if let newPerk = forgePool.randomElement() {
             SaveManager.shared.addPassivePerk(slotId: slotId, perk: newPerk)
+            forgedPerkResult = newPerk
         }
         
         forgeSelection = []

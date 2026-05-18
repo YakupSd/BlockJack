@@ -77,7 +77,71 @@ struct MerchantView: View {
                 // Footer
                 footerSection
             }
+            
+            if let newPerk = viewModel.forgedPerkResult {
+                ZStack {
+                    Color.black.opacity(0.88).ignoresSafeArea()
+                    
+                    VStack(spacing: 24) {
+                        Image(systemName: "hammer.circle.fill")
+                            .font(.system(size: 80))
+                            .foregroundStyle(ThemeColors.neonPurple)
+                            .shadow(color: ThemeColors.neonPurple.opacity(0.6), radius: 20)
+                        
+                        Text(userEnv.labelForgeSuccessfulCaps)
+                            .font(.custom("Outfit-Bold", size: 30))
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+                        
+                        VStack(spacing: 16) {
+                            if newPerk.icon.hasPrefix("perk_") || newPerk.icon.hasPrefix("item_") {
+                                Image(newPerk.icon)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 90, height: 90)
+                                    .shadow(color: ThemeColors.neonPurple, radius: 20)
+                            } else {
+                                Image(systemName: newPerk.icon)
+                                    .font(.system(size: 60, weight: .bold))
+                                    .foregroundStyle(ThemeColors.neonPurple)
+                                    .shadow(color: ThemeColors.neonPurple, radius: 20)
+                            }
+                            
+                            Text(newPerk.name)
+                                .font(.custom("Outfit-Bold", size: 24))
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.center)
+                            
+                            Text(newPerk.desc)
+                                .font(.custom("Outfit-Medium", size: 14))
+                                .foregroundColor(ThemeColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.vertical, 20)
+                        
+                        Button(action: {
+                            withAnimation {
+                                viewModel.forgedPerkResult = nil
+                            }
+                        }) {
+                            Text(userEnv.btnContinue)
+                                .font(.headline)
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 40)
+                                .padding(.vertical, 12)
+                                .background(ThemeColors.neonPurple)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding()
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
         }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.forgedPerkResult != nil)
     }
     
     // MARK: - Components
