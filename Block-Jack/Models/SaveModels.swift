@@ -18,6 +18,23 @@ enum CharacterDifficulty: String, Codable, Hashable {
     case beginner = "BEGINNER"
     case advanced = "ADVANCED"
     case expert = "EXPERT"
+
+    func title(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish:
+            switch self {
+            case .beginner: return "KOLAY"
+            case .advanced: return "ORTA"
+            case .expert: return "ZOR"
+            }
+        case .english:
+            switch self {
+            case .beginner: return "EASY"
+            case .advanced: return "MEDIUM"
+            case .expert: return "HARD"
+            }
+        }
+    }
 }
 
 enum UnlockCondition: Codable, Hashable {
@@ -43,6 +60,13 @@ enum UnlockCondition: Codable, Hashable {
         case .goldAndLevel(let amount, let level): return "\(amount) Gold + Reach Level \(level)"
         }
     }
+
+    func description(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish: return descriptionTR
+        case .english: return descriptionEN
+        }
+    }
 }
 
 
@@ -51,8 +75,10 @@ struct GameCharacter: Codable, Identifiable, Hashable {
     let id: String
     let name: String
     let icon: String
-    let passiveDesc: String
-    let activeDesc: String
+    let passiveDescTR: String
+    let passiveDescEN: String
+    let activeDescTR: String
+    let activeDescEN: String
     let isPremium: Bool
     let cost: Int
     var overdriveThresholds: [Double] = [0.33, 0.66, 1.0] // Default
@@ -61,77 +87,146 @@ struct GameCharacter: Codable, Identifiable, Hashable {
     let loreTR: String
     let loreEN: String
     let favoriteBlockType: BlockType
-    let strongMode: String
+    let strongModeTR: String
+    let strongModeEN: String
     let difficulty: CharacterDifficulty
     let unlockCondition: UnlockCondition
+
+    func passiveDesc(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish: return passiveDescTR
+        case .english: return passiveDescEN
+        }
+    }
+
+    func activeDesc(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish: return activeDescTR
+        case .english: return activeDescEN
+        }
+    }
+
+    func strongMode(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish: return strongModeTR
+        case .english: return strongModeEN
+        }
+    }
+
+    func lore(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish: return loreTR
+        case .english: return loreEN
+        }
+    }
     
     static let roster: [GameCharacter] = [
         GameCharacter(id: "block_e", name: "BLOCK-E", icon: "port_block_e",
-                      passiveDesc: "Her 10sn sahadaki bir hücreyi temizler (max 3/tur)",
-                      activeDesc: "Hedefli temizlik: T1 satır, T2 çapraz, T3 3×3 bomba",
+                      passiveDescTR: "Her 10sn sahadaki bir hücreyi temizler (max 3/tur)",
+                      passiveDescEN: "Clears a cell on the board every 10s (max 3/turn)",
+                      activeDescTR: "Hedefli temizlik: T1 satır, T2 çapraz, T3 3×3 bomba",
+                      activeDescEN: "Targeted clean: T1 row, T2 diagonal, T3 3x3 bomb",
                       isPremium: false, cost: 0,
                       loreTR: "İlk üretilen temizlik asistanı. Yıllarca fabrikada çalıştıktan sonra yapay zekası limitleri aştı.",
                       loreEN: "The first generation cleaning assistant. Its AI broke bounds after years in the factory.",
-                      favoriteBlockType: .I, strongMode: "Satır Temizliği", difficulty: .beginner, unlockCondition: .free),
+                      favoriteBlockType: .I,
+                      strongModeTR: "Satır Temizliği",
+                      strongModeEN: "Row Clearing",
+                      difficulty: .beginner, unlockCondition: .free),
 
         GameCharacter(id: "architect", name: "THE ARCHITECT", icon: "port_architect",
-                      passiveDesc: "Kare (O) bloklarla temizlikte +%30 çarpan",
-                      activeDesc: "Alan yıkımı: T1 3×3, T2 5×5, T3 7×7 +1500 puan",
+                      passiveDescTR: "Kare (O) bloklarla temizlikte +%30 çarpan",
+                      passiveDescEN: "+30% multiplier for clears with Square (O) blocks",
+                      activeDescTR: "Alan yıkımı: T1 3×3, T2 5×5, T3 7×7 +1500 puan",
+                      activeDescEN: "Area destruction: T1 3x3, T2 5x5, T3 7x7 +1500 pts",
                       isPremium: true, cost: 500,
                       loreTR: "Gridin yaratıcısı. Sistemin her bir köşesini kendi elleriyle kodladı.",
                       loreEN: "Creator of the Grid. Coded every edge of the system manually.",
-                      favoriteBlockType: .O, strongMode: "Büyük Kombinasyonlar", difficulty: .advanced, unlockCondition: .gold(500)),
+                      favoriteBlockType: .O,
+                      strongModeTR: "Büyük Kombinasyonlar",
+                      strongModeEN: "Big Combinations",
+                      difficulty: .advanced, unlockCondition: .gold(500)),
 
         GameCharacter(id: "timebender", name: "TIME BENDER", icon: "port_timebender",
-                      passiveDesc: "Temizlikte +%50 süre, streak yavaş düşer",
-                      activeDesc: "Zaman kontrolü: T1 5sn dur, T2 8sn+tepsi, T3 3 hamle freeze",
+                      passiveDescTR: "Temizlikte +%50 süre, streak yavaş düşer",
+                      passiveDescEN: "+50% duration on clears, streak decays slower",
+                      activeDescTR: "Zaman kontrolü: T1 5sn dur, T2 8sn+tepsi, T3 3 hamle freeze",
+                      activeDescEN: "Time control: T1 freeze 5s, T2 8s+tray, T3 freeze 3 moves",
                       isPremium: true, cost: 800,
                       loreTR: "Zaman algısını bükmeyi başardı. O oynarken saniyeler uzar, dakikalar kaybolur.",
                       loreEN: "Mastered twisting the perception of time. Seconds stretch as he plays.",
-                      favoriteBlockType: .T, strongMode: "Zaman Yönetimi", difficulty: .advanced, unlockCondition: .gold(800)),
+                      favoriteBlockType: .T,
+                      strongModeTR: "Zaman Yönetimi",
+                      strongModeEN: "Time Management",
+                      difficulty: .advanced, unlockCondition: .gold(800)),
 
         GameCharacter(id: "gambler", name: "THE GAMBLER", icon: "port_gambler",
-                      passiveDesc: "%7 şansla o hamlede +9 çarpan (≈×10 combo)",
-                      activeDesc: "Şans tepsi: T1 1 blok, T2 tüm tepsi, T3 tepsi +2000 puan",
+                      passiveDescTR: "%7 şansla o hamlede +9 çarpan (≈×10 combo)",
+                      passiveDescEN: "7% chance for a +9 multiplier on that move (≈x10 combo)",
+                      activeDescTR: "Şans tepsi: T1 1 blok, T2 tüm tepsi, T3 tepsi +2000 puan",
+                      activeDescEN: "Lucky tray: T1 1 block, T2 whole tray, T3 tray +2000 pts",
                       isPremium: true, cost: 1200,
                       loreTR: "Sisteme her girişinde hayatını ortaya koyuyor. Şansı yaver giderse yıkılamaz.",
                       loreEN: "Puts his life on the line on every login. Invincible if lucky.",
-                      favoriteBlockType: .J, strongMode: "Yüksek Risk, Yüksek Ödül", difficulty: .expert, unlockCondition: .gold(1200)),
+                      favoriteBlockType: .J,
+                      strongModeTR: "Yüksek Risk, Yüksek Ödül",
+                      strongModeEN: "High Risk, High Reward",
+                      difficulty: .expert, unlockCondition: .gold(1200)),
 
         GameCharacter(id: "neonwraith", name: "NEON WRAITH", icon: "port_neonwraith",
-                      passiveDesc: "Süre <%20 iken +2.5 çarpan (Wraith Fury)",
-                      activeDesc: "T1 +15sn, T2 +25sn & satır temizle, T3 sonraki 3 clear +2×",
+                      passiveDescTR: "Süre <%20 iken +2.5 çarpan (Wraith Fury)",
+                      passiveDescEN: "+2.5 multiplier when time is <20% (Wraith Fury)",
+                      activeDescTR: "T1 +15sn, T2 +25sn & satır temizle, T3 sonraki 3 clear +2×",
+                      activeDescEN: "T1 +15s, T2 +25s & clear row, T3 next 3 clears +2x",
                       isPremium: true, cost: 3000,
                       loreTR: "Sokakların hayaleti. Kimse yüzünü görmedi. Sadece hızıyla ve ardında bıraktığı yıkımla bilinir.",
                       loreEN: "Ghost of the streets. Known only for its speed and destruction left behind.",
-                      favoriteBlockType: .Z, strongMode: "Panik Kontrolü", difficulty: .expert, unlockCondition: .goldAndLevel(amount: 3000, level: 5)),
+                      favoriteBlockType: .Z,
+                      strongModeTR: "Panik Kontrolü",
+                      strongModeEN: "Panic Control",
+                      difficulty: .expert, unlockCondition: .goldAndLevel(amount: 3000, level: 5)),
 
         GameCharacter(id: "ghost", name: "GHOST", icon: "port_ghost",
-                      passiveDesc: "Her 10sn +3sn whisper zaman bonusu",
-                      activeDesc: "Phantom overwrite: T1 yer, T2 +%50 clear, T3 +%100 +10sn",
+                      passiveDescTR: "Her 10sn +3sn whisper zaman bonusu",
+                      passiveDescEN: "+3s whisper time bonus every 10s",
+                      activeDescTR: "Phantom overwrite: T1 yer, T2 +%50 clear, T3 +%100 +10sn",
+                      activeDescEN: "Phantom overwrite: T1 place, T2 +50% clear, T3 +100% +10s",
                       isPremium: true, cost: 2000,
                       overdriveThresholds: [0.33, 0.66, 1.0],
                       loreTR: "Sistemin arka kapısı. O varken bloklar sessizce kaybolur.",
                       loreEN: "Backdoor of the system. Blocks vanish quietly when it's around.",
-                      favoriteBlockType: .single, strongMode: "Gizlilik ve Sabır", difficulty: .expert, unlockCondition: .goldAndLevel(amount: 2000, level: 10)),
+                      favoriteBlockType: .single,
+                      strongModeTR: "Gizlilik ve Sabır",
+                      strongModeEN: "Stealth and Patience",
+                      difficulty: .expert, unlockCondition: .goldAndLevel(amount: 2000, level: 10)),
 
         GameCharacter(id: "alchemist", name: "ALCHEMIST", icon: "port_alchemist",
-                      passiveDesc: "Tek-renk temizlikte +1.0 çarpan (Resonance)",
-                      activeDesc: "T1 tepsi yenile, T2 tek-renk tepsi, T3 3 hamle ×2 puan",
+                      passiveDescTR: "Tek-renk temizlikte +1.0 çarpan (Resonance)",
+                      passiveDescEN: "+1.0 multiplier on single-color clears (Resonance)",
+                      activeDescTR: "T1 tepsi yenile, T2 tek-renk tepsi, T3 3 hamle ×2 puan",
+                      activeDescEN: "T1 refresh tray, T2 single-color tray, T3 3 moves x2 score",
                       isPremium: true, cost: 2500,
                       overdriveThresholds: [0.4, 0.7, 1.0],
                       loreTR: "Veri tiplerini altına çevirir. Kuralları esnetir ve yeniden yazar.",
                       loreEN: "Turns data types into gold. Bends and rewrites the rules.",
-                      favoriteBlockType: .L, strongMode: "Dönüşüm Zincirleri", difficulty: .advanced, unlockCondition: .goldAndLevel(amount: 2500, level: 15)),
+                      favoriteBlockType: .L,
+                      strongModeTR: "Dönüşüm Zincirleri",
+                      strongModeEN: "Transmutation Chains",
+                      difficulty: .advanced, unlockCondition: .goldAndLevel(amount: 2500, level: 15)),
 
         GameCharacter(id: "titan", name: "TITAN", icon: "port_titan",
-                      passiveDesc: "Heavy hücre temizlikte +0.5× (her heavy başına)",
-                      activeDesc: "T1 dev blok, T2 2× dev +500 overkill, T3 Earthquake +2500",
+                      passiveDescTR: "Heavy hücre temizlikte +0.5× (her heavy başına)",
+                      passiveDescEN: "+0.5x on heavy cell clears (per heavy)",
+                      activeDescTR: "T1 dev blok, T2 2× dev +500 overkill, T3 Earthquake +2500",
+                      activeDescEN: "T1 giant block, T2 2x giant +500 overkill, T3 Earthquake +2500",
                       isPremium: true, cost: 4000,
                       overdriveThresholds: [0.5, 0.8, 1.2],
                       loreTR: "Son teknoloji savaş makinesi modifikasyonu. O düştüğünde grid titrer.",
                       loreEN: "High-tech war machine mod. The grid shakes when it drops.",
-                      favoriteBlockType: .I, strongMode: "Dev Şekiller", difficulty: .beginner, unlockCondition: .goldAndLevel(amount: 4000, level: 20))
+                      favoriteBlockType: .I,
+                      strongModeTR: "Dev Şekiller",
+                      strongModeEN: "Giant Shapes",
+                      difficulty: .beginner, unlockCondition: .goldAndLevel(amount: 4000, level: 20))
     ]
 }
 
@@ -154,13 +249,13 @@ struct StartingPerk: Codable, Identifiable, Hashable {
     static let available: [StartingPerk] = [
         // ---- TIER 1: Ücretsiz (3 adet) ----
         StartingPerk(id: "golden_stamp", nameTR: "Golden Stamp", nameEN: "Golden Stamp", icon: "perk_golden_stamp",
-                    descTR: "Hedef skor -%15", descEN: "Target score -15%.",
+                    descTR: "Hedef skor %15 azalır.", descEN: "Reduces target score by 15%.",
                     tier: 1, goldCost: 0),
         StartingPerk(id: "overkill", nameTR: "Overkill", nameEN: "Overkill", icon: "perk_overkill",
-                    descTR: "Kalan puanları bir sonraki tura aktarır", descEN: "Carry leftover score into the next round.",
+                    descTR: "Artan puanların %30'u aktarılır.", descEN: "Carries over 30% of excess score.",
                     tier: 1, goldCost: 0),
         StartingPerk(id: "safe_house", nameTR: "Safe House", nameEN: "Safe House", icon: "perk_safe_house",
-                    descTR: "Dinlenme alanlarında otomatik +50 Altın", descEN: "Rest sites grant +50 Gold automatically.",
+                    descTR: "Dinlenme alanlarında +50 Altın verir.", descEN: "Grants +50 Gold at rest sites.",
                     tier: 1, goldCost: 0),
 
         // ---- TIER 2: 200 Gold ----
@@ -378,6 +473,7 @@ struct SaveSlot: Codable, Identifiable {
     var activePassivePerks: [PassivePerk] = []
     var inventory: [ConsumableItem] = []
     var gold: Int = 0
+    var diamonds: Int?
     var lives: Int = 3
     
     // Scoring V3 Persistence

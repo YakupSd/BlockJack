@@ -104,8 +104,8 @@ struct MapView: View {
                                 .font(.system(size: 14, weight: .bold))
                             Text(
                                 viewModel.isChapterCleared
-                                ? userEnv.localizedString("DÜNYA SEÇİMİ", "WORLD SELECT")
-                                : userEnv.localizedString("ANA MENÜ", "MAIN MENU")
+                                ? userEnv.labelWorldSelectionCaps
+                                : userEnv.labelMainMenuCaps
                             )
                         }
                         .font(.setCustomFont(name: .InterBold, size: 13))
@@ -146,13 +146,13 @@ struct MapView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Circle().fill(ThemeColors.neonCyan).frame(width: 6, height: 6)
-                        Text(userEnv.localizedString("SİSTEM ANALİZİ", "SYSTEM ANALYSIS"))
+                        Text(userEnv.labelSystemAnalysisCaps)
                             .font(.setCustomFont(name: .InterBold, size: 10))
                             .foregroundStyle(ThemeColors.neonCyan)
                             .tracking(2)
                     }
                     
-                    Text(userEnv.localizedString("BÖLÜM \(viewModel.currentMap.chapterIndex)", "CHAPTER \(viewModel.currentMap.chapterIndex)"))
+                    Text(userEnv.formatChapterIndex(index: viewModel.currentMap.chapterIndex))
                         .font(.setCustomFont(name: .InterBlack, size: 24))
                         .foregroundStyle(.white)
                 }
@@ -238,8 +238,8 @@ struct MapView: View {
                         
                         HStack {
                             Text(node.isReplayable
-                                 ? userEnv.localizedString("VERİYİ YENİLE", "REFRESH DATA")
-                                 : userEnv.localizedString("BAĞLANTIYI BAŞLAT", "INITIALIZE LINK"))
+                                 ? userEnv.btnRefreshDataCaps
+                                 : userEnv.btnInitializeLinkCaps)
                                 .font(.setCustomFont(name: .InterBlack, size: 14))
                                 .tracking(2)
                             
@@ -436,26 +436,26 @@ func iconForNodeType(_ type: NodeType) -> String {
 
 func titleForNodeType(_ type: NodeType, userEnv: UserEnvironment = .shared) -> String {
     switch type {
-    case .normal:   return userEnv.localizedString("Veri Temizliği", "Data Purge")
-    case .elite:    return userEnv.localizedString("Sistem Gardiyanı", "System Guardian")
-    case .challenge:return userEnv.localizedString("Protokol X", "Protocol X")
-    case .merchant: return userEnv.localizedString("Veri Borsası", "Data Exchange")
-    case .treasure: return userEnv.localizedString("Sistem Sızıntısı", "System Leak")
-    case .rest:     return userEnv.localizedString("Enerji İstasyonu", "Power Station")
-    case .mystery:  return userEnv.localizedString("Anomali", "Anomaly")
-    case .boss:     return userEnv.localizedString("ANA ÇEKİRDEK", "CORE KERNEL")
+    case .normal:   return userEnv.labelNodeTitleNormal
+    case .elite:    return userEnv.labelNodeTitleElite
+    case .challenge:return userEnv.labelNodeTitleChallenge
+    case .merchant: return userEnv.labelNodeTitleMerchant
+    case .treasure: return userEnv.labelNodeTitleTreasure
+    case .rest:     return userEnv.labelNodeTitleRest
+    case .mystery:  return userEnv.labelNodeTitleMystery
+    case .boss:     return userEnv.labelNodeTitleBoss
     }
 }
 
 func descForNodeType(_ type: NodeType, userEnv: UserEnvironment = .shared) -> String {
     switch type {
-    case .normal:   return userEnv.localizedString("Standart veri temizleme işlemi.", "Standard data purge operation.")
-    case .elite:    return userEnv.localizedString("Yüksek güvenlikli birim koruması.", "High-security unit protection.")
-    case .challenge:return userEnv.localizedString("Riskli veri kurtarma protokolü.", "Risky data recovery protocol.")
-    case .merchant: return userEnv.localizedString("Donanım modülleri takas merkezi.", "Hardware module exchange hub.")
-    case .treasure: return userEnv.localizedString("Sahipsiz sistem yetenekleri.", "Unclaimed system capabilities.")
-    case .rest:     return userEnv.localizedString("Sistem optimizasyonu ve onarım.", "System optimization and repair.")
-    case .mystery:  return userEnv.localizedString("Tanımlanamayan veri sinyali.", "Unidentified data signal.")
-    case .boss:     return userEnv.localizedString("Sistemi kontrol eden ana protokol.", "The master protocol controlling the system.")
+    case .normal:   return userEnv.labelNodeDescNormal
+    case .elite:    return userEnv.labelNodeDescElite
+    case .challenge:return userEnv.labelNodeDescChallenge
+    case .merchant: return userEnv.labelNodeDescMerchant
+    case .treasure: return userEnv.labelNodeDescTreasure
+    case .rest:     return userEnv.labelNodeDescRest
+    case .mystery:  return userEnv.labelNodeDescMystery
+    case .boss:     return userEnv.labelNodeDescBoss
     }
 }

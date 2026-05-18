@@ -25,8 +25,8 @@ struct GameView: View {
     // Partikül sistemi
     @StateObject private var particleManager = ClearParticleManager()
     
-    init(slotId: Int, nodeType: NodeType? = nil) {
-        _vm = StateObject(wrappedValue: GameViewModel(slotId: slotId, nodeType: nodeType))
+    init(slotId: Int, nodeType: NodeType? = nil, eventConfig: EventConfig? = nil) {
+        _vm = StateObject(wrappedValue: GameViewModel(slotId: slotId, nodeType: nodeType, eventConfig: eventConfig))
     }
 
     var body: some View {
@@ -80,8 +80,10 @@ struct GameView: View {
                     ScoreHUDView(vm: vm, onInfoTap: {
                         showScoringInfo = true
                     })
-                    progressBar
-                        .padding(.horizontal, GameLayout.horizontalPadding)
+                    if vm.eventConfig == nil {
+                        progressBar
+                            .padding(.horizontal, GameLayout.horizontalPadding)
+                    }
                 }
 
                 // AAA: Boss Intent (varsa)
@@ -106,7 +108,7 @@ struct GameView: View {
 
                 Spacer(minLength: 0)
 
-                // 6) GRID + Partikül
+                // 6) GRID + Partikül + Grid Dim (Saldırı karartması)
                 // Kart dekoru dış wrapper — grid'in kendi boyutuna dokunmuyor,
                 // drag koordinatları doğru kalıyor.
                 ZStack(alignment: .topLeading) {
@@ -123,6 +125,28 @@ struct GameView: View {
                     ClearParticleOverlayView(manager: particleManager)
                         .offset(x: gridOrigin.x, y: gridOrigin.y)
                         .allowsHitTesting(false)
+                    
+                    // Grid karartma overlay (Saldırı sırasında 0.45 opacity)
+                    // Grid tıklanabilir kalır (allowsHitTesting false)
+                    if vm.notificationManager.gridDimOpacity > 0 {
+                        Color.black
+                            .opacity(vm.notificationManager.gridDimOpacity)
+                            .cornerRadius(14)
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                    
+                    // Kategori D — Tur geçiş overlay (sadece grid alanı üzerinde)
+                    if let transition = vm.notificationManager.roundTransition {
+                        RoundTransitionOverlay(
+                            transition: transition,
+                            onSkip: {
+                                vm.notificationManager.dismissRoundTransition()
+                            }
+                        )
+                        .transition(.opacity)
+                        .zIndex(10)
+                    }
                 }
                 .padding(6)
                 .background(
@@ -159,12 +183,25 @@ struct GameView: View {
                 )
             }
             .padding(.bottom, 10)
+            .padding(.top, 12)
 
-            // Score popupları
-            ForEach(vm.scorePopups) { popup in
-                ScorePopupView(popup: popup)
-                    .position(popup.position)
-            }
+            // Score popupları (Legacy - fully phased out to Notification System)
+            // Keeping array in GameViewModel for backward compatibility, but hidden from UI
+            // ForEach(vm.scorePopups) { popup in
+            //     ScorePopupView(popup: popup)
+            //         .position(popup.position)
+            // }
+            
+            // --- NOTIFICATION TOAST PANEL (Sağ Üst — Kategori A & C) ---
+            NotificationPanelView(notificationManager: vm.notificationManager)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .zIndex(75)
+            
+            // --- ENEMY ABILITY ALERT PANEL (Düşman satırı altı — Kategori B) ---
+            EnemyAbilityPanelView(notificationManager: vm.notificationManager)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, 180) // Düşman banner'ı altına konumlan
+                .zIndex(76)
             
             // --- BIG COMBO LABEL ---
             if let bigLabel = vm.showBigComboLabel {
@@ -226,7 +263,7 @@ struct GameView: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "xmark.circle.fill")
-                                Text(userEnv.localizedString("İPTAL", "CANCEL"))
+                                Text(userEnv.btnCancelCaps)
                             }
                             .font(.setCustomFont(name: .InterBold, size: 12))
                             .foregroundStyle(.white)
@@ -278,12 +315,14 @@ struct GameView: View {
                 PauseOverlay(vm: vm)
             }
             
-            // --- DÜŞMAN SALDIRI UYARISI ---
+            // --- DÜŞMAN SALDIRI UYARISI (Yeni: Inline banner, non-blocking) ---
             if vm.showEnemyAttackWarning && vm.phase == .playing {
                 EnemyAttackWarningOverlay(vm: vm)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 200) // Düşman banner'ının altına konumlanır
                     .transition(.asymmetric(
-                        insertion: .scale(scale: 0.85).combined(with: .opacity),
-                        removal: .opacity
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
                     ))
                     .zIndex(50)
                     .animation(.spring(response: 0.3), value: vm.showEnemyAttackWarning)
@@ -463,7 +502,7 @@ struct GameView: View {
                 .shadow(color: ThemeColors.neonPink.opacity(0.5), radius: 4)
             
             VStack(alignment: .leading, spacing: 1) {
-                Text(userEnv.localizedString("BÖLÜM PATRONU", "CHAPTER BOSS"))
+                Text(userEnv.labelChapterBossCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 9))
                     .foregroundStyle(ThemeColors.neonPink)
                     .tracking(1.8)

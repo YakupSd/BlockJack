@@ -31,170 +31,193 @@ struct DashboardView: View {
             ThemeColors.backgroundGradient.ignoresSafeArea()
             backgroundGrid
 
-            VStack(spacing: 0) {
-                // Üst bar
-                HStack(spacing: 12) {
-                    Button {
-                        HapticManager.shared.play(.buttonTap)
-                        showDailyReward = true
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(ThemeColors.surfaceDark)
-                                .frame(width: 44, height: 44)
-                                .overlay(Circle().stroke(ThemeColors.gridStroke, lineWidth: 1))
-                            Image(systemName: "gift.fill")
-                                .foregroundStyle(userEnv.canClaimDaily ? ThemeColors.electricYellow : ThemeColors.textMuted)
-                                .font(.system(size: 18, weight: .bold))
-                            if userEnv.canClaimDaily {
-                                Circle()
-                                    .fill(ThemeColors.neonPink)
-                                    .frame(width: 10, height: 10)
-                                    .offset(x: 14, y: -14)
+            GeometryReader { geometry in
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        // Üst bar
+                        HStack(spacing: 12) {
+                            Spacer()
+
+                            Button {
+                                HapticManager.shared.play(.buttonTap)
+                                openStore()
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(ThemeColors.surfaceDark)
+                                        .frame(width: 44, height: 44)
+                                        .overlay(Circle().stroke(ThemeColors.neonCyan.opacity(0.5), lineWidth: 1))
+                                    Image(systemName: "cart.fill")
+                                        .foregroundStyle(ThemeColors.neonCyan)
+                                        .font(.system(size: 18, weight: .bold))
+                                    Text("NEW")
+                                        .font(.setCustomFont(name: .InterBlack, size: 8))
+                                        .tracking(1)
+                                        .foregroundStyle(ThemeColors.cosmicBlack)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
+                                        .background(Capsule().fill(ThemeColors.neonPink))
+                                        .offset(x: 14, y: -14)
+                                }
+                            }
+                            .padding(.trailing, 6)
+
+                            Button {
+                                HapticManager.shared.play(.buttonTap)
+                                MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(SettingsView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
+                            } label: {
+                                Image("ui_settings")
+                                    .resizable()
+                                    .frame(width: 44, height: 44)
+                                    .background(ThemeColors.surfaceDark)
+                                    .clipShape(Circle())
+                                    .overlay(Circle().stroke(ThemeColors.gridStroke, lineWidth: 1))
+                            }
+                            .padding(.trailing, 24)
+                        }
+                        .padding(.top, 16)
+
+                        Spacer(minLength: 20)
+
+                        // Logo
+                        VStack(spacing: 8) {
+                            Text("BLOCK")
+                                .font(.setCustomFont(name: .InterBlack, size: 56))
+                                .foregroundStyle(ThemeColors.neonCyan)
+                                .shadow(color: ThemeColors.neonCyan.opacity(0.8), radius: 25)
+                                .tracking(10)
+                            Text("JACK")
+                                .font(.setCustomFont(name: .InterBlack, size: 56))
+                                .foregroundStyle(ThemeColors.neonPurple)
+                                .shadow(color: ThemeColors.neonPurple.opacity(0.8), radius: 25)
+                                .tracking(10)
+                            Text("ROGUELITE PUZZLE")
+                                .font(.setCustomFont(name: .InterMedium, size: 14))
+                                .foregroundStyle(ThemeColors.textSecondary)
+                                .tracking(6)
+                                .padding(.top, 4)
+                                .opacity(0.8)
+                        }
+                        .scaleEffect(titleScale)
+                        .opacity(titleOpacity)
+                        .padding(.vertical, 10)
+
+                        Spacer(minLength: 10)
+
+                        // En Yüksek Skor
+                        VStack(spacing: 4) {
+                            Text(userEnv.labelHighScoreCaps)
+                                .font(.setCustomFont(name: .InterMedium, size: 11))
+                                .foregroundStyle(ThemeColors.textMuted)
+                                .tracking(3)
+                            Text(userEnv.highScore.formatted())
+                                .font(.setCustomFont(name: .InterExtraBold, size: 32))
+                                .foregroundStyle(ThemeColors.electricYellow)
+                                .shadow(color: ThemeColors.electricYellow.opacity(0.5), radius: 8)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            HapticManager.shared.play(.buttonTap)
+                            openLeaderboard()
+                        }
+                        .padding(.bottom, 20)
+
+                        // REGISTRATION PROMPT (Guest Users)
+                        if !userEnv.isRegistered {
+                            registrationPromptBanner
+                                .padding(.bottom, 24)
+                        }
+
+                        // MAIN ACTION BUTTONS
+                        VStack(spacing: 12) {
+                            if let slot = latestActiveSlot {
+                                // — Dolu slot var: Büyük DEVAM ET + küçük Yeni Run
+                                continueButton(slot: slot)
+                                newRunButton()
+                            } else {
+                                // — Hiç save yok: tek büyük OYNA butonu
+                                firstPlayButton()
+                            }
+
+                            // Çoklu slot seçimi için küçük link
+                            if saveManager.slots.filter({ !$0.isEmpty }).count > 1 {
+                                Button {
+                                    HapticManager.shared.play(.buttonTap)
+                                    MainViewsRouter.shared.pushToSaveSlotSelection()
+                                } label: {
+                                    Text(userEnv.labelOtherProfiles)
+                                        .font(.setCustomFont(name: .InterBold, size: 13))
+                                        .foregroundStyle(ThemeColors.textMuted)
+                                        .underline()
+                                }
                             }
                         }
-                    }
-                    .padding(.leading, 24)
+                        .padding(.horizontal, 32)
 
-                    Spacer()
-
-                    Button {
-                        HapticManager.shared.play(.buttonTap)
-                        openStore()
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(ThemeColors.surfaceDark)
-                                .frame(width: 44, height: 44)
-                                .overlay(Circle().stroke(ThemeColors.neonCyan.opacity(0.5), lineWidth: 1))
-                            Image(systemName: "cart.fill")
-                                .foregroundStyle(ThemeColors.neonCyan)
-                                .font(.system(size: 18, weight: .bold))
-                            Text("NEW")
-                                .font(.setCustomFont(name: .InterBlack, size: 8))
-                                .tracking(1)
-                                .foregroundStyle(ThemeColors.cosmicBlack)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(Capsule().fill(ThemeColors.neonPink))
-                                .offset(x: 14, y: -14)
+                        VStack(spacing: 12) {
+                            // Challenge pill (full width)
+                            dashboardPill(
+                                icon: "gamecontroller.fill",
+                                title: userEnv.labelChallengeCaps,
+                                color: ThemeColors.neonCyan
+                            ) {
+                                MainViewsRouter.shared.push(EventsView().environmentObject(userEnv))
+                            }
+                            
+                            // Gallery + Leaderboard (side by side)
+                            HStack(spacing: 12) {
+                                dashboardPill(
+                                    icon: "books.vertical.fill",
+                                    title: userEnv.labelGalleryCaps,
+                                    color: ThemeColors.neonPurple
+                                ) {
+                                    MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(CollectionMainView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
+                                }
+                                
+                                dashboardPill(
+                                    icon: "trophy.fill",
+                                    title: userEnv.labelLeaderboardCaps,
+                                    color: ThemeColors.electricYellow
+                                ) {
+                                    openLeaderboard()
+                                }
+                            }
+                            
+                            // Social + Store (side by side)
+                            HStack(spacing: 12) {
+                                dashboardPill(
+                                    icon: "person.2.fill",
+                                    title: userEnv.labelDuelsCaps,
+                                    color: ThemeColors.neonOrange
+                                ) {
+                                    MainViewsRouter.shared.push(SocialView().environmentObject(userEnv))
+                                }
+                                
+                                dashboardPill(
+                                    icon: "bag.fill",
+                                    title: userEnv.labelStoreCaps,
+                                    color: ThemeColors.neonPink
+                                ) {
+                                    openStore()
+                                }
+                            }
+                            
+                            // Career Pill
+                            dashboardPill(
+                                icon: "chart.bar.fill",
+                                title: userEnv.labelCareerCaps,
+                                color: ThemeColors.neonPurple
+                            ) {
+                                MainViewsRouter.shared.push(CareerView().environmentObject(userEnv))
+                            }
                         }
-                    }
-                    .padding(.trailing, 6)
+                        .padding(.horizontal, 32)
+                        .padding(.top, 20)
 
-                    Button {
-                        HapticManager.shared.play(.buttonTap)
-                        MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(SettingsView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
-                    } label: {
-                        Image("ui_settings")
-                            .resizable()
-                            .frame(width: 44, height: 44)
-                            .background(ThemeColors.surfaceDark)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(ThemeColors.gridStroke, lineWidth: 1))
+                        Spacer()
                     }
-                    .padding(.trailing, 24)
+                    .frame(minHeight: geometry.size.height)
                 }
-                .padding(.top, 16)
-
-                Spacer()
-
-                // Logo
-                VStack(spacing: 8) {
-                    Text("BLOCK")
-                        .font(.setCustomFont(name: .InterBlack, size: 56))
-                        .foregroundStyle(ThemeColors.neonCyan)
-                        .shadow(color: ThemeColors.neonCyan.opacity(0.8), radius: 25)
-                        .tracking(10)
-                    Text("JACK")
-                        .font(.setCustomFont(name: .InterBlack, size: 56))
-                        .foregroundStyle(ThemeColors.neonPurple)
-                        .shadow(color: ThemeColors.neonPurple.opacity(0.8), radius: 25)
-                        .tracking(10)
-                    Text("ROGUELITE PUZZLE")
-                        .font(.setCustomFont(name: .InterMedium, size: 14))
-                        .foregroundStyle(ThemeColors.textSecondary)
-                        .tracking(6)
-                        .padding(.top, 4)
-                        .opacity(0.8)
-                }
-                .scaleEffect(titleScale)
-                .opacity(titleOpacity)
-                .padding(.vertical, 20)
-
-                Spacer()
-
-                // En Yüksek Skor
-                VStack(spacing: 4) {
-                    Text(userEnv.localizedString("EN YÜKSEK SKOR", "HIGH SCORE"))
-                        .font(.setCustomFont(name: .InterMedium, size: 11))
-                        .foregroundStyle(ThemeColors.textMuted)
-                        .tracking(3)
-                    Text(userEnv.highScore.formatted())
-                        .font(.setCustomFont(name: .InterExtraBold, size: 32))
-                        .foregroundStyle(ThemeColors.electricYellow)
-                        .shadow(color: ThemeColors.electricYellow.opacity(0.5), radius: 8)
-                }
-                .padding(.bottom, 32)
-
-                // MAIN ACTION BUTTONS
-                VStack(spacing: 12) {
-                    if let slot = latestActiveSlot {
-                        // — Dolu slot var: Büyük DEVAM ET + küçük Yeni Run
-                        continueButton(slot: slot)
-                        newRunButton()
-                    } else {
-                        // — Hiç save yok: tek büyük OYNA butonu
-                        firstPlayButton()
-                    }
-
-                    // Çoklu slot seçimi için küçük link
-                    if saveManager.slots.filter({ !$0.isEmpty }).count > 1 {
-                        Button {
-                            HapticManager.shared.play(.buttonTap)
-                            MainViewsRouter.shared.pushToSaveSlotSelection()
-                        } label: {
-                            Text(userEnv.localizedString("Diğer Profiller ›", "Other Profiles ›"))
-                                .font(.setCustomFont(name: .InterBold, size: 13))
-                                .foregroundStyle(ThemeColors.textMuted)
-                                .underline()
-                        }
-                    }
-                }
-                .padding(.horizontal, 32)
-
-                HStack {
-                    dashboardPill(
-                        icon: "books.vertical.fill",
-                        title: userEnv.localizedString("GALERİ", "GALLERY"),
-                        color: ThemeColors.neonPurple
-                    ) {
-                        MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(CollectionMainView().environmentObject(userEnv), withNavigationTitle: "", navigationBarHidden: true))
-                    }
-                    .frame(maxWidth: 200)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 20)
-
-                HStack(spacing: 24) {
-                    Button {
-                        HapticManager.shared.play(.buttonTap)
-                        openStore()
-                    } label: {
-                        currencyBadge(iconName: "icon_gold", value: userEnv.gold, color: ThemeColors.electricYellow)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        HapticManager.shared.play(.buttonTap)
-                        openStore()
-                    } label: {
-                        currencyBadge(iconName: "icon_diamond", value: userEnv.diamonds, color: ThemeColors.neonCyan)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 24)
-                .padding(.bottom, 48)
             }
 
             if showDailyReward {
@@ -237,7 +260,7 @@ struct DashboardView: View {
                             .stroke(ThemeColors.neonCyan.opacity(0.5), lineWidth: 1.5))
                 }
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(userEnv.localizedString("DEVAM ET", "CONTINUE"))
+                    Text(userEnv.btnContinue)
                         .font(.setCustomFont(name: .InterExtraBold, size: 20))
                         .tracking(3)
                         .foregroundStyle(ThemeColors.cosmicBlack)
@@ -279,7 +302,7 @@ struct DashboardView: View {
             HStack(spacing: 10) {
                 Image(systemName: "plus.circle")
                     .font(.system(size: 18, weight: .bold))
-                Text(userEnv.localizedString("YENİ RUN", "NEW RUN"))
+                Text(userEnv.btnNewRunCaps)
                     .font(.setCustomFont(name: .InterBold, size: 16))
                     .tracking(2)
             }
@@ -304,7 +327,7 @@ struct DashboardView: View {
             HStack(spacing: 12) {
                 Image(systemName: "play.fill")
                     .font(.system(size: 20, weight: .black))
-                Text(userEnv.localizedString("OYNA", "PLAY"))
+                Text(userEnv.btnPlayCaps)
                     .font(.setCustomFont(name: .InterExtraBold, size: 26))
                     .tracking(8)
             }
@@ -345,6 +368,89 @@ struct DashboardView: View {
         }
     }
     
+    // MARK: - Registration Prompt Banner
+    @State private var showLoginSheet: Bool = false
+    
+    private var registrationPromptBanner: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "star.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(ThemeColors.electricYellow)
+                        
+                        Text(userEnv.labelSaveScores)
+                            .font(.setCustomFont(name: .InterBlack, size: 14))
+                            .foregroundStyle(.white)
+                    }
+                    
+                    Text(userEnv.labelSaveScoresDesc)
+                        .font(.setCustomFont(name: .InterMedium, size: 12))
+                        .foregroundStyle(ThemeColors.textSecondary)
+                }
+                
+                Spacer()
+            }
+            
+            VStack(spacing: 10) {
+                Button {
+                    HapticManager.shared.play(.buttonTap)
+                    MainViewsRouter.shared.present(
+                        view: MainNavigationView.builder.makeView(
+                            PlayerRegistrationView().environmentObject(userEnv),
+                            withNavigationTitle: "",
+                            navigationBarHidden: true
+                        )
+                    )
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 14, weight: .bold))
+                        
+                        Text(userEnv.btnRegisterNowCaps)
+                            .font(.setCustomFont(name: .InterBold, size: 13))
+                            .tracking(1)
+                    }
+                    .foregroundStyle(ThemeColors.cosmicBlack)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(ThemeColors.electricYellow)
+                    .clipShape(Capsule())
+                    .shadow(color: ThemeColors.electricYellow.opacity(0.3), radius: 8)
+                }
+                
+                Button {
+                    HapticManager.shared.play(.buttonTap)
+                    showLoginSheet = true
+                } label: {
+                    Text(userEnv.btnAlreadyHaveAccount)
+                        .font(.setCustomFont(name: .InterMedium, size: 12))
+                        .foregroundStyle(ThemeColors.neonCyan)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(ThemeColors.neonCyan.opacity(0.1))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(ThemeColors.neonCyan.opacity(0.3), lineWidth: 1))
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(ThemeColors.electricYellow.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(ThemeColors.electricYellow.opacity(0.25), lineWidth: 1.5)
+        )
+        .padding(.horizontal, 32)
+        .sheet(isPresented: $showLoginSheet) {
+            ExistingAccountLoginView(isPresented: $showLoginSheet)
+                .environmentObject(userEnv)
+        }
+    }
+    
     // MARK: - Para Göstergesi (tap → mağaza)
     private func currencyBadge(iconName: String, value: Int, color: Color) -> some View {
         HStack(spacing: 6) {
@@ -369,7 +475,17 @@ struct DashboardView: View {
         .shadow(color: color.opacity(0.1), radius: 5)
     }
 
-    // MARK: - Store Açma
+    // MARK: - Navigation Helpers
+    private func openLeaderboard() {
+        MainViewsRouter.shared.present(
+            view: MainNavigationView.builder.makeView(
+                LeaderboardTabContent().environmentObject(userEnv),
+                withNavigationTitle: "",
+                navigationBarHidden: true
+            )
+        )
+    }
+
     private func openStore() {
         MainViewsRouter.shared.present(
             view: MainNavigationView.builder.makeView(

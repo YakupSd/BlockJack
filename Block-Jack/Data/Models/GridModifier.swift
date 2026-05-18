@@ -21,4 +21,7 @@ enum CellModifierType: Codable, Equatable {
     /// Static Charge perki aktifken round başında gride yerleştirilir. Bu hücre
     /// bir temizliğin parçası olduğunda overdrive barına burst şarj ekler.
     case staticCharge
+    /// Phantom Siphon perki aktifken round başında gride yerleştirilir. Bu hücre
+    /// üzerine blok koyulduğunda tier'a bağlı süre bonusu verir.
+    case phantomSiphon
 }

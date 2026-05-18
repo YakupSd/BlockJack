@@ -511,6 +511,18 @@ final class BoardViewModel: ObservableObject {
         }
     }
     
+    /// Phantom Siphon perki için: boş hücrelerden `count` kadarına phantomSiphon
+    /// modifier'ı yerleştirir. Üzerine blok koyulduğunda tier'a bağlı süre bonusu verir.
+    func applyPhantomCells(count: Int) {
+        let positions = allEmptyPositions()
+            .filter { grid[$0.row][$0.col].modifier == nil } // Zaten modifier olan hücreleri atla
+            .shuffled()
+            .prefix(count)
+        for pos in positions {
+            grid[pos.row][pos.col].modifier = .phantomSiphon
+        }
+    }
+    
     // MARK: - Tactical Lens (Best Placement Hint)
     
     /// Verilen blok için, mevcut grid üzerinde en çok satır/sütun/zone temizleyecek

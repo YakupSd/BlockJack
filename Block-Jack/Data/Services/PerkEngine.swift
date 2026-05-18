@@ -13,99 +13,63 @@ class PerkEngine {
         let nameTR: String
         let nameEN: String
         let icon: String
-        let descTR: String
-        let descEN: String
         let synergyPartnerIds: [String]
 
         func name(lang: AppLanguage) -> String { lang == .turkish ? nameTR : nameEN }
-        func desc(lang: AppLanguage) -> String { lang == .turkish ? descTR : descEN }
+        
+        func desc(lang: AppLanguage, tier: Int = 1) -> String {
+            if let upgradeId = PerkUpgradeID(rawValue: id) {
+                let desc = PerkUpgradeRegistry.effectDescription(for: upgradeId, tier: tier)
+                // Localization check: Registry might be EN only, but for core perks we can append TR if needed
+                // For now, registry descriptions are clear enough.
+                return desc
+            }
+            return "???"
+        }
 
         func toPassivePerk(lang: AppLanguage, tier: Int = 1) -> PassivePerk {
             PassivePerk(
                 id: id,
                 name: name(lang: lang),
                 icon: icon,
-                desc: desc(lang: lang),
+                desc: desc(lang: lang, tier: tier),
                 tier: tier,
                 synergyPartnerIds: synergyPartnerIds
             )
         }
     }
 
-    /// Tek kaynak: Perk metinleri TR/EN burada tutulur.
     static let perkCatalog: [PerkDefinition] = [
-        PerkDefinition(id: "momentum", nameTR: "Momentum", nameEN: "Momentum", icon: "perk_momentum",
-                       descTR: "4. seride çift puan verip komboyu sıfırlar", descEN: "On the 4th streak: double score and reset combo.",
-                       synergyPartnerIds: ["clockwork"]),
-        PerkDefinition(id: "glass_cannon", nameTR: "Glass Cannon", nameEN: "Glass Cannon", icon: "perk_glass_cannon",
-                       descTR: "Can 1 iken tüm puanlar x1.5 artar (Lvl başına +0.5x)", descEN: "When at 1 life: all scores x1.5 (+0.5x per level).",
-                       synergyPartnerIds: ["last_stand"]),
-        PerkDefinition(id: "overkill", nameTR: "Overkill", nameEN: "Overkill", icon: "perk_overkill",
-                       descTR: "Kalan puanları bir sonraki tura aktarır (%30 taban, her tier +%15)", descEN: "Carry leftover score into the next round (+15% per tier).",
-                       synergyPartnerIds: ["echoes"]),
-        PerkDefinition(id: "last_stand", nameTR: "Last Stand", nameEN: "Last Stand", icon: "perk_last_stand",
-                       descTR: "Öldüğünde 1 kereliğine ücretsiz canlanma sunar (+1 kullanım per tier)", descEN: "Revive once for free when you die (+1 use per tier).",
-                       synergyPartnerIds: ["glass_cannon"]),
-        PerkDefinition(id: "safe_house", nameTR: "Safe House", nameEN: "Safe House", icon: "perk_safe_house",
-                       descTR: "Dinlenme alanına her girdiğinde Lvl başına +50 Altın (Taban 50)", descEN: "Each rest site grants +50 Gold per level (Base 50).",
-                       synergyPartnerIds: []),
-        PerkDefinition(id: "echoes", nameTR: "Echoes", nameEN: "Echoes", icon: "perk_echoes",
-                       descTR: "Tur sonu, en iyi hamlenin puanını tekrar ekler (+0.5x çarpan per tier)", descEN: "End of round: repeat your best move score (+0.5x multiplier per tier).",
-                       synergyPartnerIds: ["overkill"]),
-        PerkDefinition(id: "wide_load", nameTR: "Wide Load", nameEN: "Wide Load", icon: "perk_wide_load",
-                       descTR: "Blok haznesine ekstra 4. bir slot açar", descEN: "Unlock an extra 4th tray slot.",
-                       synergyPartnerIds: ["sculptor"]),
-        PerkDefinition(id: "clockwork", nameTR: "Clockwork", nameEN: "Clockwork", icon: "perk_clockwork",
-                       descTR: "Kazanılan süre ilerledikçe bonus çarpan ekler (Limit artar per tier)", descEN: "Time gained gradually adds a bonus multiplier (Limit scales per tier).",
-                       synergyPartnerIds: ["momentum"]),
-        PerkDefinition(id: "sculptor", nameTR: "Sculptor", nameEN: "Sculptor", icon: "perk_sculptor",
-                       descTR: "Turda blok döndürme hakkı verir (Lvl başına +2 hak)", descEN: "Rotate blocks (+2 times per round per tier).",
-                       synergyPartnerIds: ["wide_load"]),
-        PerkDefinition(id: "golden_stamp", nameTR: "Golden Stamp", nameEN: "Golden Stamp", icon: "perk_golden_stamp",
-                       descTR: "Hedef skor -%15 (Lvl başına ek -%10)", descEN: "Target score -15% (extra -10% per tier).",
-                       synergyPartnerIds: []),
-        PerkDefinition(id: "blue_pill", nameTR: "Blue Pill", nameEN: "Blue Pill", icon: "perk_blue_pill",
-                       descTR: "Mavi bloklar ×2 Chips verir (Lvl başına +1x)", descEN: "Blue blocks grant x2 Chips (+1x per tier).",
-                       synergyPartnerIds: ["lead_pill"]),
-        PerkDefinition(id: "lucky_clover", nameTR: "Lucky Clover", nameEN: "Lucky Clover", icon: "perk_lucky_clover",
-                       descTR: "Her temizlikte +0.5x çarpan (her tier +0.5x)", descEN: "+0.5x multiplier per clear (per tier).",
-                       synergyPartnerIds: []),
-
-        PerkDefinition(id: "lead_pill", nameTR: "Lead Pill", nameEN: "Lead Pill", icon: "perk_lead_pill",
-                       descTR: "Yeşil bloklar ×2 Chips verir (Lvl başına +1x)", descEN: "Green blocks grant x2 Chips (+1x per tier).",
-                       synergyPartnerIds: ["blue_pill"]),
-        PerkDefinition(id: "midas_touch", nameTR: "Midas Touch", nameEN: "Midas Touch", icon: "perk_midas_touch",
-                       descTR: "Her Flush +5 Altın verir (Lvl başına +5)", descEN: "Each Flush grants +5 Gold (+5 per tier).",
-                       synergyPartnerIds: ["golden_stamp"]),
-        PerkDefinition(id: "vampiric_core", nameTR: "Vampiric Core", nameEN: "Vampiric Core", icon: "perk_vampiric_core",
-                       descTR: "5000 puanda bir can şansı (Her tier -500 hedef)", descEN: "Every 5000 score: chance to gain +1 Life (Target -500 per tier).",
-                       synergyPartnerIds: []),
-        PerkDefinition(id: "recycler", nameTR: "Recycler", nameEN: "Recycler", icon: "perk_recycler",
-                       descTR: "2+ satırda %20 tray yenileme (Lvl başına +%10)", descEN: "On 2+ line clear: 20% chance to refresh tray (+10% per tier).",
-                       synergyPartnerIds: ["wide_load"]),
-        PerkDefinition(id: "chain_pulse", nameTR: "Chain Pulse", nameEN: "Chain Pulse", icon: "perk_chain_pulse",
-                       descTR: "Temizlik sonrası %15 şansla zincir temizlik (Lvl başına +%10)", descEN: "After a clear: 15% chance to chain-clear (+10% per tier).",
-                       synergyPartnerIds: ["static_charge"]),
-        PerkDefinition(id: "heavy_duty", nameTR: "Heavy Duty", nameEN: "Heavy Duty", icon: "perk_heavy_duty",
-                       descTR: "Temizlenen her Heavy hücre +1.0x çarpan getirir (tier başına)", descEN: "Each Heavy cell cleared grants +1.0x multiplier (per tier).",
-                       synergyPartnerIds: []),
-        PerkDefinition(id: "phantom_siphon", nameTR: "Phantom Siphon", nameEN: "Phantom Siphon", icon: "perk_phantom_siphon",
-                       descTR: "Phantom modifier'lı round'da her yerleştirme +2s (tier başına)", descEN: "In Phantom rounds: each placement grants +2s (per tier).",
-                       synergyPartnerIds: []),
-        PerkDefinition(id: "double_down", nameTR: "Double Down", nameEN: "Double Down", icon: "perk_double_down",
-                       descTR: "Son hamlede temizlik +3 hamle (Lvl başına +2 hamle)", descEN: "If you clear on your last move: +3 moves (+2 per tier).",
-                       synergyPartnerIds: []),
-        PerkDefinition(id: "static_charge", nameTR: "Static Charge", nameEN: "Static Charge", icon: "perk_static_charge",
-                       descTR: "Round başında static hücreler yerleşir; üzerine blok koyunca overdrive +50% (Lvl başına +20%)", descEN: "Static cells appear at round start; placing over them grants +50% overdrive (+20% per tier).",
-                       synergyPartnerIds: ["chain_pulse"]),
-        PerkDefinition(id: "tactical_lens", nameTR: "Tactical Lens", nameEN: "Tactical Lens", icon: "perk_tactical_lens",
-                       descTR: "Blok çekilirken en iyi yerleşim yeşil ışıkla işaretlenir", descEN: "While dragging: highlights the best placement in green.",
-                       synergyPartnerIds: [])
+        PerkDefinition(id: "overkill", nameTR: "Overkill", nameEN: "Overkill", icon: "perk_overkill", synergyPartnerIds: ["echoes"]),
+        PerkDefinition(id: "last_stand", nameTR: "Last Stand", nameEN: "Last Stand", icon: "perk_last_stand", synergyPartnerIds: ["glass_cannon"]),
+        PerkDefinition(id: "safe_house", nameTR: "Safe House", nameEN: "Safe House", icon: "perk_safe_house", synergyPartnerIds: []),
+        PerkDefinition(id: "echoes", nameTR: "Echoes", nameEN: "Echoes", icon: "perk_echoes", synergyPartnerIds: ["overkill"]),
+        PerkDefinition(id: "wide_load", nameTR: "Wide Load", nameEN: "Wide Load", icon: "perk_wide_load", synergyPartnerIds: ["sculptor"]),
+        PerkDefinition(id: "clockwork", nameTR: "Clockwork", nameEN: "Clockwork", icon: "perk_clockwork", synergyPartnerIds: ["momentum"]),
+        PerkDefinition(id: "sculptor", nameTR: "Sculptor", nameEN: "Sculptor", icon: "perk_sculptor", synergyPartnerIds: ["wide_load"]),
+        PerkDefinition(id: "golden_stamp", nameTR: "Golden Stamp", nameEN: "Golden Stamp", icon: "perk_golden_stamp", synergyPartnerIds: []),
+        PerkDefinition(id: "blue_pill", nameTR: "Blue Pill", nameEN: "Blue Pill", icon: "perk_blue_pill", synergyPartnerIds: ["lead_pill"]),
+        PerkDefinition(id: "lucky_clover", nameTR: "Lucky Clover", nameEN: "Lucky Clover", icon: "perk_lucky_clover", synergyPartnerIds: []),
+        PerkDefinition(id: "lead_pill", nameTR: "Lead Pill", nameEN: "Lead Pill", icon: "perk_lead_pill", synergyPartnerIds: ["blue_pill"]),
+        PerkDefinition(id: "midas_touch", nameTR: "Midas Touch", nameEN: "Midas Touch", icon: "perk_midas_touch", synergyPartnerIds: ["golden_stamp"]),
+        PerkDefinition(id: "vampiric_core", nameTR: "Vampiric Core", nameEN: "Vampiric Core", icon: "perk_vampiric_core", synergyPartnerIds: []),
+        PerkDefinition(id: "recycler", nameTR: "Recycler", nameEN: "Recycler", icon: "perk_recycler", synergyPartnerIds: ["wide_load"]),
+        PerkDefinition(id: "chain_pulse", nameTR: "Chain Pulse", nameEN: "Chain Pulse", icon: "perk_chain_pulse", synergyPartnerIds: ["static_charge"]),
+        PerkDefinition(id: "heavy_duty", nameTR: "Heavy Duty", nameEN: "Heavy Duty", icon: "perk_heavy_duty", synergyPartnerIds: []),
+        PerkDefinition(id: "phantom_siphon", nameTR: "Phantom Siphon", nameEN: "Phantom Siphon", icon: "perk_phantom_siphon", synergyPartnerIds: []),
+        PerkDefinition(id: "double_down", nameTR: "Double Down", nameEN: "Double Down", icon: "perk_double_down", synergyPartnerIds: []),
+        PerkDefinition(id: "static_charge", nameTR: "Static Charge", nameEN: "Static Charge", icon: "perk_static_charge", synergyPartnerIds: ["chain_pulse"]),
+        PerkDefinition(id: "tactical_lens", nameTR: "Tactical Lens", nameEN: "Tactical Lens", icon: "perk_tactical_lens", synergyPartnerIds: []),
+        PerkDefinition(id: "momentum", nameTR: "Momentum", nameEN: "Momentum", icon: "perk_momentum", synergyPartnerIds: ["clockwork"]),
+        PerkDefinition(id: "glass_cannon", nameTR: "Glass Cannon", nameEN: "Glass Cannon", icon: "perk_glass_cannon", synergyPartnerIds: ["last_stand"])
     ]
 
-    /// Geriye dönük uyumluluk ve dinamik havuz: Dile göre perk listesi sunar.
-    static func getPerkPool(lang: AppLanguage) -> [PassivePerk] {
-        perkCatalog.map { $0.toPassivePerk(lang: lang, tier: 1) }
+    /// Geriye dönük uyumluluk ve dinamik havuz: Dile ve meta seviyelere göre perk listesi sunar.
+    static func getPerkPool(lang: AppLanguage, perkLevels: [String: Int] = [:]) -> [PassivePerk] {
+        perkCatalog.map { def in
+            let tier = perkLevels[def.id] ?? 1
+            return def.toPassivePerk(lang: lang, tier: tier)
+        }
     }
 
     static func definition(for id: String) -> PerkDefinition? {
@@ -179,22 +143,6 @@ class PerkEngine {
     // Most perks are handled dynamically in GameViewModel when clear/score/next round happens.
     // PerkEngine acts as the central logic container.
     
-    static func triggerOverkill(currentScore: Int, targetScore: Int) -> Int {
-        if currentScore > targetScore {
-            // Overkill: %30 carryover
-            return Int(Double(currentScore - targetScore) * 0.3)
-        }
-        return 0
-    }
+    // (Eski trigger'lar ScoreManager'da dinamik tier hesabı ile yapıldığı için kaldırıldı)
     
-    static func triggerClockwork(secondsGained: Double, currentBonus: Double) -> Double {
-        // Her kazanılan sn x 0.1, max 2.0
-        let newBonus = currentBonus + (secondsGained * 0.1)
-        return min(2.0, newBonus)
-    }
-    
-    /// Safe House perki için dinlenme alanında uygulanacak bonus altın miktarı.
-    /// RestSiteView doğrudan SaveManager.updateGold(+100) çağırıyor; bu fonksiyon
-    /// geriye dönük uyumluluk için kaldı (eskiden 2 altındı, açıklamayla çelişiyordu).
-    static let safeHouseGoldBonus: Int = 100
 }

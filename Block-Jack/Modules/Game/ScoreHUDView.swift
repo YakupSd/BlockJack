@@ -53,7 +53,7 @@ struct ScoreHUDView: View {
     private var scoreBlock: some View {
         let reached = vm.run.currentScore >= vm.run.currentRoundTargetScore
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(userEnv.localizedString("PUAN", "SCORE"))
+            Text(userEnv.labelScore)
                 .font(.setCustomFont(name: .InterBold, size: 9))
                 .foregroundStyle(ThemeColors.textMuted)
                 .tracking(1.2)
@@ -67,11 +67,13 @@ struct ScoreHUDView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             
-            Text("/ \(vm.run.currentRoundTargetScore.formatted())")
-                .font(.setCustomFont(name: .InterBold, size: 11))
-                .foregroundStyle(ThemeColors.textMuted.opacity(0.9))
-                .monospacedDigit()
-                .lineLimit(1)
+            if vm.eventConfig == nil {
+                Text("/ \(vm.run.currentRoundTargetScore.formatted())")
+                    .font(.setCustomFont(name: .InterBold, size: 11))
+                    .foregroundStyle(ThemeColors.textMuted.opacity(0.9))
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
         }
         .shadow(color: reached ? ThemeColors.electricYellow.opacity(0.4) : .clear, radius: 6)
         .layoutPriority(1)
@@ -105,7 +107,7 @@ struct ScoreHUDView: View {
     private var multiplierBadge: some View {
         let mult = vm.currentMultiplier
         VStack(spacing: -1) {
-            Text(userEnv.localizedString("Çarpan", "Mult"))
+            Text(userEnv.labelMult)
                 .font(.setCustomFont(name: .InterBold, size: 7))
                 .foregroundStyle(ThemeColors.electricYellow.opacity(0.85))
                 .tracking(1)
@@ -123,37 +125,6 @@ struct ScoreHUDView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 8).stroke(ThemeColors.electricYellow.opacity(0.5), lineWidth: 1)
         )
-    }
-}
-
-// MARK: - Score Popup Overlay (korundu — eski davranış)
-struct ScorePopupView: View {
-    let popup: ScorePopup
-
-    @State private var offset: CGFloat = 0
-    @State private var opacity: Double = 1.0
-    @State private var scale: CGFloat = 0.5
-    @State private var rotation: Double = Double.random(in: -15...15)
-
-    var body: some View {
-        Text(popup.text)
-            .font(.setCustomFont(name: .InterExtraBold, size: 24))
-            .foregroundStyle(popup.color)
-            .shadow(color: popup.color, radius: 10)
-            .scaleEffect(scale)
-            .rotationEffect(.degrees(rotation))
-            .offset(y: offset)
-            .opacity(opacity)
-            .onAppear {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                    scale = 1.2
-                }
-                withAnimation(.easeOut(duration: 1.2).delay(0.2)) {
-                    offset = -80
-                    opacity = 0
-                    scale = 1.0
-                }
-            }
     }
 }
 

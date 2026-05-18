@@ -97,7 +97,7 @@ final class AbilityManager {
         // Kullanım Sınırı Kontrolü (Master Builder ise 4. slot ücretsiz)
         if !hasUnlimited && (!isMasterBuilder || !isFourthSlot) {
             guard vm.run.currentRotationUses > 0 else {
-                vm.addPopup(text: vm.userEnv.localizedString("ROTASYON SINIRI!", "ROTATE LIMIT!"), color: ThemeColors.neonPink)
+                vm.addPopup(text: vm.userEnv.labelRotateLimit, color: ThemeColors.neonPink)
                 return
             }
             vm.run.currentRotationUses -= 1
@@ -111,7 +111,7 @@ final class AbilityManager {
             vm.blockTray[index].rotate()
             vm.selectedBlock = vm.blockTray[index]
             vm.haptic.play(.selection)
-            vm.addPopup(text: vm.userEnv.localizedString("DÖNDÜRÜLDÜ!", "ROTATED!"), color: ThemeColors.neonCyan)
+            vm.addPopup(text: vm.userEnv.labelRotated, color: ThemeColors.neonCyan)
         }
     }
 
@@ -125,7 +125,7 @@ final class AbilityManager {
         if vm.run.maxRotationUses > 0 {
             if !hasUnlimited && vm.run.currentRotationUses <= 0 {
                 vm.haptic.play(.error)
-                vm.addPopup(text: vm.userEnv.localizedString("ROTASYON SINIRI!", "ROTATE LIMIT!"), color: ThemeColors.textMuted)
+                vm.addPopup(text: vm.userEnv.labelRotateLimit, color: ThemeColors.textMuted)
                 return
             }
             

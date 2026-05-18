@@ -132,7 +132,7 @@ struct SlotHubView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.left")
-                    Text(userEnv.localizedString("GERİ", "BACK"))
+                    Text(userEnv.btnBackCaps)
                 }
                 .font(.setCustomFont(name: .InterBold, size: 10))
                 .tracking(2)
@@ -217,7 +217,7 @@ struct SlotHubView: View {
                 // Status Bar
                 HStack(spacing: 6) {
                     Circle().fill(ThemeColors.neonGreen).frame(width: 6, height: 6)
-                    Text(userEnv.localizedString("NÖRAL BAĞLANTI: STABİL", "NEURAL LINK: STABLE"))
+                    Text(userEnv.labelNeuralLinkStableCaps)
                         .font(.setCustomFont(name: .InterBold, size: 8))
                         .tracking(2)
                         .foregroundStyle(ThemeColors.neonGreen)
@@ -260,7 +260,7 @@ struct SlotHubView: View {
         VStack(alignment: .leading, spacing: 20) {
             // Header
             HStack {
-                Text(userEnv.localizedString("SİSTEM VERİLERİ", "SYSTEM TELEMETRY"))
+                Text(userEnv.labelSystemTelemetryCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 10))
                     .tracking(3)
                     .foregroundStyle(ThemeColors.textSecondary)
@@ -272,16 +272,16 @@ struct SlotHubView: View {
 
             // Telemetry Grid
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
-                telemetryBox(title: userEnv.localizedString("EN YÜKSEK SKOR", "MAX SECTOR"), value: "W\(slot.bestWorldLevel)", color: ThemeColors.neonPurple, icon: "map.fill")
-                telemetryBox(title: userEnv.localizedString("ALTIN", "CREDITS"), value: "\(slot.gold)", color: ThemeColors.electricYellow, icon: "bitcoinsign.circle.fill")
-                telemetryBox(title: userEnv.localizedString("STABİLİTE", "STABILITY"), value: "R\(slot.currentRound)", color: ThemeColors.neonCyan, icon: "waveform.path.ecg")
-                telemetryBox(title: userEnv.localizedString("MODÜLLER", "MODULES"), value: "\(slot.perkLevels.filter { $0.value >= 1 }.count)", color: ThemeColors.neonPink, icon: "cpu.fill")
+                telemetryBox(title: userEnv.labelMaxSectorCaps, value: "W\(slot.bestWorldLevel)", color: ThemeColors.neonPurple, icon: "map.fill")
+                telemetryBox(title: userEnv.labelCreditsCaps, value: "\(slot.gold)", color: ThemeColors.electricYellow, icon: "bitcoinsign.circle.fill")
+                telemetryBox(title: userEnv.labelStabilityCaps, value: "R\(slot.currentRound)", color: ThemeColors.neonCyan, icon: "waveform.path.ecg")
+                telemetryBox(title: userEnv.labelModulesCaps, value: "\(slot.perkLevels.filter { $0.value >= 1 }.count)", color: ThemeColors.neonPink, icon: "cpu.fill")
             }
 
             // Run Logs
             if !slot.recentRuns.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(userEnv.localizedString("SON VERİ KAYITLARI", "RECENT DATA LOGS"))
+                    Text(userEnv.labelRecentDataLogsCaps)
                         .font(.setCustomFont(name: .InterBold, size: 9))
                         .tracking(2)
                         .foregroundStyle(ThemeColors.textMuted)
@@ -297,7 +297,7 @@ struct SlotHubView: View {
                                 Text(name.uppercased())
                                     .font(.setCustomFont(name: .InterBlack, size: 10))
                                     .foregroundStyle(.white)
-                                Text(userEnv.localizedString("SEKTÖR \(r.worldLevelReached) VERİSİ", "SECTOR \(r.worldLevelReached) DATA"))
+                                Text(userEnv.formatSectorDataLog(sectorIndex: r.worldLevelReached))
                                     .font(.setCustomFont(name: .InterMedium, size: 8))
                                     .foregroundStyle(ThemeColors.textSecondary)
                             }
@@ -396,8 +396,8 @@ struct SlotHubView: View {
                     Image(systemName: hasActiveRun ? "play.circle.fill" : "bolt.fill")
                         .font(.system(size: 24, weight: .bold))
                     Text(hasActiveRun 
-                         ? userEnv.localizedString("SEFERE DEVAM ET", "CONTINUE RUN")
-                         : userEnv.localizedString("YENİ SEFER BAŞLAT", "START NEW RUN"))
+                         ? userEnv.btnContinueRunCaps
+                         : userEnv.btnStartNewRunCaps)
                         .font(.setCustomFont(name: .InterBlack, size: 18))
                         .tracking(1)
                 }
@@ -415,7 +415,7 @@ struct SlotHubView: View {
             )
         } label: {
             HStack {
-                Text(userEnv.localizedString("SEKTÖRÜ DEĞİŞTİR", "CHANGE SECTOR"))
+                Text(userEnv.btnChangeSectorCaps)
                 Spacer()
                 Image(systemName: "arrow.triangle.2.circlepath")
             }
@@ -437,7 +437,7 @@ struct SlotHubView: View {
             )
         } label: {
             HStack {
-                Text(userEnv.localizedString("PERK GELİŞTİRME", "PERK UPGRADES"))
+                Text(userEnv.btnPerkUpgradesCaps)
                 Spacer()
                 Image(systemName: "sparkles")
             }
@@ -456,16 +456,16 @@ struct SlotHubView: View {
 
     private var hubPills: some View {
         HStack(spacing: 12) {
-            hubPill(icon: "person.fill", title: userEnv.localizedString("KAHRAMAN", "HERO"), color: ThemeColors.neonCyan) {
+            hubPill(icon: "person.fill", title: userEnv.labelHeroCaps, color: ThemeColors.neonCyan) {
                 MainViewsRouter.shared.pushToCharacterSelection(slotId: slotId, mode: .changeInHub)
             }
-            hubPill(icon: "cart.fill", title: userEnv.localizedString("PAZAR", "MARKET"), color: ThemeColors.electricYellow) {
+            hubPill(icon: "cart.fill", title: userEnv.labelMarketCaps, color: ThemeColors.electricYellow) {
                 MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(
                     UpgradesView(slotId: slotId).environmentObject(userEnv),
                     withNavigationTitle: "", navigationBarHidden: true
                 ))
             }
-            hubPill(icon: "book.fill", title: userEnv.localizedString("KOLEKSİYON", "LORE"), color: ThemeColors.neonPurple) {
+            hubPill(icon: "book.fill", title: userEnv.labelLoreCaps, color: ThemeColors.neonPurple) {
                 MainViewsRouter.shared.present(view: MainNavigationView.builder.makeView(
                     CollectionMainView().environmentObject(userEnv),
                     withNavigationTitle: "", navigationBarHidden: true

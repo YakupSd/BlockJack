@@ -2,99 +2,118 @@
 //  EnemyHUDView.swift
 //  Block-Jack
 //
+//  Yeni bildirim sistemi: Düşman saldırı uyarısı.
+//  Eski full-screen modal overlay KALDIRILDI.
+//  Yeni tasarım: Düşman satırı altına kayan inline banner + grid karartma.
+//  Grid opacity: 0.45 (tıklanabilir kalır).
+//
 
 import SwiftUI
 
-// MARK: - Düşman Saldırı Uyarı Overlay (3sn geri sayım)
+// MARK: - Düşman Saldırı Uyarı — Inline Banner (Eski overlay yerine)
+/// Artık tam ekran overlay değil.
+/// Düşman banner'ının hemen altına kayar.
+/// Grid 0.45 opacity ile kararır ama tıklanabilir kalır.
 
 struct EnemyAttackWarningOverlay: View {
     @ObservedObject var vm: GameViewModel
-    @State private var shakeOffset: CGFloat = 0
+    @State private var slideIn: Bool = false
     @State private var bgPulse: Double = 0.0
     
     var body: some View {
         guard let attack = vm.enemy.currentAttack else { return AnyView(EmptyView()) }
         
         return AnyView(
-            ZStack {
-                // Kırmızı kenar glow
-                RoundedRectangle(cornerRadius: 0)
-                    .stroke(attack.warningColor, lineWidth: 6)
-                    .opacity(bgPulse)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                
-                VStack(spacing: 0) {
-                    Spacer()
+            VStack(spacing: 0) {
+                // Inline banner (düşman satırı altına eklenir)
+                HStack(spacing: 12) {
+                    // Sol: Sayaç dairesi
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: "#2d1515"))
+                            .frame(width: 42, height: 42)
+                        
+                        Circle()
+                            .trim(from: 0, to: CGFloat(max(0, vm.enemyCountdown) / 3.0))
+                            .stroke(
+                                attack.warningColor,
+                                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                            )
+                            .frame(width: 42, height: 42)
+                            .rotationEffect(.degrees(-90))
+                            .animation(.linear(duration: 0.1), value: vm.enemyCountdown)
+                        
+                        Text(String(format: "%.0f", max(0, vm.enemyCountdown)))
+                            .font(.setCustomFont(name: .InterBlack, size: 18))
+                            .foregroundStyle(attack.warningColor)
+                            .monospacedDigit()
+                    }
                     
-                    // Uyarı kartı
-                    VStack(spacing: 8) {
-                        // Geri sayım dairesi
-                        ZStack {
-                            Circle()
-                                .stroke(attack.warningColor.opacity(0.3), lineWidth: 4)
-                                .frame(width: 64, height: 64)
-                            
-                            Circle()
-                                .trim(from: 0, to: CGFloat(max(0, vm.enemyCountdown) / 3.0))
-                                .stroke(attack.warningColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                                .frame(width: 64, height: 64)
-                                .rotationEffect(.degrees(-90))
-                                .animation(.linear(duration: 0.1), value: vm.enemyCountdown)
-                            
-                            Text(String(format: "%.0f", max(0, vm.enemyCountdown)))
-                                .font(.setCustomFont(name: .InterBlack, size: 28))
-                                .foregroundStyle(attack.warningColor)
+                    // Orta: Uyarı yazıları
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 4) {
+                            Text("⚠️")
+                                .font(.system(size: 10))
+                            Text(vm.userEnv.labelAttackIncoming)
+                                .font(.setCustomFont(name: .InterBold, size: 10))
+                                .foregroundStyle(ThemeColors.textMuted)
+                                .tracking(0.5)
                         }
                         
-                        Text("⚠️ SALDIRI GELİYOR!")
-                            .font(.setCustomFont(name: .InterBlack, size: 11))
-                            .foregroundStyle(ThemeColors.textMuted)
-                            .tracking(2)
-                        
-                        HStack(spacing: 8) {
+                        HStack(spacing: 6) {
                             Text(attack.icon)
-                                .font(.system(size: 28))
+                                .font(.system(size: 18))
                             
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(attack.name)
-                                    .font(.setCustomFont(name: .InterBlack, size: 18))
-                                    .foregroundStyle(attack.warningColor)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(attack.name.uppercased())
+                                    .font(.setCustomFont(name: .InterBlack, size: 13))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
                                 
                                 Text(attack.description)
-                                    .font(.setCustomFont(name: .InterMedium, size: 11))
+                                    .font(.setCustomFont(name: .InterMedium, size: 10))
                                     .foregroundStyle(ThemeColors.textSecondary)
+                                    .lineLimit(1)
                             }
                         }
-                        .padding(.horizontal, 8)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(attack.warningColor.opacity(0.5), lineWidth: 2)
-                            )
-                            .shadow(color: attack.warningColor.opacity(0.3), radius: 20)
-                    )
-                    .offset(x: shakeOffset)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 200) // Tray üzerinde konumlanır
+                    
+                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color(hex: "#2d1515").opacity(0.92))
+                )
+                .overlay(
+                    // Sol kenarda kırmızı border accent (3px)
+                    HStack {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(attack.warningColor)
+                            .frame(width: 3)
+                            .padding(.vertical, 4)
+                        Spacer()
+                    }
+                    .padding(.leading, 2)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(attack.warningColor.opacity(0.35), lineWidth: 1)
+                )
+                .shadow(color: attack.warningColor.opacity(0.3), radius: 10)
+                .padding(.horizontal, GameLayout.horizontalPadding)
+                .offset(y: slideIn ? 0 : -60)
+                .opacity(slideIn ? 1 : 0)
             }
             .onAppear {
-                // Titreme efekti
-                withAnimation(.easeInOut(duration: 0.08).repeatCount(6, autoreverses: true)) {
-                    shakeOffset = 6
+                // slideDown 250ms
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    slideIn = true
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation { shakeOffset = 0 }
-                }
-                // Kenar nabzı
+                // Kenar nabzı (ince vurgu)
                 withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
-                    bgPulse = 0.5
+                    bgPulse = 0.3
                 }
             }
         )
@@ -131,7 +150,7 @@ struct EnemyHUDView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(userEnv.localizedString("Düşman: ", "Enemy: ") + attack.name)
+                    Text(userEnv.labelEnemyPrefix + attack.name)
                         .font(.setCustomFont(name: .InterBlack, size: 10))
                         .foregroundStyle(.white)
                         .lineLimit(1)
@@ -141,8 +160,7 @@ struct EnemyHUDView: View {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 8))
                                 .foregroundStyle(ThemeColors.electricYellow)
-                            Text(userEnv.localizedString("Kilit: \(Int(vm.enemy.trayLockRemainingTime))sn",
-                                                        "Lock: \(Int(vm.enemy.trayLockRemainingTime))s"))
+                            Text(userEnv.labelEnemyTrayLockRemainingTemplate.replacingOccurrences(of: "{{time}}", with: "\(Int(vm.enemy.trayLockRemainingTime))"))
                                 .font(.setCustomFont(name: .InterBold, size: 9))
                                 .foregroundStyle(ThemeColors.electricYellow)
                         }
@@ -157,7 +175,7 @@ struct EnemyHUDView: View {
                 Spacer(minLength: 4)
                 
                 // Sağ: DÜŞMAN etiketi
-                Text(userEnv.localizedString("DÜŞMAN", "ENEMY"))
+                Text(userEnv.labelEnemyCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 9))
                     .foregroundStyle(attack.warningColor)
                     .tracking(2)

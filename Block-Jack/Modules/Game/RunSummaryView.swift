@@ -16,6 +16,11 @@ struct RunSummaryView: View {
     @EnvironmentObject var userEnv: UserEnvironment
     @State private var appeared = false
     @State private var scoreCounter: Int = 0
+    
+    @StateObject private var leaderboardVM = LeaderboardViewModel()
+    @State private var scoreSubmitResult: ScoreSubmitResponse? = nil
+    @State private var scoreSubmitted: Bool = false
+    @State private var showRegistration: Bool = false
 
     private var character: GameCharacter? {
         GameCharacter.roster.first(where: { $0.id == summary.characterId })
@@ -32,12 +37,12 @@ struct RunSummaryView: View {
 
                 // --- Başlık ---
                 VStack(spacing: 8) {
-                    Text(userEnv.localizedString("RUN BİTTİ", "RUN OVER"))
+                    Text(userEnv.labelRunOverCaps)
                         .font(.setCustomFont(name: .InterBlack, size: 14))
                         .tracking(4)
                         .foregroundStyle(ThemeColors.neonPink)
 
-                    Text(userEnv.localizedString("İSTATİSTİKLER", "SUMMARY"))
+                    Text(userEnv.labelSummaryCaps)
                         .font(.setCustomFont(name: .InterExtraBold, size: 32))
                         .foregroundStyle(.white)
                         .tracking(3)
@@ -74,7 +79,7 @@ struct RunSummaryView: View {
                             .tracking(2)
 
                         if summary.wasTrial {
-                            Text(userEnv.localizedString("TRIAL RUN", "TRIAL RUN"))
+                            Text(userEnv.labelTrialRunCaps)
                                 .font(.setCustomFont(name: .InterBold, size: 10))
                                 .tracking(2)
                                 .foregroundStyle(ThemeColors.neonOrange)
@@ -96,7 +101,7 @@ struct RunSummaryView: View {
                 VStack(spacing: 10) {
                     // Büyük Skor
                     VStack(spacing: 4) {
-                        Text(userEnv.localizedString("TOPLAM SKOR", "TOTAL SCORE"))
+                        Text(userEnv.labelTotalScoreCaps)
                             .font(.setCustomFont(name: .InterBold, size: 11))
                             .tracking(2)
                             .foregroundStyle(ThemeColors.textMuted)
@@ -118,19 +123,19 @@ struct RunSummaryView: View {
                     HStack(spacing: 10) {
                         statCard(
                             icon: "globe.europe.africa.fill",
-                            label: userEnv.localizedString("WORLD", "WORLD"),
+                            label: userEnv.labelWorldCaps,
                             value: "W\(summary.worldLevelReached)",
                             color: ThemeColors.neonPurple
                         )
                         statCard(
                             icon: "bitcoinsign.circle.fill",
-                            label: userEnv.localizedString("ALTIN", "GOLD"),
+                            label: userEnv.labelGoldCaps,
                             value: "\(summary.goldTotal)",
                             color: ThemeColors.electricYellow
                         )
                         statCard(
                             icon: "bolt.fill",
-                            label: userEnv.localizedString("PERK", "PERKS"),
+                            label: userEnv.labelPerkCaps,
                             value: "\(summary.perksCount)",
                             color: ThemeColors.neonCyan
                         )
@@ -142,6 +147,64 @@ struct RunSummaryView: View {
                 .animation(.easeOut(duration: 0.45).delay(0.2), value: appeared)
 
                 Spacer()
+                
+                // --- Score Submit Banner ---
+                if let result = scoreSubmitResult {
+                    ScoreSubmitBanner(result: result, onDismiss: {
+                        scoreSubmitResult = nil
+                    })
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+                } else if !scoreSubmitted && userEnv.isRegistered {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .tint(ThemeColors.neonCyan)
+                            .scaleEffect(0.8)
+                        Text(userEnv.labelSubmittingScore)
+                            .font(.setCustomFont(name: .InterMedium, size: 12))
+                            .foregroundStyle(ThemeColors.textSecondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+                } else if !userEnv.isRegistered {
+                    VStack(spacing: 10) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "star.circle.fill")
+                                .foregroundStyle(ThemeColors.electricYellow)
+                            Text(userEnv.labelSaveYourScores)
+                                .font(.setCustomFont(name: .InterBold, size: 13))
+                                .foregroundStyle(.white)
+                        }
+                        
+                        Button {
+                            HapticManager.shared.play(.buttonTap)
+                            showRegistration = true
+                        } label: {
+                            Text(userEnv.btnRegisterNowCaps)
+                                .font(.setCustomFont(name: .InterBold, size: 13))
+                                .foregroundStyle(ThemeColors.cosmicBlack)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(ThemeColors.electricYellow)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ThemeColors.electricYellow.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(ThemeColors.electricYellow.opacity(0.2), lineWidth: 1))
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+                    .sheet(isPresented: $showRegistration) {
+                        PlayerRegistrationView()
+                            .environmentObject(userEnv)
+                    }
+                }
 
                 // --- Aksiyon Butonları ---
                 VStack(spacing: 12) {
@@ -156,7 +219,7 @@ struct RunSummaryView: View {
                         HStack(spacing: 10) {
                             Image(systemName: "arrow.clockwise.circle.fill")
                                 .font(.system(size: 20, weight: .bold))
-                            Text(userEnv.localizedString("YENİ RUN", "NEW RUN"))
+                            Text(userEnv.labelNewRunCaps)
                                 .font(.setCustomFont(name: .InterExtraBold, size: 20))
                                 .tracking(3)
                         }
@@ -174,7 +237,7 @@ struct RunSummaryView: View {
                         HapticManager.shared.play(.buttonTap)
                         MainViewsRouter.shared.popToDashboard()
                     } label: {
-                        Text(userEnv.localizedString("ANA MENÜ", "MAIN MENU"))
+                        Text(userEnv.labelMainMenuCaps)
                             .font(.setCustomFont(name: .InterBold, size: 16))
                             .foregroundStyle(ThemeColors.textSecondary)
                             .frame(maxWidth: .infinity)
@@ -207,6 +270,39 @@ struct RunSummaryView: View {
                         scoreCounter = min(target, i * stepValue)
                         if i == steps { scoreCounter = target }
                     }
+                }
+            }
+            
+            // Score submit işlemi (registered users için)
+            if userEnv.isRegistered && !scoreSubmitted {
+                Task {
+                    await submitScore()
+                }
+            } else if !scoreSubmitted {
+                scoreSubmitted = true
+            }
+        }
+    }
+    
+    // MARK: - Score Submission
+    
+    private func submitScore() async {
+        scoreSubmitted = true
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            Task {
+                await leaderboardVM.submitScore(
+                    username: userEnv.username,
+                    score: summary.score,
+                    worldLevel: summary.worldLevelReached,
+                    currentRound: 1,
+                    characterId: summary.characterId,
+                    durationSeconds: 120
+                )
+                
+                // Result alınca göster
+                if let result = leaderboardVM.lastSubmitResult {
+                    scoreSubmitResult = result
                 }
             }
         }

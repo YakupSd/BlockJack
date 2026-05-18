@@ -49,7 +49,7 @@ struct CharacterSelectionView: View {
                             .clipShape(Circle())
                     }
                     Spacer()
-                    Text(userEnv.localizedString("KARAKTER", "CHARACTER"))
+                    Text(userEnv.labelCharacter)
                         .font(.setCustomFont(name: .InterBlack, size: 20))
                         .foregroundStyle(ThemeColors.neonCyan)
                         .tracking(2)
@@ -104,10 +104,10 @@ struct CharacterSelectionView: View {
                 } label: {
                     Text(isUnlocked
                          ? (mode == .changeInHub
-                            ? userEnv.localizedString("BU KARAKTERİ SEÇ", "SELECT THIS CHARACTER")
-                            : userEnv.localizedString("SEÇ VE DEVAM ET", "SELECT & CONTINUE"))
+                            ? userEnv.labelSelectThisCharacter
+                            : userEnv.labelSelectAndContinue)
                          : (userEnv.canStartTrialToday()
-                            ? userEnv.localizedString("TRIAL (ÜCRETSİZ) — 1 RUN", "TRIAL (FREE) — 1 RUN")
+                            ? userEnv.labelTrialFreeOneRun
                             : "\(char.cost) 💎 UNLOCK"))
                         .font(.setCustomFont(name: .InterExtraBold, size: 18))
                         .foregroundStyle(ThemeColors.cosmicBlack)
@@ -182,7 +182,7 @@ struct CharacterSelectionView: View {
         
         VStack(spacing: 16) {
             // Phase 7: Lore
-            Text(userEnv.localizedString(char.loreTR, char.loreEN))
+            Text(char.lore(lang: userEnv.language))
                 .font(.setCustomFont(name: .InterMedium, size: 13))
                 .foregroundStyle(ThemeColors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -191,9 +191,9 @@ struct CharacterSelectionView: View {
                 
             // Phase 7: Stats
             HStack(spacing: 12) {
-                statBadge(title: "ZORLUK", value: char.difficulty.rawValue, color: difficultyColor(char.difficulty))
-                statBadge(title: "GÜÇLÜ YÖN", value: char.strongMode, color: ThemeColors.neonCyan)
-                statBadge(title: "FAVORİ BLOK", value: char.favoriteBlockType.rawValue, color: ThemeColors.electricYellow)
+                statBadge(title: userEnv.labelDifficultyCaps, value: char.difficulty.title(lang: userEnv.language), color: difficultyColor(char.difficulty))
+                statBadge(title: userEnv.labelStrongPointCaps, value: char.strongMode(lang: userEnv.language), color: ThemeColors.neonCyan)
+                statBadge(title: userEnv.labelFavoriteBlockCaps, value: char.favoriteBlockType.rawValue, color: ThemeColors.electricYellow)
             }
             .padding(.bottom, 8)
             
@@ -204,10 +204,10 @@ struct CharacterSelectionView: View {
                     .foregroundStyle(ThemeColors.electricYellow)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(userEnv.localizedString("PASİF YETENEK", "PASSIVE ABILITY"))
+                    Text(userEnv.labelPassiveAbilityCaps)
                         .font(.setCustomFont(name: .InterBold, size: 12))
                         .foregroundStyle(ThemeColors.textMuted)
-                    Text(char.passiveDesc)
+                    Text(char.passiveDesc(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterMedium, size: 14))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.leading)
@@ -226,10 +226,10 @@ struct CharacterSelectionView: View {
                     .foregroundStyle(ThemeColors.neonPink)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(userEnv.localizedString("AKTİF YETENEK (OVERDRIVE)", "ACTIVE ABILITY (OVERDRIVE)"))
+                    Text(userEnv.labelActiveAbilityOverdriveCaps)
                         .font(.setCustomFont(name: .InterBold, size: 12))
                         .foregroundStyle(ThemeColors.textMuted)
-                    Text(char.activeDesc)
+                    Text(char.activeDesc(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterMedium, size: 14))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.leading)
@@ -250,8 +250,8 @@ struct CharacterSelectionView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "lock.circle.fill")
                             .font(.system(size: 16))
-                        Text(userEnv.localizedString(char.unlockCondition.descriptionTR, char.unlockCondition.descriptionEN))
-                        Text("— " + userEnv.localizedString("MAĞAZAYA GİT", "GO TO SHOP"))
+                        Text(char.unlockCondition.description(lang: userEnv.language))
+                        Text("— " + userEnv.labelGoToShop)
                             .underline()
                     }
                     .font(.setCustomFont(name: .InterBold, size: 14))
@@ -269,7 +269,7 @@ struct CharacterSelectionView: View {
     @ViewBuilder
     private func statBadge(title: String, value: String, color: Color) -> some View {
         VStack(spacing: 4) {
-            Text(userEnv.localizedString(title, title))
+            Text(title)
                 .font(.setCustomFont(name: .InterBold, size: 9))
                 .foregroundStyle(ThemeColors.textMuted)
             Text(value)

@@ -136,19 +136,19 @@ struct WorldMapDetailSheet: View {
         if level.type == .boss {
             return BossRegistry.shared.getBoss(for: level.id).name
         }
-        return userEnv.localizedString("SEKTÖR \(level.id)", "SECTOR \(level.id)")
+        return userEnv.formatSectorIndex(index: level.id)
     }
 
     private var typeBadgeText: String {
         switch (level.type, level.status) {
         case (.boss, _):
-            return userEnv.localizedString("KRİTİK HEDEF", "CRITICAL TARGET")
+            return userEnv.labelCriticalTargetCaps
         case (_, .completed):
-            return userEnv.localizedString("VERİ TEMİZLENDİ", "DATA PURGED")
+            return userEnv.labelDataPurgedCaps
         case (_, .locked):
-            return userEnv.localizedString("ERİŞİM ENGELLENDİ", "ACCESS DENIED")
+            return userEnv.labelAccessDeniedCaps
         case (_, .available):
-            return userEnv.localizedString("AKTİF SİNYAL", "ACTIVE SIGNAL")
+            return userEnv.labelActiveSignalCaps
         }
     }
 
@@ -159,12 +159,7 @@ struct WorldMapDetailSheet: View {
 
     private var modifierHintText: String? {
         let bucket = (level.id / 5) % 4
-        switch bucket {
-        case 0: return userEnv.localizedString("TAVSİYE: Titan blokları ağırlık direnci gerektirir.", "ADVICE: Titan blocks require weight resistance.")
-        case 1: return userEnv.localizedString("TAVSİYE: Zaman Bükücü'ye karşı hızlı hamleler yap.", "ADVICE: Use fast moves against Time Benders.")
-        case 2: return userEnv.localizedString("TAVSİYE: Neon Hayaletler görüş alanını daraltabilir.", "ADVICE: Neon Wraiths may narrow your field of view.")
-        default: return userEnv.localizedString("TAVSİYE: Boşluk bloklarını temizlemek için kombolara odaklan.", "ADVICE: Focus on combos to clear Void blocks.")
-        }
+        return userEnv.formatModifierHint(bucket: bucket)
     }
 
     private var nodeHeaderBorder: Color {
@@ -186,7 +181,7 @@ struct WorldSheetBattleContent: View {
         VStack(spacing: 24) {
             // Target Info
             VStack(alignment: .leading, spacing: 12) {
-                Text(userEnv.localizedString("DÜŞMAN ANALİZİ", "ENEMY ANALYSIS"))
+                Text(userEnv.labelEnemyAnalysisCaps)
                     .font(.setCustomFont(name: .InterBold, size: 10))
                     .foregroundColor(.white.opacity(0.4))
                     .tracking(1)
@@ -217,7 +212,7 @@ struct WorldSheetBattleContent: View {
 
             // Rewards
             VStack(alignment: .leading, spacing: 14) {
-                Text(userEnv.localizedString("POTANSİYEL ÖDÜL", "POTENTIAL REWARDS"))
+                Text(userEnv.labelPotentialRewardsCaps)
                     .font(.setCustomFont(name: .InterBold, size: 10))
                     .foregroundColor(.white.opacity(0.4))
                     .tracking(1)
@@ -297,7 +292,7 @@ struct WorldSheetBossContent: View {
                 }
 
                 VStack(spacing: 6) {
-                    Text(userEnv.localizedString("KRİTİK TEHDİT TESPİT EDİLDİ", "CRITICAL THREAT DETECTED"))
+                    Text(userEnv.labelCriticalThreatDetectedCaps)
                         .font(.setCustomFont(name: .InterBold, size: 12))
                         .foregroundColor(ThemeColors.neonPink)
                         .tracking(2)
@@ -315,15 +310,15 @@ struct WorldSheetBossContent: View {
             
             // Risk Analysis
             VStack(alignment: .leading, spacing: 12) {
-                Text(userEnv.localizedString("RİSK ANALİZİ & ÖDÜLLER", "RISK ANALYSIS & REWARDS"))
+                Text(userEnv.labelRiskAnalysisRewardsCaps)
                     .font(.setCustomFont(name: .InterBold, size: 10))
                     .foregroundColor(.white.opacity(0.4))
                     .tracking(1)
                 
                 HStack(spacing: 12) {
                     riskInfoCard(
-                        title: userEnv.localizedString("GÜVENLİ", "SAFE"),
-                        desc: userEnv.localizedString("Standart Zorluk", "Standard Difficulty"),
+                        title: userEnv.labelSafeCaps,
+                        desc: userEnv.labelStandardDifficulty,
                         reward: "+0%",
                         color: ThemeColors.neonCyan,
                         isSelected: selectedContract == .safe,
@@ -331,8 +326,8 @@ struct WorldSheetBossContent: View {
                     )
                     
                     riskInfoCard(
-                        title: userEnv.localizedString("RİSKLİ", "RISKY"),
-                        desc: userEnv.localizedString("+50% Boss Canı", "+50% Boss HP"),
+                        title: userEnv.labelRiskyCaps,
+                        desc: userEnv.labelRiskyHPModifier,
                         reward: "+50% GOLD",
                         color: ThemeColors.neonPink,
                         isSelected: selectedContract == .risky,
@@ -451,10 +446,10 @@ struct WorldSheetActionButtonV2: View {
 
     private var label: String {
         switch (level.type, level.status) {
-        case (_, .locked):     return userEnv.localizedString("ERİŞİM KISITLI", "ACCESS RESTRICTED")
-        case (.boss, _):       return userEnv.localizedString("BAĞLANTIYI KUR", "INITIALIZE LINK")
-        case (_, .completed):  return userEnv.localizedString("YENİDEN BAĞLAN", "RE-CONNECT")
-        case (_, .available):  return userEnv.localizedString("SİSTEME GİRİŞ", "INITIALIZE ENTRY")
+        case (_, .locked):     return userEnv.btnAccessRestrictedCaps
+        case (.boss, _):       return userEnv.btnInitializeLinkCapsV2
+        case (_, .completed):  return userEnv.btnReConnectCaps
+        case (_, .available):  return userEnv.btnInitializeEntryCaps
         }
     }
 }

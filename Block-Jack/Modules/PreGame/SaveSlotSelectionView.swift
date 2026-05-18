@@ -43,7 +43,7 @@ struct SaveSlotSelectionView: View {
                     
                     Spacer()
                     
-                    Text(userEnv.localizedString("SLOT SEÇ", "SELECT SLOT"))
+                    Text(userEnv.labelSelectSlotCaps)
                         .font(.setCustomFont(name: .InterBlack, size: 20))
                         .foregroundStyle(ThemeColors.neonCyan)
                         .tracking(2)
@@ -66,16 +66,16 @@ struct SaveSlotSelectionView: View {
             }
         }
         .navigationBarHidden(true)
-        .alert(userEnv.localizedString("Kaydı Sil", "Delete Save"), isPresented: $showingDeleteAlert) {
-            Button(userEnv.localizedString("İptal", "Cancel"), role: .cancel) { }
-            Button(userEnv.localizedString("Sil", "Delete"), role: .destructive) {
+        .alert(userEnv.labelDeleteSave, isPresented: $showingDeleteAlert) {
+            Button(userEnv.btnCancel, role: .cancel) { }
+            Button(userEnv.btnDelete, role: .destructive) {
                 if let id = slotToDelete {
                     HapticManager.shared.play(.buttonTap)
                     saveManager.deleteSave(slotId: id)
                 }
             }
         } message: {
-            Text(userEnv.localizedString("Bu kaydı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.", "Are you sure you want to delete this save? This action cannot be undone."))
+            Text(userEnv.labelConfirmDeleteSavePrompt)
         }
     }
     
@@ -117,7 +117,7 @@ struct SaveSlotSelectionView: View {
                         .tracking(1.5)
                     
                     if slot.isEmpty {
-                        Text(userEnv.localizedString("Boş Kayıt", "Empty Slot"))
+                        Text(userEnv.labelEmptySlotStatus)
                             .font(.setCustomFont(name: .InterBold, size: 18))
                             .foregroundStyle(.white)
                     } else {
@@ -132,10 +132,7 @@ struct SaveSlotSelectionView: View {
 
                         // Bölüm · Tur · Skor — tek satır
                         HStack(spacing: 6) {
-                            Text(userEnv.localizedString(
-                                "Bölüm \(slot.unlockedWorldLevel)",
-                                "Chapter \(slot.unlockedWorldLevel)"
-                            ))
+                            Text(userEnv.formatChapterLabelTemplate(chapterIndex: slot.unlockedWorldLevel))
                                 .font(.setCustomFont(name: .InterBold, size: 12))
                                 .foregroundStyle(ThemeColors.neonPurple)
 
@@ -143,10 +140,7 @@ struct SaveSlotSelectionView: View {
                                 .font(.setCustomFont(name: .InterBold, size: 12))
                                 .foregroundStyle(ThemeColors.textMuted)
 
-                            Text(userEnv.localizedString(
-                                "Tur \(slot.currentRound)",
-                                "Round \(slot.currentRound)"
-                            ))
+                            Text(userEnv.formatRoundLabelTemplate(roundIndex: slot.currentRound))
                                 .font(.setCustomFont(name: .InterBold, size: 12))
                                 .foregroundStyle(ThemeColors.neonCyan)
                         }

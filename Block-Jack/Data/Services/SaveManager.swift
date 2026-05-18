@@ -171,6 +171,23 @@ class SaveManager: ObservableObject {
         saveToDisk()
     }
     
+    /// Sector/Bölüm baştan başlatıldığında sadece node ilerlemesini sıfırlar, map'i korur.
+    func resetMapProgress(slotId: Int) {
+        guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        
+        if var map = slots[index].currentChapterMap {
+            for i in 0..<map.nodes.count {
+                map.nodes[i].isCompleted = false
+                map.nodes[i].isAccessible = (map.nodes[i].id == map.startNodeId)
+            }
+            slots[index].currentChapterMap = map
+        }
+        
+        slots[index].completedNodeIds = []
+        slots[index].lastSaved = Date()
+        saveToDisk()
+    }
+    
     // Phase 10: Run State direct modifiers
     func updateGold(slotId: Int, amount: Int) {
         guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
@@ -186,6 +203,17 @@ class SaveManager: ObservableObject {
         }
     }
     
+    func updateDiamonds(slotId: Int, amount: Int) {
+        guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        let current = slots[index].diamonds ?? 0
+        slots[index].diamonds = max(0, current + amount)
+        slots[index].lastSaved = Date()
+        saveToDisk()
+        if UserEnvironment.shared.activeSlotId == slotId {
+            UserEnvironment.shared.diamonds = slots[index].diamonds ?? 0
+        }
+    }
+    
     /// Slot'un mevcut altın değerini mutlak olarak yazar. Run sonunda oyun içi
     /// biriken altını diske kalıcı hale getirmek için kullanılır.
     func setGold(slotId: Int, total: Int) {
@@ -195,6 +223,16 @@ class SaveManager: ObservableObject {
         saveToDisk()
         if UserEnvironment.shared.activeSlotId == slotId {
             UserEnvironment.shared.gold = slots[index].gold
+        }
+    }
+    
+    func setDiamonds(slotId: Int, total: Int) {
+        guard let index = slots.firstIndex(where: { $0.id == slotId }) else { return }
+        slots[index].diamonds = max(0, total)
+        slots[index].lastSaved = Date()
+        saveToDisk()
+        if UserEnvironment.shared.activeSlotId == slotId {
+            UserEnvironment.shared.diamonds = slots[index].diamonds ?? 0
         }
     }
     

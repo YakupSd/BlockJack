@@ -41,7 +41,7 @@ struct MysteryEventView: View {
             AdaptiveOverlay(
                 header: {
                     OverlayTitleBlock(
-                        "GİZEMLİ OLAY",
+                        userEnv.labelMysteryEventCaps,
                         subtitle: nil,
                         color: ThemeColors.neonPurple
                     )
@@ -80,7 +80,7 @@ struct MysteryEventView: View {
                         let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
                         let activeIds = Set(slot.activePassivePerks.map { $0.id })
                         
-                        let availablePerks = PerkEngine.getPerkPool(lang: userEnv.language).filter { perk in
+                        let availablePerks = PerkEngine.getPerkPool(lang: userEnv.language, perkLevels: perkLevels).filter { perk in
                             unlockedIds.contains(perk.id) && 
                             (slot.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 0) < 3
                         }
@@ -127,10 +127,7 @@ struct MysteryEventView: View {
                 .easeInOut(duration: 2).repeatForever(autoreverses: true)
             }
 
-            Text(userEnv.localizedString(
-                "Önünde karanlık bir enerji süzülüyor...\nDokunmaya cesaretin var mı?",
-                "A dark energy swirls before you...\nDare to touch it?"
-            ))
+            Text(userEnv.labelMysteryEnergySwirl)
                 .font(.subheadline.weight(.medium))
                 .foregroundColor(ThemeColors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -146,7 +143,7 @@ struct MysteryEventView: View {
                     HapticManager.shared.play(.success)
                 }
             }) {
-                Text(userEnv.localizedString("DOKUN VE GÖR", "TOUCH AND SEE"))
+                Text(userEnv.btnTouchAndSeeCaps)
                     .font(.headline)
                     .foregroundColor(.white)
                     .padding(.horizontal, 32)
@@ -198,7 +195,7 @@ struct MysteryEventView: View {
             NotificationCenter.default.post(name: NSNotification.Name("mapOverlayDidDismiss"), object: nil)
             dismiss()
         }) {
-            Text(eventRevealed ? "KABUL ET VE DEVAM ET" : "UZAKLAŞ")
+            Text(eventRevealed ? userEnv.btnAcceptAndContinueCaps : userEnv.btnLeaveCaps)
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)

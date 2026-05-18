@@ -34,6 +34,13 @@ struct CharacterQuest: Identifiable, Codable, Equatable {
     let rewardDiamonds: Int
     let icon: String
     let event: CharacterQuestEvent
+
+    func title(for lang: AppLanguage) -> String {
+        lang == .turkish ? titleTR : titleEN
+    }
+    func desc(for lang: AppLanguage) -> String {
+        lang == .turkish ? descTR : descEN
+    }
 }
 
 enum CharacterQuestEngine {

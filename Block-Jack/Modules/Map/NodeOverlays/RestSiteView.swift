@@ -51,7 +51,7 @@ struct RestSiteView: View {
                         NotificationCenter.default.post(name: NSNotification.Name("mapOverlayDidDismiss"), object: nil)
                         dismiss()
                     }) {
-                        Text(hasActed ? "AYRIL" : "ŞİMDİLİK DEĞİL")
+                        Text(hasActed ? userEnv.btnLeaveCaps : userEnv.btnNotNowCaps)
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -207,7 +207,7 @@ struct RestSiteView: View {
                     Image(systemName: "shield.lefthalf.filled")
                         .foregroundColor(ThemeColors.electricYellow)
                     let bonus = Int(PerkUpgradeRegistry.tierData(for: .safeHouse, tier: safeHouseTier).effectValue)
-                    Text(userEnv.localizedString("SAFE HOUSE (L\(safeHouseTier)) bonusu: +\(bonus) Altın", "SAFE HOUSE (L\(safeHouseTier)) bonus: +\(bonus) Gold"))
+                    Text(userEnv.formatSafeHouseBonus(tier: safeHouseTier, bonus: bonus))
                         .font(.footnote.weight(.bold))
                         .foregroundColor(.white)
                         .lineLimit(1)

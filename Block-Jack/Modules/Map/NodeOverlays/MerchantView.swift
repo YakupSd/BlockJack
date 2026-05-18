@@ -49,14 +49,11 @@ struct MerchantView: View {
                             
                             // Dialogue Bubble
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(userEnv.localizedString("TÜCCAR KAIRO", "MERCHANT KAIRO"))
+                                Text(userEnv.labelMerchantKairoCaps)
                                     .font(.custom("Outfit-Bold", size: 14))
                                     .foregroundColor(ThemeColors.electricYellow)
                                 
-                                Text(userEnv.localizedString(
-                                    "\"Veri akışında nadir parçalar keşfettim. Elindeki altınlar burada değerli.\"",
-                                    "\"I've scavenged rare data fragments. Your gold buys well here.\""
-                                ))
+                                Text(userEnv.labelMerchantKairoDialogue)
                                     .font(.custom("Outfit-Medium", size: 14))
                                     .foregroundColor(.white)
                                     .padding(12)
@@ -88,10 +85,10 @@ struct MerchantView: View {
     private var merchantHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(userEnv.localizedString("TÜCCAR", "MERCHANT"))
+                Text(userEnv.labelMerchantCaps)
                     .font(.custom("Outfit-Bold", size: 32, relativeTo: .largeTitle))
                     .foregroundColor(ThemeColors.electricYellow)
-                Text(userEnv.localizedString("SLOT \(slotId)", "SLOT \(slotId)"))
+                Text("\(userEnv.labelSlotCaps) \(slotId)")
                     .font(.setCustomFont(name: .InterBold, size: 10))
                     .tracking(2)
                     .foregroundStyle(ThemeColors.textMuted)
@@ -99,10 +96,7 @@ struct MerchantView: View {
                     .padding(.vertical, 2)
                     .background(ThemeColors.electricYellow.opacity(0.15))
                     .clipShape(Capsule())
-                Text(userEnv.localizedString(
-                    "\"Karanlıkta parlayan her şey altın değildir... ama bunlar öyle.\"",
-                    "\"Not all that glitters in the dark is gold... but these are.\""
-                ))
+                Text(userEnv.labelMerchantSubDialogue)
                     .font(.caption)
                     .italic()
                     .foregroundColor(ThemeColors.textSecondary)
@@ -128,7 +122,7 @@ struct MerchantView: View {
     
     private var shopSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(userEnv.localizedString("TEKLİFLER", "OFFERS"))
+            Text(userEnv.labelOffersCaps)
                 .font(.headline)
                 .foregroundColor(ThemeColors.textSecondary)
                 .padding(.horizontal)
@@ -151,21 +145,18 @@ struct MerchantView: View {
     private var forgeSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(userEnv.localizedString("PERK DEMİRCİSİ", "PERK FORGE"))
+                Text(userEnv.labelPerkForgeCaps)
                     .font(.headline)
                     .foregroundColor(ThemeColors.textSecondary)
                 Spacer()
-                Text(userEnv.localizedString("2 Seç: 1 Yeni", "Pick 2: Get 1"))
+                Text(userEnv.labelForgeSelectionHint)
                     .font(.caption)
                     .foregroundColor(ThemeColors.neonPurple)
             }
             .padding(.horizontal)
             
             VStack(spacing: 20) {
-                Text(userEnv.localizedString(
-                    "İki perk'i feda ederek çok daha güçlü veya rastgele bir perk elde et.",
-                    "Sacrifice two perks to forge a stronger or random new one."
-                ))
+                Text(userEnv.labelForgeDescription)
                     .font(.caption)
                     .foregroundColor(ThemeColors.textMuted)
                     .multilineTextAlignment(.center)
@@ -195,7 +186,7 @@ struct MerchantView: View {
                 }) {
                     HStack {
                         Image(systemName: "hammer.fill")
-                        Text(userEnv.localizedString("BİRLEŞTİR (FORGE)", "FORGE"))
+                        Text(userEnv.btnForgeCaps)
                             .bold()
                     }
                     .frame(maxWidth: .infinity)
@@ -228,7 +219,7 @@ struct MerchantView: View {
             NotificationCenter.default.post(name: NSNotification.Name("mapOverlayDidDismiss"), object: nil)
             dismiss()
         }) {
-            Text(userEnv.localizedString("HARİTAYA DÖN", "BACK TO MAP"))
+            Text(userEnv.btnBackToMapCaps)
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -285,7 +276,7 @@ struct MerchantItemView: View {
                     
                     if item.isSold {
                         Color.black.opacity(0.6).cornerRadius(15)
-                        Text(userEnv.localizedString("SATILDI", "SOLD"))
+                        Text(userEnv.labelSoldCaps)
                             .font(.caption2)
                             .bold()
                             .foregroundColor(.white)
@@ -294,7 +285,7 @@ struct MerchantItemView: View {
                 }
                 
                 VStack(spacing: 4) {
-                    Text(item.perk?.name ?? (item.consumableType == .lifeRestoration ? userEnv.localizedString("Yaşam İksiri", "Life Potion") : userEnv.localizedString("Bilinmeyen", "Unknown")))
+                    Text(item.perk?.name ?? (item.consumableType == .lifeRestoration ? userEnv.labelLifePotion : userEnv.labelUnknown))
                         .font(.subheadline)
                         .bold()
                         .foregroundColor(.white)

@@ -80,7 +80,7 @@ struct EnTextFieldUIKit: UIViewRepresentable {
         toolbar.sizeToFit()
         let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
         let doneButton = UIBarButtonItem(
-            title: userEnv.localizedString("Bitti", "Done"),
+            title: userEnv.btnDone,
             style: .done,
             target: textField,
             action: #selector(UIView.endEditing(_:))

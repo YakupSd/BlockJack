@@ -21,6 +21,13 @@ struct Achievement: Identifiable, Codable, Equatable {
     let rewardGold: Int
     let rewardDiamonds: Int
     let icon: String
+
+    func title(for lang: AppLanguage) -> String {
+        lang == .turkish ? titleTR : titleEN
+    }
+    func desc(for lang: AppLanguage) -> String {
+        lang == .turkish ? descTR : descEN
+    }
 }
 
 enum AchievementEngine {

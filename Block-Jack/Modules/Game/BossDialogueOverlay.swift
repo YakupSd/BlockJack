@@ -48,9 +48,9 @@ struct BossDialogueOverlay: View {
                         LuminescentSpeechBubble(
                             text: userEnv.language == .turkish ? currentLine.textTR : currentLine.textEN,
                             speaker: .player,
-                            speakerName: userEnv.localizedString("SİBER ŞÖVALYE", "CYBER KNIGHT")
+                            speakerName: userEnv.labelCyberKnight
                         )
-                        .padding(.top, 60)
+                        .padding(.top, 100)
                         .transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .opacity))
                     }
                 }
@@ -87,7 +87,7 @@ struct BossDialogueOverlay: View {
                             speaker: .boss,
                             speakerName: boss.name.uppercased()
                         )
-                        .padding(.bottom, 120)
+                        .padding(.bottom, 180)
                         .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
                     }
                 }
@@ -97,18 +97,52 @@ struct BossDialogueOverlay: View {
                         .offset(y: 20)
                 )
             }
+            .offset(y: -40) // Push images up to make room for bottom UI
             
             // Central VS Badge
             VSBadge()
-                .offset(x: -20, y: -20)
+                .offset(x: -20, y: -60)
             
-            // Action Button
-            VStack {
+            // Action Button and Modifier Info
+            VStack(spacing: 20) {
                 Spacer()
+                
+                // NEW: Modifier warning
+                VStack(spacing: 6) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 13))
+                        Text("\(userEnv.labelBossPowerWarning): \(modifierLocalizedTitle)")
+                            .font(.setCustomFont(name: .InterBlack, size: 12))
+                    }
+                    .foregroundStyle(ThemeColors.electricYellow)
+                    
+                    Text(modifierLocalizedDesc)
+                        .font(.setCustomFont(name: .InterMedium, size: 13))
+                        .foregroundStyle(ThemeColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 16)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                }
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color.black.opacity(0.9))
+                )
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(ThemeColors.electricYellow.opacity(0.4), lineWidth: 1))
+                .shadow(color: ThemeColors.electricYellow.opacity(0.15), radius: 10)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 4)
+                .opacity(showUI ? 1 : 0)
+                .offset(y: showUI ? 0 : 20)
+                .animation(.easeOut(duration: 0.6).delay(0.3), value: showUI)
+
                 Button(action: advanceDialogue) {
                     Text(currentLineIndex < boss.dialogues.count - 1 ? 
-                         userEnv.localizedString("DEVAM ET", "CONTINUE") : 
-                         userEnv.localizedString("SAVAŞI BAŞLAT", "INITIATE COMBAT"))
+                         userEnv.btnContinue : 
+                         userEnv.btnInitiateCombat)
                         .font(.setCustomFont(name: .InterExtraBold, size: 16))
                         .foregroundStyle(Color.black)
                         .padding(.vertical, 16)
@@ -127,6 +161,24 @@ struct BossDialogueOverlay: View {
         }
     }
     
+    private var modifierLocalizedTitle: String {
+        switch boss.modifier {
+        case .fog: return userEnv.labelModifierFogTitle
+        case .glitch: return userEnv.labelModifierGlitchTitle
+        case .weight: return userEnv.labelModifierWeightTitle
+        case .phantom: return userEnv.labelModifierPhantomTitle
+        }
+    }
+    
+    private var modifierLocalizedDesc: String {
+        switch boss.modifier {
+        case .fog: return userEnv.labelModifierFogDesc
+        case .glitch: return userEnv.labelModifierGlitchDesc
+        case .weight: return userEnv.labelModifierWeightDesc
+        case .phantom: return userEnv.labelModifierPhantomDesc
+        }
+    }
+
     private func advanceDialogue() {
         HapticManager.shared.play(.selection)
         if currentLineIndex < boss.dialogues.count - 1 {

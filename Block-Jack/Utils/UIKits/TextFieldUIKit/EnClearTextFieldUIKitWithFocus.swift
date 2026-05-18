@@ -43,7 +43,7 @@ struct EnClearTextFieldUIKitWithFocus: UIViewRepresentable {
         let toolbar = UIToolbar()
         toolbar.sizeToFit()
         let doneButton = UIBarButtonItem(
-            title: userEnv.localizedString("Kapat", "Close"),
+            title: userEnv.btnClose,
             style: .done,
             target: context.coordinator,
             action: #selector(Coordinator.doneTapped)

@@ -52,7 +52,12 @@ class WorldMapViewModel: ObservableObject {
                 status: status
             ))
         }
-        self.levels = newLevels
+        // Sort by level ID to ensure consistent ordering
+        self.levels = newLevels.sorted { $0.id < $1.id }
+        print("📊 Generated \(self.levels.count) levels for world \(worldId), unlockedMax=\(unlockedMax)")
+        for level in self.levels.prefix(5) {
+            print("  Level \(level.id): \(level.status)")
+        }
     }
 
     // MARK: - Etkileşim
@@ -88,11 +93,24 @@ class WorldMapViewModel: ObservableObject {
         MainViewsRouter.shared.pushToMap(slotId: slotId)
     }
 
-    // Oyuncu sprite'ının haritada bulunduğu seviye (aktif olan veya yoksa son tamamlanan).
+    // Oyuncu sprite'ının haritada bulunduğu seviye — direkt unlockedWorldLevel'den hesapla
     var playerLevelId: Int {
-        if let current = levels.first(where: { $0.status == .available }) { return current.id }
-        if let lastDone = levels.last(where: { $0.status == .completed }) { return lastDone.id }
-        return (worldId - 1) * 20 + 1
+        let start = (worldId - 1) * 20 + 1
+        let end = worldId * 20
+        let unlockedMax = userEnv.unlockedWorldLevel
+        
+        // Eğer oyuncu bu dünyada ise
+        if unlockedMax >= start && unlockedMax <= end {
+            return unlockedMax
+        }
+        
+        // Eğer dünyayı geçtiyse, son level'i göster
+        if unlockedMax > end {
+            return end
+        }
+        
+        // Dünyaya henüz erişemedi (shouldn't happen)
+        return start
     }
 
     var totalChapters: Int { 20 }

@@ -17,10 +17,13 @@ final class TimerManager: ObservableObject {
     @Published var didExpire: Bool = false
     @Published var ratio: Double = 1.0  // Artık @Published
 
+    @Published var elapsedSeconds: Double = 0.0
+
     // MARK: - Properties
     private var totalTime: Double = 60.0
     private var cancellable: AnyCancellable?
     private let tickInterval: Double = 0.05  // 50ms → smooth animasyon
+    var isInfiniteMode: Bool = false        // Event mode: sonsuz zaman
 
     // MARK: - Computed (Helper for logic outside publishers)
     var isCritical: Bool { ratio < 0.1 }
@@ -31,12 +34,14 @@ final class TimerManager: ObservableObject {
         reset()
         totalTime = seconds
         timeRemaining = seconds
+        elapsedSeconds = 0.0
         ratio = 1.0
     }
 
     func reset() {
         stop()
         didExpire = false
+        elapsedSeconds = 0.0
         ratio = 1.0
     }
 
@@ -73,6 +78,14 @@ final class TimerManager: ObservableObject {
     // MARK: - Private
     private func tick() {
         guard isRunning else { return }
+        
+        elapsedSeconds += tickInterval
+        
+        // Infinite mode: timer expired olmasın
+        if isInfiniteMode {
+            return
+        }
+        
         timeRemaining -= tickInterval
         if timeRemaining <= 0 {
             timeRemaining = 0

@@ -39,12 +39,12 @@ struct UpgradesView: View {
                     Spacer()
                     
                     VStack(spacing: 2) {
-                        Text(userEnv.localizedString("MARKET", "UPGRADES"))
+                        Text(userEnv.labelUpgradesCaps)
                             .font(.setCustomFont(name: .InterBlack, size: 24))
                             .foregroundStyle(ThemeColors.electricYellow)
                             .tracking(2)
                         if let slotId = slotId {
-                            Text(userEnv.localizedString("SLOT \(slotId)", "SLOT \(slotId)"))
+                            Text("SLOT \(slotId)")
                                 .font(.setCustomFont(name: .InterBold, size: 10))
                                 .tracking(2)
                                 .foregroundStyle(ThemeColors.textMuted)
@@ -99,8 +99,8 @@ struct UpgradesView: View {
                 
                 // MARK: - Tab Selector
                 HStack(spacing: 8) {
-                    tabButton(title: userEnv.localizedString("ALTIN", "GOLD"), icon: "icon_gold", index: 1, accentColor: ThemeColors.electricYellow)
-                    tabButton(title: userEnv.localizedString("ELMAS", "DIAMOND"), icon: "icon_diamond", index: 0, accentColor: ThemeColors.neonCyan)
+                    tabButton(title: userEnv.labelGoldCaps, icon: "icon_gold", index: 1, accentColor: ThemeColors.electricYellow)
+                    tabButton(title: userEnv.labelDiamondsCaps, icon: "icon_diamond", index: 0, accentColor: ThemeColors.neonCyan)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
@@ -110,16 +110,16 @@ struct UpgradesView: View {
                     VStack(spacing: 14) {
                         if selectedTab == 0 {
                             // --- Diamond Tab ---
-                            sectionHeader(title: userEnv.localizedString("KALİCİ GELİŞTİRMELER", "PERMANENT UPGRADES"),
-                                          subtitle: userEnv.localizedString("Tek seferlik satın al, sonsuza kadar aktif.", "Buy once, active forever."))
-                            upgradeRow(.goldEye, icon: "upg_gold_eye", titleTR: "Altın Göz", titleEN: "Gold Eye", descTR: "Pasif: Her tur sonu +%10 bonus altın.", descEN: "Passive: +10% bonus gold at round end.")
-                            upgradeRow(.ironWill, icon: "shield.fill", titleTR: "Iron Will", titleEN: "Iron Will", descTR: "Başlangıç süresini +10 saniye artırır.", descEN: "Starting time +10 seconds permanently.")
-                            upgradeRow(.luckyDice, icon: "dice.fill", titleTR: "Şanslı Zar", titleEN: "Lucky Dice", descTR: "The Gambler'ın şansı +%3 artar.", descEN: "Gambler's trigger chance +3%.")
-                            upgradeRow(.extraSlot, icon: "bag.fill", titleTR: "Ekstra Slot", titleEN: "Extra Slot", descTR: "Maksimum envanter 3'ten 4'e çıkar.", descEN: "Max inventory slots from 3 to 4.")
+                            sectionHeader(title: userEnv.labelPermanentUpgrades,
+                                          subtitle: userEnv.labelPermanentUpgradesDesc)
+                            upgradeRow(.goldEye, icon: "upg_gold_eye")
+                            upgradeRow(.ironWill, icon: "shield.fill")
+                            upgradeRow(.luckyDice, icon: "dice.fill")
+                            upgradeRow(.extraSlot, icon: "bag.fill")
                         } else {
                             // --- Gold Tab ---
-                            sectionHeader(title: userEnv.localizedString("PASSİF GÜÇLENDİRMELER", "PASSIVE BOOSTS"),
-                                          subtitle: userEnv.localizedString("Seviye atla, etkisi artsın. Max. Seviye: 5", "Level up for stronger effect. Max Level: 5"))
+                            sectionHeader(title: userEnv.labelPassiveBoosts,
+                                          subtitle: userEnv.labelPassiveBoostsDesc)
                             ForEach(GoldUpgrade.allCases, id: \.rawValue) { upgrade in
                                 goldUpgradeRow(upgrade)
                             }
@@ -180,7 +180,7 @@ struct UpgradesView: View {
     
     // MARK: - Diamond Upgrade Row
     @ViewBuilder
-    private func upgradeRow(_ upgrade: MetaUpgrade, icon: String, titleTR: String, titleEN: String, descTR: String, descEN: String) -> some View {
+    private func upgradeRow(_ upgrade: MetaUpgrade, icon: String) -> some View {
         let isUnlocked = userEnv.unlockedUpgradeIDs.contains(upgrade.rawValue)
         let canAfford = userEnv.diamonds >= upgrade.cost
         
@@ -204,11 +204,11 @@ struct UpgradesView: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(userEnv.localizedString(titleTR, titleEN))
+                    Text(upgrade.title(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterBold, size: 15))
                         .foregroundStyle(.white)
                     if isUnlocked {
-                        Text(userEnv.localizedString("AKTİF", "ACTIVE"))
+                        Text(userEnv.labelActiveCaps)
                             .font(.setCustomFont(name: .InterBold, size: 9))
                             .foregroundStyle(ThemeColors.neonCyan)
                             .padding(.horizontal, 6)
@@ -217,7 +217,7 @@ struct UpgradesView: View {
                             .clipShape(Capsule())
                     }
                 }
-                Text(userEnv.localizedString(descTR, descEN))
+                Text(upgrade.desc(lang: userEnv.language))
                     .font(.setCustomFont(name: .InterMedium, size: 12))
                     .foregroundStyle(ThemeColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -278,7 +278,16 @@ struct UpgradesView: View {
         let nextLevel = level + 1
         let cost = upgrade.cost(for: nextLevel)
         let canAfford = userEnv.gold >= cost
-        let effectText = currentEffectText(for: upgrade, level: level)
+        
+        let currentVal = upgrade.calculatedValue(level: level, isEffect: false)
+        let descText = upgrade.desc(lang: userEnv.language)
+            .replacingOccurrences(of: "{{value}}", with: "\(currentVal)")
+        let effectText: String? = {
+            guard level > 0 else { return nil }
+            let effectVal = upgrade.calculatedValue(level: level, isEffect: true)
+            return upgrade.currentEffectTemplate(lang: userEnv.language)
+                .replacingOccurrences(of: "{{value}}", with: "\(effectVal)")
+        }()
         
         HStack(spacing: 14) {
             // Icon + Level Badge
@@ -307,7 +316,7 @@ struct UpgradesView: View {
             // Text
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(userEnv.localizedString(upgrade.titleTR, upgrade.titleEN))
+                    Text(upgrade.title(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterBold, size: 15))
                         .foregroundStyle(.white)
                     if isMaxed {
@@ -322,12 +331,12 @@ struct UpgradesView: View {
                 }
                 
                 if level > 0 {
-                    Text(userEnv.localizedString(upgrade.descTR(level: level), upgrade.descEN(level: level)))
+                    Text(descText)
                         .font(.setCustomFont(name: .InterMedium, size: 11))
                         .foregroundStyle(ThemeColors.electricYellow.opacity(0.8))
                         .fixedSize(horizontal: false, vertical: true)
                 }
-
+ 
                 if let effectText {
                     Text(effectText)
                         .font(.setCustomFont(name: .InterMedium, size: 10))
@@ -336,7 +345,11 @@ struct UpgradesView: View {
                 }
                 
                 if !isMaxed {
-                    Text(userEnv.localizedString("Sonraki: \(upgrade.descTR(level: nextLevel))", "Next: \(upgrade.descEN(level: nextLevel))"))
+                    let nextVal = upgrade.calculatedValue(level: nextLevel, isEffect: false)
+                    let nextDesc = upgrade.desc(lang: userEnv.language)
+                        .replacingOccurrences(of: "{{value}}", with: "\(nextVal)")
+                    
+                    Text(userEnv.labelNextTemplate.replacingOccurrences(of: "{{desc}}", with: nextDesc))
                         .font(.setCustomFont(name: .InterMedium, size: 11))
                         .foregroundStyle(ThemeColors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -401,22 +414,7 @@ struct UpgradesView: View {
         .shadow(color: level > 0 ? ThemeColors.electricYellow.opacity(0.1) : .clear, radius: 8)
     }
 
-    private func currentEffectText(for upgrade: GoldUpgrade, level: Int) -> String? {
-        guard level > 0 else { return nil }
-        switch upgrade {
-        case .startBonus:
-            return userEnv.localizedString("Şu an: +\(level * 50) puan / round", "Now: +\(level * 50) score / round")
-        case .goldMagnet:
-            return userEnv.localizedString("Şu an: +\(level * 10) altın / round", "Now: +\(level * 10) gold / round")
-        case .overdriveFill:
-            return userEnv.localizedString("Şu an: +%\(level * 10) dolum hızı", "Now: +\(level * 10)% fill rate")
-        case .comboTime:
-            let pct = min(50, level * 10)
-            return userEnv.localizedString("Şu an: streak düşüşü %\(pct) daha yavaş", "Now: streak decays \(pct)% slower")
-        case .blockLuck:
-            return userEnv.localizedString("Şu an: daha iyi blok şansı +\(level)", "Now: improved block odds +\(level)")
-        }
-    }
+
 }
 
 #Preview {

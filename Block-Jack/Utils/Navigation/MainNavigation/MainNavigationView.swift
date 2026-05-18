@@ -179,6 +179,23 @@ extension MainViewsRouter {
         nav.setViewControllers([dashboardVC], animated: false)
     }
 
+    /// Onboarding / Pre-Login ekranına geçiş (İlk yüklemede)
+    func pushToOnboarding() {
+        guard let nav = nav else { return }
+        let onboardingVC = MainNavigationView.builder.makeView(
+            OnboardingLoginView().environmentObject(UserEnvironment.shared),
+            withNavigationTitle: "",
+            navigationBarHidden: true
+        )
+        let transition = CATransition()
+        transition.duration = 0.28
+        transition.type = .push
+        transition.subtype = .fromRight
+        transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        nav.view.layer.add(transition, forKey: kCATransition)
+        nav.setViewControllers([onboardingVC], animated: false)
+    }
+    
     /// Oyun ekranına git
     func pushToGame(slotId: Int, nodeType: NodeType? = nil) {
         push(
@@ -338,5 +355,19 @@ extension MainViewsRouter {
     func pushToMystery(slotId: Int) {
         let vc = MainNavigationView.builder.makeView(MysteryEventView(slotId: slotId).environmentObject(UserEnvironment.shared), withNavigationTitle: "", navigationBarHidden: true)
         present(view: vc, animated: true, presentationStyle: .overFullScreen, transitionStyle: .crossDissolve)
+    }
+
+    // MARK: - Event Flow Helpers
+
+    func pushToEventDetail(event: EventConfig, vm: EventsViewModel) {
+        push(
+            EventDetailView(event: event, vm: vm).environmentObject(UserEnvironment.shared)
+        )
+    }
+
+    func pushToEventGame(config: EventConfig) {
+        push(
+            EventGameView(config: config).environmentObject(UserEnvironment.shared)
+        )
     }
 }

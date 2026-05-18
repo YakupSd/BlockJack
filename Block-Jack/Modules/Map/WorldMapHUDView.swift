@@ -99,7 +99,7 @@ struct WorldMapHUDView: View {
                     
                     // Progress Info
                     VStack(alignment: .trailing, spacing: -1) {
-                        Text(userEnv.localizedString("BÖLÜM", "CHAPTER"))
+                        Text(userEnv.labelChapterCaps)
                             .font(.setCustomFont(name: .InterBold, size: 7))
                             .foregroundColor(.white.opacity(0.4))
                         Text("\(min(userEnv.unlockedWorldLevel, vm.totalChapters))/\(vm.totalChapters)")
@@ -125,9 +125,9 @@ struct WorldMapHUDView: View {
 
     private var difficultyLabel: String {
         switch character.difficulty {
-        case .beginner: return userEnv.localizedString("ACEMİ PİLOT", "ROOKIE PILOT")
-        case .advanced: return userEnv.localizedString("USTA PİLOT", "ADEPT PILOT")
-        case .expert:   return userEnv.localizedString("UZMAN PİLOT", "ELITE PILOT")
+        case .beginner: return userEnv.labelRookiePilotCaps
+        case .advanced: return userEnv.labelAdeptPilotCaps
+        case .expert:   return userEnv.labelElitePilotCaps
         }
     }
 }
@@ -141,7 +141,7 @@ struct WorldMapBottomBarView: View {
         VStack(spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(userEnv.localizedString("KAMPANYA İLERLEMESİ", "CAMPAIGN PROGRESS"))
+                    Text(userEnv.labelCampaignProgressCaps)
                         .font(.setCustomFont(name: .InterBold, size: 10))
                         .foregroundColor(.white.opacity(0.4))
                         .tracking(1)
@@ -156,7 +156,7 @@ struct WorldMapBottomBarView: View {
                     Text("\(vm.completedCount)")
                         .font(.setCustomFont(name: .InterBlack, size: 20))
                         .foregroundColor(.white)
-                    Text(userEnv.localizedString("TAMAM", "DONE"))
+                    Text(userEnv.labelDoneCaps)
                         .font(.setCustomFont(name: .InterBold, size: 9))
                         .foregroundColor(ThemeColors.neonCyan)
                 }

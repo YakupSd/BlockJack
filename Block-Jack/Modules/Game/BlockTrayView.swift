@@ -81,6 +81,27 @@ struct BlockTrayView: View {
                         .stroke(ThemeColors.trayBorder, lineWidth: 1)
                 )
         )
+        .overlay(alignment: .topTrailing) {
+            if vm.isDeadlocked {
+                VStack(alignment: .trailing, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("DEADLOCK!")
+                            .font(.setCustomFont(name: .InterBlack, size: 10))
+                            .tracking(1)
+                    }
+                    .foregroundStyle(ThemeColors.neonPink)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(ThemeColors.hudBg))
+                    .overlay(Capsule().stroke(ThemeColors.neonPink.opacity(0.6), lineWidth: 1))
+                }
+                .padding(.trailing, 8)
+                .padding(.top, 8)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
         .overlay(alignment: .trailing) {
             if vm.isDeadlocked {
                 refreshButton
@@ -138,8 +159,9 @@ struct BlockTrayView: View {
     private func traySlot(block: GameBlock, size: CGFloat) -> some View {
         let tileSize: CGFloat = max(9, min(14, (size - 24) / 5))
         let isActive = vm.draggingBlock?.id == block.id
+        @State var showActions = false
         
-        ZStack {
+        ZStack(alignment: .topTrailing) {
             if block.isSpecial {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(block.ability.glowColor.opacity(0.08))
@@ -180,6 +202,34 @@ struct BlockTrayView: View {
                         .padding(.bottom, 3)
                 }
             }
+            
+            // Action menu button
+            VStack(spacing: 0) {
+                Menu {
+                    Section("BLOK İŞLEMLERİ") {
+                        Button(role: .destructive) {
+                            HapticManager.shared.play(.buttonTap)
+                            vm.discardBlockFromTray(blockId: block.id)
+                        } label: {
+                            Label("Çöpe At (25G)", systemImage: "trash.fill")
+                        }
+                        
+                        Button {
+                            HapticManager.shared.play(.buttonTap)
+                            vm.rerollBlockInTray(blockId: block.id)
+                        } label: {
+                            Label("Yenile (50G)", systemImage: "arrow.2.squarepath")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(ThemeColors.neonOrange)
+                        .padding(3)
+                        .background(Circle().fill(ThemeColors.hudBg))
+                }
+            }
+            .offset(x: -2, y: 2)
         }
         .frame(width: size, height: size)
         .contentShape(Rectangle())

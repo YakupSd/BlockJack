@@ -24,6 +24,7 @@ final class HapticManager {
         case error
         case heavy
         case selection
+        case warning        // Düşman saldırı uyarısı → notification warning
     }
 
     func play(_ type: FeedbackType) {
@@ -56,6 +57,8 @@ final class HapticManager {
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         case .selection:
             UISelectionFeedbackGenerator().selectionChanged()
+        case .warning:
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
         }
     }
 

@@ -36,7 +36,7 @@ struct CharacterMasteryBadge: View {
                 )
             } else {
                 // Chapter badge
-                let chapterLabel = userEnv.localizedString("BÖLÜM", "CHAPTER")
+                let chapterLabel = userEnv.labelChapterCaps
                 masteryBadge(
                     icon: tier.icon,
                     text: "\(tier.label) • \(chapterLabel) \(chapter)",

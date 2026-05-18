@@ -111,7 +111,9 @@ final class ScoreManager {
         if vm.run.hasPerk("heavy_duty") {
             let heavyCount = clearedCells.filter { if case .heavy = $0.state { return true } else { return false } }.count
             if heavyCount > 0 {
-                extraAdditiveMult += Double(heavyCount) * Double(max(1, vm.run.perkTier("heavy_duty")))
+                let tier = vm.run.perkTier("heavy_duty")
+                let multiplier = PerkUpgradeRegistry.tierData(for: .heavyDuty, tier: tier).effectValue
+                extraAdditiveMult += Double(heavyCount) * multiplier
             }
         }
 
@@ -131,7 +133,8 @@ final class ScoreManager {
             overkillCarryover: vm.run.overkillCarryover,
             rowsCleared: result.rowsCleared,
             colsCleared: result.colsCleared,
-            frenzyMult: vm.isFrenzyActive ? 1.25 : 1.0
+            frenzyMult: vm.isFrenzyActive ? 1.25 : 1.0,
+            currentHP: vm.run.health
         )
         
         // Add extra character/perk bonuses to the context
@@ -149,8 +152,7 @@ final class ScoreManager {
             vm.ghostPhantomMultBonus = 0.0
         }
 
-        vm.run.addScore(finalScore)
-        vm.updateBossPhaseIfNeeded()
+        vm.addScore(finalScore)
         vm.lastScoreResult = scoreResult
 
         // Questline: flush
@@ -213,9 +215,10 @@ final class ScoreManager {
         // 7. Clockwork Perk Scaling
         if vm.run.hasPerk("clockwork") {
             let tier = vm.run.perkTier("clockwork")
-            let baseInc = timeBonus * 0.1
-            let scaledInc = baseInc * Double(tier)
-            vm.run.clockworkBonus = min(2.5, vm.run.clockworkBonus + scaledInc)
+            let clockworkValue = PerkUpgradeRegistry.tierData(for: .clockwork, tier: tier).effectValue
+            let multiplier = 1.0 + (clockworkValue * 5.0)  // Registry scaled: 0.05→0.30 becomes 1.25→2.5x
+            let scaledInc = timeBonus * multiplier
+            vm.run.clockworkBonus = min(3.0, vm.run.clockworkBonus + scaledInc)
         }
 
         // 8. Target Milestones
@@ -230,15 +233,14 @@ final class ScoreManager {
             vm.maxRoundScore = finalScore
         }
 
-        // 10. Round Progression
-        checkRoundTarget()
+        // 10. Round Progression (handled by vm.addScore)
+        // checkRoundTarget()
         
         // 11. End-of-Clear Perks (Last Resort & Sustain)
         
-        // Double Down: Gaining moves on empty tray
         if vm.run.movesRemaining == 0 && finalScore > 0 && vm.run.hasPerk("double_down") {
             let tier = vm.run.perkTier("double_down")
-            let movesGained = 1 + (tier * 2)
+            let movesGained = Int(PerkUpgradeRegistry.tierData(for: .doubleDown, tier: tier).effectValue)
             vm.run.movesUsed -= movesGained
             vm.addPopup(text: "DOUBLE DOWN LV.\(tier)! +\(movesGained) MOVES", color: ThemeColors.neonPurple)
             vm.haptic.play(.success)
@@ -251,9 +253,10 @@ final class ScoreManager {
             let lastMilestone = (vm.run.currentScore - finalScore) / targetScore
             let currentMilestone = vm.run.currentScore / targetScore
             if currentMilestone > lastMilestone {
-                if Double.random(in: 0...1) < 0.25 {
-                    vm.timer.addTime(5.0)
-                    vm.addPopup(text: "VAMPIRIC LV.\(tier)! +5s ⌛", color: ThemeColors.neonPink)
+                let healChance = PerkUpgradeRegistry.tierData(for: .vampiricCore, tier: tier).effectValue
+                if Double.random(in: 0...1) < healChance {
+                    vm.run.health += 1
+                    vm.addPopup(text: "VAMPIRIC LV.\(tier)! +1 ❤️", color: ThemeColors.neonPink)
                     vm.haptic.play(.success)
                 }
             }
@@ -262,7 +265,7 @@ final class ScoreManager {
         // Chain Pulse: Cascade effect
         if vm.run.hasPerk("chain_pulse") && !result.clearedPositions.isEmpty {
             let tier = vm.run.perkTier("chain_pulse")
-            let chance = 0.15 * Double(max(1, tier))
+            let chance = PerkUpgradeRegistry.tierData(for: .chainPulse, tier: tier).effectValue
             if Double.random(in: 0...1) < chance {
                 let maxTargets = max(1, tier)
                 triggerChainPulse(around: result.clearedPositions, maxTargets: maxTargets)
@@ -328,12 +331,18 @@ final class ScoreManager {
     // MARK: - Round Progression
 
     func checkRoundTarget() {
+        // Endless modu (Düello / Etkinlik) ise hedef puana ulaşılsa bile round'u bitirme
+        if vm.eventConfig != nil { return }
+        
         if vm.run.currentScore >= vm.run.currentRoundTargetScore {
             completeRound()
         }
     }
 
     func checkMoveLimit() {
+        // Endless modda (Düello / Etkinlik) hamle sınırı yok
+        if vm.eventConfig != nil { return }
+        
         // Hamle limiti artık çok yüksek (300)
         if vm.run.movesUsed >= vm.run.round.moveLimit {
             if vm.run.currentScore >= vm.run.currentRoundTargetScore {
@@ -354,9 +363,9 @@ final class ScoreManager {
         // Echoes Scaling: Repeated score scales with tier
         if vm.run.hasPerk("echoes") && vm.maxRoundScore > 0 {
             let tier = vm.run.perkTier("echoes")
-            let scale = 1.0 + (Double(tier - 1) * 0.5)
+            let scale = PerkUpgradeRegistry.tierData(for: .echoes, tier: tier).effectValue
             let bonus = Int(Double(vm.maxRoundScore) * scale)
-            vm.run.addScore(bonus)
+            vm.addScore(bonus)
             vm.addPopup(text: "ECHOES LV.\(tier) +\(bonus)", color: ThemeColors.neonPurple)
         }
         
@@ -455,9 +464,9 @@ final class ScoreManager {
     // MARK: - Chain Pulse
 
     /// Chain Pulse perk etkisi: clearedPositions'ın komşularından dolu olanları
-    /// topla, rastgele `maxTargets` kadarını "elektriklenip" temizle. Statik
-    /// charge synerjisi için görünür bir feedback sağlanır.
-    func triggerChainPulse(around cleared: [GridPosition], maxTargets: Int) {
+    /// topla, rastgele `maxTargets` kadarını temizle. Tier >= 3'te zincirleme devam eder.
+    @discardableResult
+    func triggerChainPulse(around cleared: [GridPosition], maxTargets: Int, depth: Int = 0, maxDepth: Int? = nil) -> Int {
         let deltas: [(Int, Int)] = [(-1, 0), (1, 0), (0, -1), (0, 1)]
         let clearedSet = Set(cleared)
         var candidates: Set<GridPosition> = []
@@ -473,15 +482,34 @@ final class ScoreManager {
                 }
             }
         }
-        guard !candidates.isEmpty else { return }
+        guard !candidates.isEmpty else { return 0 }
+        
         let targets = Array(candidates.shuffled().prefix(maxTargets))
         vm.board.removeCells(at: targets)
         vm.clearFlashPositions = targets
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.vm.clearFlashPositions = []
         }
-        vm.addPopup(text: "CHAIN PULSE! \(targets.count)×", color: ThemeColors.neonCyan)
-        vm.haptic.play(.success)
+        
+        let totalCleared = targets.count
+        
+        // Determine max recursion depth if not set
+        let depthLimit = maxDepth ?? max(0, vm.run.perkTier("chain_pulse") - 2)
+        
+        // Recursive cascade: tier 1-2 = no cascade, 3+ = 1+ cascades
+        if depth < depthLimit {
+            let additionalCleared = triggerChainPulse(around: targets, maxTargets: maxTargets, depth: depth + 1, maxDepth: maxDepth)
+            return totalCleared + additionalCleared
+        }
+        
+        // Final popup on outermost call
+        if depth == 0 {
+            vm.addPopup(text: "CHAIN PULSE! \(totalCleared)×", color: ThemeColors.neonCyan)
+            vm.haptic.play(.success)
+        }
+        
+        return totalCleared
     }
 
     /// STATIC SHOCK sinerjisi: static_charge hücresi tetiklendiği satırdaki
@@ -500,7 +528,7 @@ final class ScoreManager {
             self?.vm.clearFlashPositions = []
         }
         let bonus = targets.count * 75
-        vm.run.addScore(bonus)
+        vm.addScore(bonus)
         vm.addPopup(text: "STATIC SHOCK! +\(bonus)", color: ThemeColors.electricYellow)
         vm.haptic.play(.flush)
         AudioManager.shared.playSFX(.flush)

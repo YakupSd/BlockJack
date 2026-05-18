@@ -58,7 +58,7 @@ struct CharacterShopView: View {
             
             Spacer()
             
-            Text(userEnv.localizedString("KAHRAMANLAR", "HEROES"))
+            Text(userEnv.labelHeroes)
                 .font(.setCustomFont(name: .InterBlack, size: 24))
                 .foregroundStyle(ThemeColors.neonCyan)
                 .tracking(2)
@@ -98,7 +98,7 @@ struct CharacterShopView: View {
     
     private var characterCarousel: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(userEnv.localizedString("EKİBİNİ KUR", "RECRUIT YOUR TEAM"))
+            Text(userEnv.labelRecruitYourTeam)
                 .font(.setCustomFont(name: .InterBold, size: 14))
                 .foregroundStyle(ThemeColors.textSecondary)
                 .padding(.horizontal, 24)
@@ -152,7 +152,7 @@ struct CharacterShopView: View {
                                 Text(char.name)
                                     .font(.setCustomFont(name: .InterBold, size: 10))
                                     .foregroundStyle(isSelected ? ThemeColors.neonCyan : .white)
-
+ 
                                 CharacterMasteryBadge(characterId: char.id)
                             }
                             .padding(10)
@@ -188,7 +188,7 @@ struct CharacterShopView: View {
                         .font(.setCustomFont(name: .InterBlack, size: 22))
                         .foregroundStyle(.white)
                     
-                    Text(selectedChar.strongMode)
+                    Text(selectedChar.strongMode(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterBold, size: 12))
                         .foregroundStyle(ThemeColors.neonCyan)
                         .padding(.horizontal, 8)
@@ -196,7 +196,7 @@ struct CharacterShopView: View {
                         .background(ThemeColors.neonCyan.opacity(0.15))
                         .clipShape(Capsule())
                     
-                    Text(userEnv.localizedString(selectedChar.loreTR, selectedChar.loreEN))
+                    Text(selectedChar.lore(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterMedium, size: 11))
                         .foregroundStyle(ThemeColors.textSecondary)
                         .lineLimit(3)
@@ -207,8 +207,8 @@ struct CharacterShopView: View {
             
             // Stats Row
             HStack(spacing: 12) {
-                detailBadge(title: "PASİF", desc: selectedChar.passiveDesc, icon: "bolt.shield.fill", color: ThemeColors.electricYellow)
-                detailBadge(title: "AKTİF", desc: selectedChar.activeDesc, icon: "flame.fill", color: ThemeColors.neonPink)
+                detailBadge(title: userEnv.labelPassiveCaps, desc: selectedChar.passiveDesc(lang: userEnv.language), icon: "bolt.shield.fill", color: ThemeColors.electricYellow)
+                detailBadge(title: userEnv.labelActiveCaps, desc: selectedChar.activeDesc(lang: userEnv.language), icon: "flame.fill", color: ThemeColors.neonPink)
             }
             .padding(.horizontal, 20)
         }
@@ -256,7 +256,7 @@ struct CharacterShopView: View {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 24))
                         .foregroundStyle(ThemeColors.success)
-                    Text(userEnv.localizedString("BU KAHRAMAN EKİBİNDE!", "HERO RECRUITED!"))
+                    Text(userEnv.labelHeroRecruited)
                         .font(.setCustomFont(name: .InterExtraBold, size: 18))
                         .foregroundStyle(.white)
                 }
@@ -272,7 +272,7 @@ struct CharacterShopView: View {
                         Image(systemName: "lock.shield.fill")
                             .font(.system(size: 20))
                             .foregroundStyle(ThemeColors.neonPink)
-                        Text(userEnv.localizedString("SEVİYE \(requiredLevel) GEREKLİ", "REACH LEVEL \(requiredLevel)"))
+                        Text(userEnv.labelReachLevelTemplate.replacingOccurrences(of: "{{level}}", with: "\(requiredLevel)"))
                             .font(.setCustomFont(name: .InterExtraBold, size: 16))
                             .foregroundStyle(.white)
                     }
@@ -285,7 +285,7 @@ struct CharacterShopView: View {
                 
                 HStack(spacing: 16) {
                     // Gold Purchase
-                    buyButton(currencyName: "ALTIN", amount: selectedChar.cost, icon: "icon_gold", color: isLevelMet ? ThemeColors.electricYellow : ThemeColors.textMuted) {
+                    buyButton(isGold: true, amount: selectedChar.cost, icon: "icon_gold", color: isLevelMet ? ThemeColors.electricYellow : ThemeColors.textMuted) {
                         if isLevelMet {
                             _ = userEnv.unlockCharacter(selectedChar, useDiamonds: false)
                         } else {
@@ -296,7 +296,7 @@ struct CharacterShopView: View {
                     .opacity(isLevelMet ? 1.0 : 0.5)
                     
                     // Diamond Purchase
-                    buyButton(currencyName: "ELMAS", amount: selectedChar.cost / 10, icon: "icon_diamond", color: isLevelMet ? ThemeColors.neonCyan : ThemeColors.textMuted) {
+                    buyButton(isGold: false, amount: selectedChar.cost / 10, icon: "icon_diamond", color: isLevelMet ? ThemeColors.neonCyan : ThemeColors.textMuted) {
                         if isLevelMet {
                             _ = userEnv.unlockCharacter(selectedChar, useDiamonds: true)
                         } else {
@@ -307,7 +307,7 @@ struct CharacterShopView: View {
                     .opacity(isLevelMet ? 1.0 : 0.5)
                 }
                 
-                Text(userEnv.localizedString(selectedChar.unlockCondition.descriptionTR, selectedChar.unlockCondition.descriptionEN))
+                Text(selectedChar.unlockCondition.description(lang: userEnv.language))
                     .font(.setCustomFont(name: .InterBold, size: 12))
                     .foregroundStyle(ThemeColors.textMuted)
             }
@@ -316,10 +316,10 @@ struct CharacterShopView: View {
         .padding(.top, 10)
     }
     
-    private func buyButton(currencyName: String, amount: Int, icon: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func buyButton(isGold: Bool, amount: Int, icon: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Text(userEnv.localizedString("\(currencyName) İLE AÇ", "UNLOCK WITH \(currencyName)"))
+                Text(isGold ? userEnv.btnUnlockWithGold : userEnv.btnUnlockWithDiamond)
                     .font(.setCustomFont(name: .InterBold, size: 10))
                     .foregroundStyle(ThemeColors.textSecondary)
                 

@@ -21,12 +21,12 @@ enum LinePattern {
 
     var baseMultValue: Double {
         switch self {
-        case .mixed: return 2.5
-        case .duoTone: return 5.0
-        case .triTone: return 7.0
-        case .gradient: return 9.0
-        case .flush: return 16.0
-        case .superFlush: return 40.0
+        case .mixed: return 5.0
+        case .duoTone: return 10.0
+        case .triTone: return 15.0
+        case .gradient: return 25.0
+        case .flush: return 50.0
+        case .superFlush: return 150.0
         case .none: return 0
         }
     }
@@ -129,28 +129,31 @@ struct ScoreEngine {
     
     // Phase 1: Placement Scoring (V4 - MAJOR BOOST)
     static func calculatePlacementChips(mass: Int, neighbors: Int, cluster: Int) -> Double {
-        // BaseChips = (BlockMass × 25) + (NeighborBonus × 12) + (ClusterBonus × 8)
-        let massPoints = Double(mass * 25)
-        let neighborPoints = Double(neighbors * 12)
-        let clusterPoints = Double(cluster * 8)
+        // BaseChips = (BlockMass × 20) + (NeighborBonus × 10) + (ClusterBonus × 5)
+        let massPoints = Double(mass * 20)
+        let neighborPoints = Double(neighbors * 10)
+        let clusterPoints = Double(cluster * 5)
         return massPoints + neighborPoints + clusterPoints
     }
     
     // Phase 2: Color Bonus (NEW)
     static func calculateColorBonus(cells: [GameCell]) -> Double {
+        // Equal color distribution: all colors worth 1.0
+        // This prevents bias toward purple/yellow and encourages color diversity
+        // Color bonus = average value of all cleared cells in this line
         let colorValues: [BlockDisplayColor: Double] = [
-            .blue: 0.5,
-            .green: 0.7,
+            .blue: 1.0,
+            .green: 1.0,
             .red: 1.0,
-            .yellow: 1.2,
-            .purple: 1.5
+            .yellow: 1.0,
+            .purple: 1.0
         ]
         
         let validCells = cells.filter { $0.color != nil }
         guard !validCells.isEmpty else { return 0.0 }
         
         let totalValue = validCells.reduce(0.0) { sum, cell in
-            sum + (colorValues[cell.color!] ?? 0.5)
+            sum + (colorValues[cell.color!] ?? 1.0)
         }
         
         return totalValue / Double(validCells.count)
@@ -158,12 +161,15 @@ struct ScoreEngine {
 
     // Phase 3: Pattern & Combo Detection
     static func comboBonus(_ lines: Int) -> Double {
+        // Combo multipliers based on simultaneous line clears
+        // Aligned with SCORING_ENGINE_V2.md Phase 3: Combo Stack
         switch lines {
-        case 1: return 1.0   // Yeni: Tek satır bile bonus
-        case 2: return 6.0   // Eski: 2.0
-        case 3: return 12.0  // Eski: 5.0
-        case 4: return 24.0  // Eski: 12.0
-        case 5...: return 48.0 // Eski: 25.0
+        case 0: return 0.0      // No lines cleared
+        case 1: return 0.0      // Single line (no combo bonus)
+        case 2: return 10.0     // Double (+10.0)
+        case 3: return 25.0     // Triple (+25.0)
+        case 4: return 75.0     // QUAD (+75.0) - Massive boost for rare moves
+        case 5...: return 150.0 // MEGA 5+ (+150.0)
         default: return 0
         }
     }
@@ -173,30 +179,21 @@ struct ScoreEngine {
         return (Double(totalCells) / 8.0) * 2.0
     }
     
-    // Phase 5: Streak X-Mult (V4 - HYBRID)
+    // Phase 5: Streak X-Mult (V4 - Exponential)
     static func calculateStreakXMult(streak: Int) -> Double {
         if streak <= 0 { return 1.0 }
-        
-        let streakMult: Double
-        if streak <= 10 {
-            // Linear erken oyun
-            streakMult = 1.0 + (Double(streak) * 0.12)
-        } else {
-            // Yavaşlayan büyüme
-            let baseBonus = 2.2  // Streak 10 değeri
-            let extraBonus = Double(streak - 10) * 0.08
-            streakMult = min(baseBonus + extraBonus, 3.8) // Cap at 3.8
-        }
-        return streakMult
+        // Formula: 1.15^streak (Faster scaling for Elite players)
+        return pow(1.15, Double(streak))
     }
     
     // MARK: - Detection Logic
     static func detectPattern(cells: [GameCell]) -> LinePattern {
-        guard cells.count == BoardViewModel.size else { return .none }
-        let colors = cells.compactMap { $0.color }
-        guard colors.count == cells.count else { return .none }
+        let occupiedCells = cells.filter { $0.isOccupied }
+        guard !occupiedCells.isEmpty else { return .none }
         
+        let colors = occupiedCells.compactMap { $0.color }
         let uniqueColors = Set(colors)
+        
         switch uniqueColors.count {
         case 1: return .flush
         case 2: return .duoTone
@@ -219,7 +216,8 @@ struct ScoreEngine {
         overkillCarryover: Int = 0,
         rowsCleared: Int = 0,
         colsCleared: Int = 0,
-        frenzyMult: Double = 1.0
+        frenzyMult: Double = 1.0,
+        currentHP: Int = 0
     ) -> ScoreResult {
         var context = ScoreContext()
         
@@ -271,7 +269,7 @@ struct ScoreEngine {
         }
         
         // Perk X-Mults
-        applyPerkXMults(to: &context, perks: perks, timeRemaining: timeRemaining, overkillCarryover: overkillCarryover)
+        applyPerkXMults(to: &context, perks: perks, timeRemaining: timeRemaining, overkillCarryover: overkillCarryover, currentHP: currentHP)
         
         return ScoreResult(
             baseChips: Int(context.baseChips),
@@ -314,7 +312,10 @@ struct ScoreEngine {
                     context.addMult(value)
                 }
             case "lucky_clover":
-                let value = PerkUpgradeRegistry.tierData(for: .luckyClover, tier: perk.tier).effectValue
+                // Lucky Clover: Increases max streak limit (game logic) + boosts score per streak level
+                // Registry: effectValue = max streak limit (5-40 by tier)
+                // Scoring: +0.2 additive mult per streak level
+                // Example: Tier 5 (limit 40) + Streak 30 → +6.0 additive mult
                 context.addMult(Double(streak) * 0.2)
             default:
                 break
@@ -326,15 +327,22 @@ struct ScoreEngine {
         to context: inout ScoreContext,
         perks: [PassivePerk],
         timeRemaining: TimeInterval,
-        overkillCarryover: Int
+        overkillCarryover: Int,
+        currentHP: Int
     ) {
         for perk in perks {
             switch perk.id {
             case "glass_cannon":
                 let value = PerkUpgradeRegistry.tierData(for: .glassCannon, tier: perk.tier).effectValue
-                let threshold: TimeInterval = (perk.tier <= 2) ? 10.0 : (perk.tier <= 4 ? 15.0 : 20.0)
-                if timeRemaining <= threshold {
+                let hpThreshold: Int = (perk.tier <= 2) ? 1 : (perk.tier <= 4 ? 2 : 3)
+                if currentHP <= hpThreshold && currentHP > 0 {
                     context.multiplyMult(value)
+                }
+            case "overkill":
+                if overkillCarryover > 0 {
+                    let carryoverRate = PerkUpgradeRegistry.tierData(for: .overkill, tier: perk.tier).effectValue
+                    let carriedBonus = Double(overkillCarryover) * carryoverRate
+                    context.baseChips += carriedBonus
                 }
             default:
                 break

@@ -185,6 +185,10 @@ struct GridView: View {
                     Image(systemName: "bolt.fill")
                         .font(.system(size: cellSize * 0.5))
                         .foregroundStyle(ThemeColors.electricYellow)
+                case .phantomSiphon:
+                    Image(systemName: "aqi.medium")
+                        .font(.system(size: cellSize * 0.45))
+                        .foregroundStyle(ThemeColors.neonPurple.opacity(0.8))
                 default: EmptyView()
                 }
             }
@@ -208,6 +212,7 @@ struct GridView: View {
                 case .bonus: return ThemeColors.electricYellow.opacity(0.2)
                 case .cursed: return ThemeColors.neonPink.opacity(0.2)
                 case .staticCharge: return ThemeColors.electricYellow.opacity(0.15)
+                case .phantomSiphon: return ThemeColors.neonPurple.opacity(0.12)
                 default: break
                 }
             }

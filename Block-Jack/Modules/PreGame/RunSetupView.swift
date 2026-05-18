@@ -77,18 +77,18 @@ struct RunSetupView: View {
             Spacer()
 
             VStack(spacing: 2) {
-                Text(userEnv.localizedString("SEFER KURULUMU", "RUN SETUP"))
+                Text(userEnv.labelRunSetupCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 18))
                     .foregroundStyle(ThemeColors.electricYellow)
                     .tracking(2)
-                Text(userEnv.localizedString("Slot, karakter, perk ve dünya seç", "Choose slot, character, perk and world"))
+                Text(userEnv.labelRunSetupDesc)
                     .font(.setCustomFont(name: .InterMedium, size: 10))
                     .foregroundStyle(ThemeColors.textMuted)
             }
 
             Spacer()
 
-            Text(userEnv.localizedString("SLOT \(slotId)", "SLOT \(slotId)"))
+            Text("\(userEnv.labelSlotCaps) \(slotId)")
                 .font(.setCustomFont(name: .InterBold, size: 11))
                 .foregroundStyle(ThemeColors.neonCyan)
                 .padding(.horizontal, 10)
@@ -121,7 +121,7 @@ struct RunSetupView: View {
                 worldId: wid,
                 title: ["NEON CORE", "CONCRETE RUINS", "CANDY LAB", "DEEP OCEAN", "VOID KERNEL"][wid - 1],
                 levelRange: "LVL \(start)–\(end)",
-                twist: userEnv.localizedString("Dünya \(wid)", "World \(wid)"),
+                twist: userEnv.formatWorldTitleTemplate(worldId: wid),
                 icon: "globe",
                 completedLevels: completedLevels,
                 totalLevels: 20,
@@ -131,7 +131,7 @@ struct RunSetupView: View {
         }
 
         return VStack(alignment: .leading, spacing: 10) {
-            Text(userEnv.localizedString("DÜNYA", "WORLD"))
+            Text(userEnv.labelWorldHeaderCaps)
                 .font(.setCustomFont(name: .InterBlack, size: 12))
                 .tracking(2)
                 .foregroundStyle(ThemeColors.textSecondary)
@@ -159,7 +159,7 @@ struct RunSetupView: View {
                                     )
 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("WORLD \(card.worldId)")
+                                    Text("\(userEnv.labelWorldHeaderCaps) \(card.worldId)")
                                         .font(.setCustomFont(name: .InterBold, size: 11))
                                         .foregroundStyle(.white)
                                     Text(card.levelRange)
@@ -194,7 +194,7 @@ struct RunSetupView: View {
     private var characterPicker: some View {
         let roster = GameCharacter.roster
         return VStack(alignment: .leading, spacing: 10) {
-            Text(userEnv.localizedString("KARAKTER", "CHARACTER"))
+            Text(userEnv.labelCharacter)
                 .font(.setCustomFont(name: .InterBlack, size: 12))
                 .tracking(2)
                 .foregroundStyle(ThemeColors.textSecondary)
@@ -245,7 +245,7 @@ struct RunSetupView: View {
 
     private var perkPicker: some View {
         return VStack(alignment: .leading, spacing: 10) {
-            Text(userEnv.localizedString("STARTING PERK", "STARTING PERK"))
+            Text(userEnv.labelStartingPerkHeaderCaps)
                 .font(.setCustomFont(name: .InterBlack, size: 12))
                 .tracking(2)
                 .foregroundStyle(ThemeColors.textSecondary)
@@ -267,10 +267,10 @@ struct RunSetupView: View {
                                 Text(p.icon).font(.system(size: 18))
                             }
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(userEnv.localizedString(p.nameTR, p.nameEN))
+                                Text(p.displayName(lang: userEnv.language))
                                     .font(.setCustomFont(name: .InterBold, size: 12))
                                     .foregroundStyle(.white)
-                                Text(userEnv.localizedString(p.descTR, p.descEN))
+                                Text(p.displayDesc(lang: userEnv.language))
                                     .font(.setCustomFont(name: .InterMedium, size: 10))
                                     .foregroundStyle(ThemeColors.textMuted)
                                     .lineLimit(2)
@@ -309,7 +309,7 @@ struct RunSetupView: View {
         ]
 
         return VStack(alignment: .leading, spacing: 10) {
-            Text(userEnv.localizedString("STARTING ITEM", "STARTING ITEM"))
+            Text(userEnv.labelStartingItemHeaderCaps)
                 .font(.setCustomFont(name: .InterBlack, size: 12))
                 .tracking(2)
                 .foregroundStyle(ThemeColors.textSecondary)
@@ -324,10 +324,10 @@ struct RunSetupView: View {
                         HStack(spacing: 12) {
                             Text(it.icon).font(.system(size: 18))
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(userEnv.localizedString(it.tr, it.en))
+                                Text(userEnv.language == .turkish ? it.tr : it.en)
                                     .font(.setCustomFont(name: .InterBold, size: 12))
                                     .foregroundStyle(.white)
-                                Text(userEnv.localizedString(it.descTR, it.descEN))
+                                Text(userEnv.language == .turkish ? it.descTR : it.descEN)
                                     .font(.setCustomFont(name: .InterMedium, size: 10))
                                     .foregroundStyle(ThemeColors.textMuted)
                                     .lineLimit(2)
@@ -384,7 +384,7 @@ struct RunSetupView: View {
                 WorldSelectionView(slotId: slotId).environmentObject(UserEnvironment.shared)
             )
         } label: {
-            Text(userEnv.localizedString("DÜNYA SEÇ", "SELECT WORLD"))
+            Text(userEnv.labelSelectWorldCaps)
                 .font(.setCustomFont(name: .InterExtraBold, size: 20))
                 .tracking(4)
                 .foregroundStyle(ThemeColors.cosmicBlack)

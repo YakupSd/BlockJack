@@ -59,7 +59,7 @@ struct AppStartView: View {
                             .tint(ThemeColors.neonCyan)
                             .scaleEffect(1.5)
                         
-                        Text(userEnv.localizedString("YÜKLENİYOR...", "LOADING..."))
+                        Text(userEnv.labelLoadingCaps)
                             .font(.setCustomFont(name: .InterBold, size: 14))
                             .foregroundStyle(ThemeColors.textSecondary)
                             .kerning(4)
@@ -86,12 +86,20 @@ struct AppStartView: View {
             // yeniden tetiklenmez. Kitlenmeyi önlemek için burada da
             // kontrol ediyoruz.
             if vm.initializationComplete {
-                MainViewsRouter.shared.popToDashboard()
+                if userEnv.hasCompletedOnboarding {
+                    MainViewsRouter.shared.popToDashboard()
+                } else {
+                    MainViewsRouter.shared.pushToOnboarding()
+                }
             }
         }
         .onChange(of: vm.initializationComplete) { _, complete in
             if complete {
-                MainViewsRouter.shared.popToDashboard()
+                if userEnv.hasCompletedOnboarding {
+                    MainViewsRouter.shared.popToDashboard()
+                } else {
+                    MainViewsRouter.shared.pushToOnboarding()
+                }
             }
         }
     }

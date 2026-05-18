@@ -19,14 +19,6 @@ enum GamePhase {
     case gameOver
 }
 
-// MARK: - Score Popup (uçuşan yazı için)
-struct ScorePopup: Identifiable {
-    let id = UUID()
-    let text: String
-    let color: Color
-    var position: CGPoint
-}
-
 // MARK: - GameViewModel
 final class GameViewModel: ObservableObject {
 
@@ -38,6 +30,7 @@ final class GameViewModel: ObservableObject {
     lazy var scoreManager = ScoreManager(vm: self)
     lazy var abilityManager = AbilityManager(vm: self)
     lazy var boardController = BoardController(vm: self)
+    let notificationManager = NotificationManager()
 
     var currentMultiplier: Double {
         // Streak bonus logic: Lucky Clover affects the limit
@@ -68,7 +61,6 @@ final class GameViewModel: ObservableObject {
     @Published var pendingGold: Int = 0
     @Published var blockTray: [GameBlock] = []
     @Published var selectedBlock: GameBlock? = nil
-    @Published var scorePopups: [ScorePopup] = []
     @Published var lastScoreResult: ScoreResult? = nil
     @Published var isDeadlocked: Bool = false
     @Published var canRefreshTray: Bool = false
@@ -170,6 +162,7 @@ final class GameViewModel: ObservableObject {
     var enemyAttackTimer: AnyCancellable? = nil
     var enemyWarningTimer: AnyCancellable? = nil
     var enemyTrayUnlockTimer: AnyCancellable? = nil
+    var endlessEscalationTimer: AnyCancellable? = nil
     var lastPlacedPositions: [GridPosition] = []         // Son yerleştirilen blok pozisyonları (erase için)
     var activeCharacterId: String? {
         SaveManager.shared.slots.first(where: { $0.id == activeSlotId })?.characterId
@@ -190,6 +183,10 @@ final class GameViewModel: ObservableObject {
     // Drag throttle: ghost/hint güncellemesini saniyede max ~30 kez yap (33ms aralık)
     var lastGhostUpdate: Date = .distantPast
     let ghostThrottleInterval: TimeInterval = 0.033
+    
+    // Leaderboard
+    var runStartSessionTime: Date = Date()
+    @Published var leaderboardSubmitResult: ScoreSubmitResponse? = nil
 
     // MARK: - Private
     var cancellables = Set<AnyCancellable>()
@@ -199,14 +196,16 @@ final class GameViewModel: ObservableObject {
 
     let activeSlotId: Int
     let nodeType: NodeType?
+    var eventConfig: EventConfig?  // Event mode configuration (modifiers, boss, etc.)
 
     var currentNodeType: NodeType {
         nodeType ?? .normal
     }
 
-    init(slotId: Int, nodeType: NodeType? = nil, userEnv: UserEnvironment = UserEnvironment.shared) {
+    init(slotId: Int, nodeType: NodeType? = nil, eventConfig: EventConfig? = nil, userEnv: UserEnvironment = UserEnvironment.shared) {
         self.activeSlotId = slotId
         self.nodeType = nodeType
+        self.eventConfig = eventConfig
         self.userEnv = userEnv
         
         // Timer değişikliklerini ViewModel'e yansıt (UI update için)
@@ -286,6 +285,48 @@ final class GameViewModel: ObservableObject {
                 run.maxTraySlots = 4
             }
         }
+        
+        // MARK: - Event Mode Setup
+        if let eventConfig = eventConfig {
+            applyEventModifiers(eventConfig.modifiers)
+            setupEventBossConfiguration(eventConfig.boss)
+            if eventConfig.modifiers.contains(where: { $0.type == .infiniteTime }) {
+                timer.isInfiniteMode = true
+            }
+        }
+    }
+    
+    // MARK: - Event Mode Integration
+    private func applyEventModifiers(_ modifiers: [EventModifier]) {
+        for modifier in modifiers {
+            switch modifier.type {
+            case .blockSpeedMultiplier:
+                // BoardViewModel'e block drop hızını pass et
+                // BoardController'a multiplier apply edecek
+                run.blockSpeedMultiplier = modifier.value
+                
+            case .goldPerLineClear:
+                // Scoring bonus — her line clear'da bonus altın
+                run.eventGoldBonus = Int(modifier.value)
+                
+            case .infiniteTime:
+                // Timer sonsuz mode
+                timer.isInfiniteMode = true
+                
+            case .extraLife:
+                // İlave can
+                run.lives = Int(modifier.value)
+                
+            default:
+                break
+            }
+        }
+    }
+    
+    private func setupEventBossConfiguration(_ boss: EventBoss) {
+        // Event boss'u normal boss'un yerine geç
+        // Intent cycle'ı set et
+        bossIntentCooldown = boss.intentCycle
     }
     
     /// Run içinde altın kazanımlarını tek yerden geçirmek için yardımcı.
@@ -302,6 +343,7 @@ final class GameViewModel: ObservableObject {
     // MARK: - Game Control
 
     func startNewRun() {
+        runStartSessionTime = Date()
         run = RunState()
         board.resetGrid()
         startRound()
@@ -393,12 +435,26 @@ final class GameViewModel: ObservableObject {
         ghostPhantomMultBonus = 0.0
         neonWraithActiveBoost = 0
 
+        // Düello ve Etkinlikler için zorunlu kısıtlamalar (Tek round, 1 can, Sınırsız süre)
+        if let config = eventConfig {
+            run.lives = 1
+            run.maxLives = 1
+            timer.isInfiniteMode = true
+            
+            // Özel güçleri / perkleri iptal et
+            run.activePassivePerks.removeAll()
+            run.inventory.removeAll()
+            
+            // Oyun başlar başlamaz event'i markala — uygulamayı kapatıp açsa da tekrar oynayamaz.
+            UserEnvironment.shared.markEventStarted(config.id)
+        }
+
         // Gold Upgrade: Start Bonus (Head Start)
         // Round başında skor bonusu ekle.
         let startBonusLevel = userEnv.goldLevel(for: .startBonus)
         if startBonusLevel > 0 {
             let bonus = startBonusLevel * 50
-            run.addScore(bonus)
+            addScore(bonus)
             addPopup(text: "+\(bonus) START BONUS", color: ThemeColors.electricYellow)
         }
 
@@ -523,6 +579,13 @@ final class GameViewModel: ObservableObject {
             board.applyStaticCells(count: 3 + max(0, tier - 1))
         }
         
+        // Phantom Siphon: round başında 2 + (tier-1) boş hücreye phantom modifier
+        // yerleştir. Üzerine blok koyunca tier × 2sn süre bonusu verir.
+        if run.hasPerk("phantom_siphon") {
+            let tier = run.perkTier("phantom_siphon")
+            board.applyPhantomCells(count: 2 + max(0, tier - 1))
+        }
+        
         // Best placement hint sıfırla — yeni round, yeni tavsiye.
         board.bestPlacementCells = []
     }
@@ -547,6 +610,14 @@ final class GameViewModel: ObservableObject {
         run.currentScore = 0
         run.movesUsed = 0
         run.streak = 0
+        
+        runStartSessionTime = Date()
+        leaderboardSubmitResult = nil
+        
+        // NEW: Clear map progress so the player starts from the beginning of the map
+        run.completedNodeIds.removeAll()
+        UserEnvironment.shared.pendingMapNodeId = nil
+        SaveManager.shared.resetMapProgress(slotId: activeSlotId)
         
         // Grid ve state temizliği
         board.resetGrid()
@@ -608,6 +679,24 @@ final class GameViewModel: ObservableObject {
 
     func tryPlace(block: GameBlock, at position: GridPosition) {
         boardController.tryPlace(block: block, at: position)
+    }
+
+    // MARK: - Scoring Helpers
+    
+    func addScore(_ points: Int) {
+        guard points > 0 else { return }
+        run.addScore(points)
+        
+        // 1. Check Win Condition (Round Target)
+        scoreManager.checkRoundTarget()
+        
+        // 2. Update Boss Phase
+        updateBossPhaseIfNeeded()
+        
+        // 3. Track Max Round Score (for Echoes)
+        if run.currentScore > maxRoundScore {
+            maxRoundScore = run.currentScore
+        }
     }
 
     func updateBossPhaseIfNeeded() {
@@ -896,6 +985,11 @@ final class GameViewModel: ObservableObject {
         
         saveGameState()
         
+        // EVENT / DUEL: Final puanı kaydet (rage-quit dahil, en son puan geçerli)
+        if let config = eventConfig {
+            UserEnvironment.shared.saveEventScore(config.id, score: run.currentScore)
+        }
+        
         phase = .gameOver // Triggets GameOverOverlay
         
         UserEnvironment.shared.recordRun(
@@ -914,6 +1008,30 @@ final class GameViewModel: ObservableObject {
             perksCount: run.activePassivePerks.count,
             wasTrial: UserEnvironment.shared.wasTrialRunUsedToday(for: cid)
         )
+        
+        // Phase 8: Skor Submit (Leaderboard)
+        let durationSeconds = Int(Date().timeIntervalSince(runStartSessionTime))
+        let finalScore = run.currentScore
+        let finalWorld = run.worldLevel
+        let finalRound = run.currentRound
+        
+        Task { @MainActor in
+            let request = ScoreSubmitRequest(
+                deviceID: DeviceIdentifier.deviceID,
+                username: UserEnvironment.shared.username,
+                countryCode: UserEnvironment.shared.playerCountryCode,
+                score: finalScore,
+                chapterReached: UInt8(min(255, max(1, finalWorld))),
+                roundReached: UInt8(min(255, max(1, finalRound))),
+                characterID: UInt8(min(255, GameCharacter.roster.firstIndex(where: { $0.id == cid }) ?? 0)),
+                durationSeconds: Int16(min(32767, durationSeconds))
+            )
+            let result = await LeaderboardAPIService.shared.submitScore(request)
+            if case .success(let response) = result {
+                self.leaderboardSubmitResult = response
+                LeaderboardAPIService.shared.invalidateCache()
+            }
+        }
     }
 
     // MARK: - Block Tray
@@ -926,6 +1044,16 @@ final class GameViewModel: ObservableObject {
     
     func rotateBlockInTray(id: UUID) {
         abilityManager.rotateBlockInTray(id: id)
+    }
+    
+    // MARK: - Block Discard / Reroll (Phase 11.5)
+    
+    func discardBlockFromTray(blockId: UUID) {
+        boardController.discardBlockFromTray(blockId: blockId.uuidString)
+    }
+    
+    func rerollBlockInTray(blockId: UUID) {
+        boardController.rerollBlockInTray(blockId: blockId.uuidString)
     }
     
     func updateDrag(location: CGPoint, gridPosition: GridPosition?) {
@@ -968,14 +1096,64 @@ final class GameViewModel: ObservableObject {
     
 
 
-    // MARK: - Score Popup Helper
+    // MARK: - Score Popup Helper (Notification System)
 
     func addPopup(text: String, color: Color, position: CGPoint = CGPoint(x: 187, y: 300)) {
-        let popup = ScorePopup(text: text, color: color, position: position)
-        scorePopups.append(popup)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-            self?.scorePopups.removeAll { $0.id == popup.id }
+        // Determine notification type based on text content
+        var type: NotificationType
+        var title = text
+        var subtitle = ""
+        var value: String? = nil
+        
+        // Extract value from text (e.g., "+9.0", "+500")
+        if let plusRange = text.range(of: " +") {
+            let potentialValue = String(text[plusRange.lowerBound...])
+            value = potentialValue.trimmingCharacters(in: .whitespaces)
+            title = String(text[..<plusRange.lowerBound])
         }
+        
+        if text.contains("FRENZY") {
+            type = .frenzy(text)
+            subtitle = "Çarpan aktif"
+        } else if text.contains("STREAK") || text.contains("Streak") {
+            type = .streak(text)
+        } else if text.contains("GRADIENT") || text.contains("FLUSH") || text.contains("MULANK") {
+            type = .pattern(text)
+        } else if text.contains("OVERDRIVE") || text.contains("TIER") && text.contains("READY") {
+            type = .overdrive(text)
+        } else if text.contains("BOSS") || text.contains("PHASE") {
+            type = .system(text)
+        } else if text.contains("PERK") || text.contains("OVERKILL") || text.contains("SYNERGY") || text.contains("MOMENTUM") {
+            type = .perk(text)
+        } else if text.contains("ACHIEVEMENT") || text.contains("QUEST") || text.contains("DOUBLE COUNT") {
+            type = .achievement(text)
+        } else if text.contains("!") && value != nil {
+            type = .pattern(text)
+        } else {
+            type = .system(text)
+        }
+        
+        // TEK enqueue çağrısı — çift bildirim bug'ı düzeltildi
+        let notification = GameNotification(
+            type: type,
+            title: title,
+            subtitle: subtitle,
+            value: value,
+            color: color
+        )
+        notificationManager.enqueue(notification)
+    }
+    
+    /// Direct enqueue for new notification API
+    func enqueueNotification(_ notification: GameNotification) {
+        notificationManager.enqueue(notification)
+    }
+    
+    // MARK: - Enemy Ability Notification
+    
+    func showEnemyAbility(title: String, description: String, color: Color) {
+        let alert = EnemyAbilityAlert(title: title, description: description, color: color)
+        notificationManager.addEnemyAbility(alert)
     }
     
     // MARK: - Clear Analysis Helpers

@@ -137,7 +137,7 @@ struct WorldSelectionView: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(userEnv.localizedString("TOPLAM İLERLEME", "TOTAL PROGRESS"))
+                    Text(userEnv.labelTotalProgressCaps)
                         .font(.setCustomFont(name: .InterBold, size: 9))
                         .foregroundStyle(.white.opacity(0.4))
                         .tracking(1)
@@ -147,12 +147,12 @@ struct WorldSelectionView: View {
                 }
             }
 
-            Text(userEnv.localizedString("SEKTÖR SEÇİMİ", "SECTOR SELECTION"))
+            Text(userEnv.labelSectorSelectionCaps)
                 .font(.setCustomFont(name: .InterBlack, size: 28))
                 .foregroundStyle(.white)
                 .padding(.top, 10)
 
-            Text(userEnv.localizedString("Giriş yapılacak bölgeyi seçin", "Select the region to initialize entry"))
+            Text(userEnv.labelSelectRegionDesc)
                 .font(.setCustomFont(name: .InterMedium, size: 14))
                 .foregroundStyle(.white.opacity(0.5))
         }
@@ -203,23 +203,11 @@ struct WorldSelectionView: View {
     }
 
     private func worldTitle(_ wid: Int) -> String {
-        switch wid {
-        case 1: return userEnv.localizedString("NEON ÇEKİRDEK", "NEON CORE")
-        case 2: return userEnv.localizedString("BETON HARABELER", "CONCRETE RUINS")
-        case 3: return userEnv.localizedString("ŞEKER LABORATUVARI", "CANDY LAB")
-        case 4: return userEnv.localizedString("DERİN OKYANUS", "DEEP OCEAN")
-        default: return userEnv.localizedString("BOŞLUK ÇEKİRDEĞİ", "VOID KERNEL")
-        }
+        return userEnv.formatWorldTitle(worldId: wid)
     }
 
     private func worldTwist(_ wid: Int) -> String {
-        switch wid {
-        case 1: return userEnv.localizedString("Eğitim dünyası · Twist yok", "Tutorial world · No twist")
-        case 2: return userEnv.localizedString("Ağırlık: Bloklar daha hızlı düşer", "Weight: Blocks fall faster")
-        case 3: return userEnv.localizedString("Yapışkan: Bloklar birbirine bağlanır", "Sticky: Blocks chain together")
-        case 4: return userEnv.localizedString("Basınç: Karar verme süresi azalır", "Pressure: Reduced decision time")
-        default: return userEnv.localizedString("Boşluk: Gerçeklik katmanları bükülür", "Void: Reality layers distort")
-        }
+        return userEnv.formatWorldTwist(worldId: wid)
     }
 
     private func worldIcon(_ wid: Int) -> String {
@@ -453,11 +441,11 @@ private struct ActionButtonV2: View {
         let (bg, fg, text): (Color, Color, String) = {
             switch state {
             case .active:
-                return (accent, Color.white, userEnv.localizedString("SİSTEME GİRİŞ", "INITIALIZE ENTRY"))
+                return (accent, Color.white, userEnv.btnInitializeEntryCaps)
             case .completed:
-                return (Color.white.opacity(0.1), .white, userEnv.localizedString("TEKRAR BAĞLAN", "RE-CONNECT"))
+                return (Color.white.opacity(0.1), .white, userEnv.btnReConnectCapsV2)
             case .locked:
-                return (Color.white.opacity(0.05), Color.white.opacity(0.3), userEnv.localizedString("ERİŞİM ENGELLENDİ", "ACCESS DENIED"))
+                return (Color.white.opacity(0.05), Color.white.opacity(0.3), userEnv.labelAccessDeniedCaps)
             }
         }()
 

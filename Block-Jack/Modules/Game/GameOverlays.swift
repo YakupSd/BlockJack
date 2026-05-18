@@ -13,59 +13,139 @@ struct GameOverOverlay: View {
         ZStack {
             Color.black.opacity(0.85).ignoresSafeArea()
 
-            VStack(spacing: 20) {
-                // Başlık
-                Text(userEnv.localizedString("ROUND KAYBEDİLDİ", "ROUND LOST"))
-                    .font(.setCustomFont(name: .InterBlack, size: 34))
-                    .foregroundStyle(ThemeColors.neonPink)
-                    .shadow(color: ThemeColors.neonPink, radius: 12)
-
-                VStack(spacing: 4) {
-                    Text(userEnv.localizedString("Grid sıkıştı veya süren bitti.", "Grid locked or time ran out."))
-                        .font(.setCustomFont(name: .InterMedium, size: 14))
-                        .foregroundStyle(ThemeColors.textSecondary)
+            if vm.eventConfig != nil {
+                // ─── EVENT / DUEL GAME OVER ───────────────────────────────
+                VStack(spacing: 24) {
+                    Text(userEnv.labelChallengeOver)
+                        .font(.setCustomFont(name: .InterBlack, size: 30))
+                        .foregroundStyle(ThemeColors.neonPink)
+                        .shadow(color: ThemeColors.neonPink, radius: 12)
                         .multilineTextAlignment(.center)
-                }
-                .padding(.horizontal, 32)
 
-                // Her durumda Retry (Artık can mantığı yok)
-                Button {
-                    HapticManager.shared.play(.buttonTap)
-                    vm.resetToSectorStart()
-                } label: {
-                    Text(userEnv.localizedString("TEKRAR DENE", "RETRY"))
-                        .font(.setCustomFont(name: .InterExtraBold, size: 20))
-                        .foregroundStyle(ThemeColors.cosmicBlack)
-                        .padding(.vertical, 16)
-                        .padding(.horizontal, 32)
-                        .background(ThemeColors.electricYellow)
-                        .clipShape(Capsule())
-                }
+                    Text(userEnv.labelChallengeOverDesc)
+                    .font(.setCustomFont(name: .InterMedium, size: 14))
+                    .foregroundStyle(ThemeColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
 
-                // Pes Etme (Özeti gör ve Dashboard'a dön)
-                Button {
-                    HapticManager.shared.play(.buttonTap)
-                    // Run'ı manuel sonlandır
-                    UserEnvironment.shared.pendingMapNodeId = nil
-                    if let summary = SaveManager.shared.slots
-                        .first(where: { $0.id == vm.activeSlotId })?.lastRunSummary {
-                        MainViewsRouter.shared.push(
-                            RunSummaryView(summary: summary, slotId: vm.activeSlotId)
-                                .environmentObject(UserEnvironment.shared)
-                        )
-                    } else {
-                        MainViewsRouter.shared.popToDashboard()
+                    // Final puan
+                    VStack(spacing: 6) {
+                        Text(userEnv.labelYourScore)
+                            .font(.setCustomFont(name: .InterBold, size: 12))
+                            .foregroundStyle(ThemeColors.textMuted)
+                            .tracking(2)
+                        Text(vm.run.currentScore.formatted())
+                            .font(.setCustomFont(name: .InterBlack, size: 52))
+                            .foregroundStyle(ThemeColors.neonCyan)
+                            .shadow(color: ThemeColors.neonCyan.opacity(0.6), radius: 16)
                     }
-                } label: {
-                    Text(userEnv.localizedString("PES ET / ÖZETİ GÖR", "GIVE UP / VIEW SUMMARY"))
-                        .font(.setCustomFont(name: .InterBold, size: 16))
-                        .foregroundStyle(ThemeColors.textMuted)
-                        .padding(.vertical, 12)
+                    .padding(24)
+                    .background(ThemeColors.neonCyan.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(ThemeColors.neonCyan.opacity(0.3), lineWidth: 1))
+
+                    // Leaderboard sonucu
+                    if let result = vm.leaderboardSubmitResult {
+                        ScoreSubmitBanner(result: result)
+                            .padding(.horizontal, 24)
+                    }
+
+                    // Tekrar oynamak YOK — sadece menüye dön
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        MainViewsRouter.shared.nav?.popViewController(animated: true)
+                    } label: {
+                        Text(userEnv.labelBackToMenu)
+                            .font(.setCustomFont(name: .InterExtraBold, size: 18))
+                            .foregroundStyle(ThemeColors.cosmicBlack)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(ThemeColors.neonCyan)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .shadow(color: ThemeColors.neonCyan.opacity(0.4), radius: 12)
+                    }
+                    .padding(.horizontal, 32)
+                }
+                .padding(.vertical, 40)
+            } else {
+                // ─── NORMAL GAME OVER ─────────────────────────────────────
+                VStack(spacing: 20) {
+                    // Başlık
+                    Text(userEnv.labelRoundLost)
+                        .font(.setCustomFont(name: .InterBlack, size: 34))
+                        .foregroundStyle(ThemeColors.neonPink)
+                        .shadow(color: ThemeColors.neonPink, radius: 12)
+
+                    VStack(spacing: 4) {
+                        Text(userEnv.labelRoundLostDesc)
+                            .font(.setCustomFont(name: .InterMedium, size: 14))
+                            .foregroundStyle(ThemeColors.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, 32)
+                    
+                    // --- Leaderboard Sonucu ---
+                    if let result = vm.leaderboardSubmitResult {
+                        ScoreSubmitBanner(result: result)
+                            .padding(.horizontal, 24)
+                    }
+
+                    // Retry — sektörü başa sar ve haritaya dön
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        // Sektörü başa sarıp haritaya dön
+                        SaveManager.shared.resetMapProgress(slotId: vm.activeSlotId)
+                        UserEnvironment.shared.pendingMapNodeId = nil
+                        
+                        let current = vm.run.currentRound
+                        let sectorStart = ((current - 1) / 5) * 5 + 1
+                        
+                        vm.run.currentRound = sectorStart
+                        vm.run.currentScore = 0
+                        vm.run.movesUsed = 0
+                        vm.run.streak = 0
+                        vm.run.completedNodeIds.removeAll()
+                        vm.saveGameState()
+                        
+                        MainViewsRouter.shared.popToMap(slotId: vm.activeSlotId)
+                    } label: {
+                        Text(userEnv.labelRetry)
+                            .font(.setCustomFont(name: .InterExtraBold, size: 20))
+                            .foregroundStyle(ThemeColors.cosmicBlack)
+                            .padding(.vertical, 16)
+                            .padding(.horizontal, 32)
+                            .background(ThemeColors.electricYellow)
+                            .clipShape(Capsule())
+                    }
+
+                    // Pes Etme (Özeti gör ve Dashboard'a dön)
+                    Button {
+                        HapticManager.shared.play(.buttonTap)
+                        // Run'ı manuel sonlandır
+                        UserEnvironment.shared.pendingMapNodeId = nil
+                        
+                        if let summary = SaveManager.shared.slots
+                            .first(where: { $0.id == vm.activeSlotId })?.lastRunSummary {
+                            SaveManager.shared.clearChapterMap(slotId: vm.activeSlotId)
+                            MainViewsRouter.shared.push(
+                                RunSummaryView(summary: summary, slotId: vm.activeSlotId)
+                                    .environmentObject(UserEnvironment.shared)
+                            )
+                        } else {
+                            MainViewsRouter.shared.popToDashboard()
+                        }
+                    } label: {
+                        Text(userEnv.labelGiveUpViewSummary)
+                            .font(.setCustomFont(name: .InterBold, size: 16))
+                            .foregroundStyle(ThemeColors.textMuted)
+                            .padding(.vertical, 12)
+                    }
                 }
             }
         }
     }
 }
+
 
 struct RoundCompleteOverlay: View {
     @ObservedObject var vm: GameViewModel
@@ -78,7 +158,7 @@ struct RoundCompleteOverlay: View {
             VStack(spacing: 0) {
                 // Header
                 VStack(spacing: 8) {
-                    Text(userEnv.localizedString("ROUND TAMAMLANDI", "ROUND CLEAR"))
+                    Text(userEnv.labelRoundClear)
                         .font(.setCustomFont(name: .InterBlack, size: 30))
                         .foregroundStyle(ThemeColors.success)
                         .shadow(color: ThemeColors.success, radius: 10)
@@ -102,7 +182,7 @@ struct RoundCompleteOverlay: View {
                     // Phase 9: Haritaya Dönüş
                     MainViewsRouter.shared.popToMap(slotId: vm.activeSlotId)
                 } label: {
-                    Text(userEnv.localizedString("HARİTAYA DÖN", "BACK TO MAP"))
+                    Text(userEnv.labelBackToMap)
                         .font(.setCustomFont(name: .InterExtraBold, size: 18))
                         .foregroundStyle(ThemeColors.cosmicBlack)
                         .frame(maxWidth: .infinity)
@@ -132,8 +212,8 @@ struct PauseOverlay: View {
             AdaptiveOverlay(
                 header: {
                     OverlayTitleBlock(
-                        userEnv.localizedString("DURAKLATILDI", "PAUSED"),
-                        subtitle: userEnv.localizedString("Sistem ayarlarını yönet ve devam et.", "Manage system settings and continue."),
+                        userEnv.labelPaused,
+                        subtitle: userEnv.labelPausedDesc,
                         color: ThemeColors.electricYellow
                     )
                 },
@@ -141,13 +221,13 @@ struct PauseOverlay: View {
                     VStack(spacing: 14) {
                         // Quick toggles
                         toggleRow(
-                            title: userEnv.localizedString("Ses", "Sound"),
+                            title: userEnv.labelSound,
                             systemIcon: "speaker.wave.2.fill",
                             isOn: $userEnv.isSoundEnabled,
                             tint: ThemeColors.neonCyan
                         )
                         toggleRow(
-                            title: userEnv.localizedString("Titreşim", "Haptics"),
+                            title: userEnv.labelHaptics,
                             systemIcon: "waveform.path",
                             isOn: $userEnv.isHapticEnabled,
                             tint: ThemeColors.neonPurple
@@ -155,23 +235,26 @@ struct PauseOverlay: View {
                         
                         // Actions
                         actionButton(
-                            title: userEnv.localizedString("DEVAM ET", "RESUME"),
+                            title: userEnv.labelResume,
                             color: ThemeColors.neonCyan
                         ) {
                             HapticManager.shared.play(.buttonTap)
                             vm.resumeGame()
                         }
                         
-                        actionButton(
-                            title: userEnv.localizedString("SEKTÖRÜ YENİDEN BAŞLAT", "RESTART SECTOR"),
-                            color: ThemeColors.electricYellow
-                        ) {
-                            HapticManager.shared.play(.buttonTap)
-                            vm.resetToSectorStart()
+                        // Event modunda sektör yeniden başlatma yok (sadece 1 kez oynanır)
+                        if vm.eventConfig == nil {
+                            actionButton(
+                                title: userEnv.labelRestartSector,
+                                color: ThemeColors.electricYellow
+                            ) {
+                                HapticManager.shared.play(.buttonTap)
+                                vm.resetToSectorStart()
+                            }
                         }
                         
                         actionButton(
-                            title: userEnv.localizedString("AYARLAR", "SETTINGS"),
+                            title: userEnv.labelSettingsCaps,
                             color: ThemeColors.neonPink
                         ) {
                             HapticManager.shared.play(.buttonTap)
@@ -190,9 +273,17 @@ struct PauseOverlay: View {
                         // Hub'a dönülce pending node iptal — kullanıcı tekrar oynayabilir
                         UserEnvironment.shared.pendingMapNodeId = nil
                         vm.saveGameState()
-                        MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
+                        
+                        if let config = vm.eventConfig {
+                            UserEnvironment.shared.saveEventScore(config.id, score: vm.run.currentScore)
+                            MainViewsRouter.shared.nav?.popViewController(animated: true)
+                        } else {
+                            MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
+                        }
                     } label: {
-                        Text(userEnv.localizedString("KAYDET VE HUB'A DÖN", "SAVE & BACK TO HUB"))
+                        Text(vm.eventConfig != nil 
+                             ? userEnv.labelGiveUpSaveScore 
+                             : userEnv.labelSaveBackToHub)
                             .font(.setCustomFont(name: .InterExtraBold, size: 18))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -264,14 +355,14 @@ struct BossIntroOverlay: View {
             Color.black.opacity(0.9).ignoresSafeArea()
             
             VStack(spacing: 20) {
-                Text(userEnv.localizedString("DİKKAT", "WARNING"))
+                Text(userEnv.labelWarningCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 24))
                     .foregroundStyle(ThemeColors.neonPink)
                     .tracking(8)
                     .opacity(animate ? 1 : 0.3)
                     .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: animate)
                 
-                Text(userEnv.localizedString("BOSS ROUND", "BOSS ROUND"))
+                Text(userEnv.labelBossRoundCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 48))
                     .foregroundStyle(.white)
                     .shadow(color: ThemeColors.neonPink, radius: animate ? 20 : 5)
@@ -298,7 +389,7 @@ struct BossIntroOverlay: View {
                     HapticManager.shared.play(.heavy)
                     vm.startBossRound()
                 } label: {
-                    Text(userEnv.localizedString("SAVAŞ", "FIGHT"))
+                    Text(userEnv.labelFightCaps)
                         .font(.setCustomFont(name: .InterBlack, size: 28))
                         .foregroundStyle(ThemeColors.cosmicBlack)
                         .frame(width: 200, height: 60)
@@ -362,7 +453,7 @@ struct TutorialOverlay: View {
             
             VStack(spacing: 30) {
                 // Header
-                Text(userEnv.localizedString("NASIL OYNANIR?", "HOW TO PLAY"))
+                Text(userEnv.labelHowToPlayCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 20))
                     .foregroundStyle(ThemeColors.textMuted)
                     .tracking(2)
@@ -373,12 +464,12 @@ struct TutorialOverlay: View {
                         .font(.system(size: 80))
                         .shadow(color: ThemeColors.neonCyan.opacity(0.5), radius: 20)
                         
-                    Text(userEnv.localizedString(steps[currentStep].titleTR, steps[currentStep].titleEN))
+                    Text(userEnv.language == .turkish ? steps[currentStep].titleTR : steps[currentStep].titleEN)
                         .font(.setCustomFont(name: .InterBlack, size: 28))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
                     
-                    Text(userEnv.localizedString(steps[currentStep].descTR, steps[currentStep].descEN))
+                    Text(userEnv.language == .turkish ? steps[currentStep].descTR : steps[currentStep].descEN)
                         .font(.setCustomFont(name: .InterMedium, size: 18))
                         .foregroundStyle(ThemeColors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -413,8 +504,8 @@ struct TutorialOverlay: View {
                     }
                 } label: {
                     Text(currentStep < steps.count - 1 ? 
-                         userEnv.localizedString("SONRAKİ", "NEXT") : 
-                         userEnv.localizedString("BAŞLA!", "START!"))
+                         userEnv.labelNextCaps : 
+                         userEnv.labelStartCaps)
                         .font(.setCustomFont(name: .InterExtraBold, size: 22))
                         .foregroundStyle(ThemeColors.cosmicBlack)
                         .frame(maxWidth: .infinity)

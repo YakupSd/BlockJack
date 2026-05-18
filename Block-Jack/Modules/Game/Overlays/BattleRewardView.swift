@@ -36,10 +36,10 @@ struct BattleRewardView: View {
             AdaptiveOverlay(
                 header: {
                     OverlayTitleBlock(
-                        userEnv.localizedString("TUR TAMAMLANDI!", "ROUND COMPLETE!"),
+                        userEnv.labelRoundCompleteCaps,
                         subtitle: isChallenge
-                        ? userEnv.localizedString("BONUS ÖDÜL AKTİF (Challenge/Contract).", "BONUS REWARD ACTIVE (Challenge/Contract).")
-                        : userEnv.localizedString("Ganimeti topla ve güçlen.", "Claim your loot and power up."),
+                        ? userEnv.labelBonusRewardActiveCaps
+                        : userEnv.labelClaimLootDesc,
                         color: ThemeColors.electricYellow
                     )
                 },
@@ -58,7 +58,7 @@ struct BattleRewardView: View {
                             NotificationCenter.default.post(name: NSNotification.Name("mapOverlayDidDismiss"), object: nil)
                             onClaim()
                         }) {
-                            Text(userEnv.localizedString("DEVAM ET", "CONTINUE"))
+                            Text(userEnv.btnContinue)
                                 .font(.custom("Outfit-Bold", size: 18))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
@@ -103,9 +103,9 @@ struct BattleRewardView: View {
 
         let goldAmount = isChallenge ? Int.random(in: 220...480) : Int.random(in: 100...250)
         options.append(RewardOption(
-            title: "Veri Önbelleği",
+            title: userEnv.labelRewardDataCache,
             icon: "💰",
-            desc: "+\(goldAmount) Altın kazan.",
+            desc: userEnv.labelRewardGoldEarnTemplate.replacingOccurrences(of: "{{amount}}", with: "\(goldAmount)"),
             color: ThemeColors.electricYellow,
             action: { id in
                 SaveManager.shared.updateGold(slotId: id, amount: goldAmount)
@@ -115,9 +115,9 @@ struct BattleRewardView: View {
         if isChallenge {
             let diamondAmount = Int.random(in: 8...18)
             options.append(RewardOption(
-                title: "Elmas Önbelleği",
+                title: userEnv.labelRewardDiamondCache,
                 icon: "💎",
-                desc: "+\(diamondAmount) Elmas kazan.",
+                desc: userEnv.labelRewardDiamondEarnTemplate.replacingOccurrences(of: "{{amount}}", with: "\(diamondAmount)"),
                 color: ThemeColors.neonCyan,
                 action: { _ in
                     UserEnvironment.shared.earn(diamonds: diamondAmount)
@@ -140,9 +140,9 @@ struct BattleRewardView: View {
         let rand = Double.random(in: 0...1)
         if rand < 0.3 {
             options.append(RewardOption(
-                title: "Yedek Batarya",
+                title: userEnv.labelRewardBackupBattery,
                 icon: "❤️",
-                desc: "+1 Yaşam Puanı kazan.",
+                desc: userEnv.labelRewardLifeEarnTemplate.replacingOccurrences(of: "{{amount}}", with: "1"),
                 color: ThemeColors.neonPink,
                 action: { id in
                     SaveManager.shared.updateLives(slotId: id, amount: 1)
@@ -154,18 +154,20 @@ struct BattleRewardView: View {
             let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
             
             // Sadece açık olan perkler havuzda
-            let availablePerks = PerkEngine.getPerkPool(lang: userEnv.language).filter { unlockedIds.contains($0.id) }
+            let availablePerks = PerkEngine.getPerkPool(lang: userEnv.language, perkLevels: perkLevels).filter { unlockedIds.contains($0.id) }
             
             if let perk = availablePerks.randomElement() {
                 let isOwned = slot?.activePassivePerks.contains { $0.id == perk.id } ?? false
                 let tier = slot?.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 1
 
                 options.append(RewardOption(
-                    title: isOwned ? "LEVEL UP: \(perk.name)" : perk.name,
+                    title: isOwned
+                        ? userEnv.labelRewardLevelUpTemplate.replacingOccurrences(of: "{{name}}", with: perk.name)
+                        : perk.name,
                     icon: perk.icon,
                     desc: isOwned
-                        ? "Mevcut perki L\(tier + 1) seviyesine yükselt."
-                        : "YENİ PERK: \(perk.desc)",
+                        ? userEnv.labelRewardUpgradePerkTemplate.replacingOccurrences(of: "{{level}}", with: "\(tier + 1)")
+                        : userEnv.labelRewardNewPerkTemplate.replacingOccurrences(of: "{{desc}}", with: perk.desc),
                     color: isOwned ? ThemeColors.neonCyan : ThemeColors.neonPurple,
                     action: { id in
                         SaveManager.shared.addPassivePerk(slotId: id, perk: perk)

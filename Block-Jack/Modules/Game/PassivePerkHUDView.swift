@@ -12,7 +12,7 @@ struct PassivePerkHUDView: View {
     var body: some View {
         HStack(spacing: 8) {
             // Sol etiket
-            Text(userEnv.localizedString("PERKLER", "PERKS"))
+            Text(userEnv.labelPerksCaps)
                 .font(.setCustomFont(name: .InterBlack, size: 9))
                 .foregroundStyle(ThemeColors.textMuted)
                 .tracking(1.3)
@@ -24,7 +24,7 @@ struct PassivePerkHUDView: View {
             
             // Perk listesi
             if vm.run.activePassivePerks.isEmpty {
-                Text(userEnv.localizedString("Aktif perk yok", "No active perk"))
+                Text(userEnv.labelNoActivePerk)
                     .font(.setCustomFont(name: .InterMedium, size: 9))
                     .foregroundColor(ThemeColors.textMuted)
                     .lineLimit(1)
@@ -240,7 +240,7 @@ struct PerkHUDIcon: View {
                 
                 if !perk.synergyPartnerIds.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(vm.userEnv.localizedString("SİNERJİ ORTAKLARI", "SYNERGY PARTNERS"))
+                        Text(vm.userEnv.labelSynergyPartnersCaps)
                             .font(.setCustomFont(name: .InterBold, size: 10))
                             .foregroundStyle(ThemeColors.textMuted)
                         

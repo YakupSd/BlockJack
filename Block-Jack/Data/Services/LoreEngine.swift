@@ -14,6 +14,13 @@ struct WorldLore: Identifiable, Codable, Equatable {
     let titleEN: String
     let bodyTR: String
     let bodyEN: String
+
+    func title(for lang: AppLanguage) -> String {
+        lang == .turkish ? titleTR : titleEN
+    }
+    func body(for lang: AppLanguage) -> String {
+        lang == .turkish ? bodyTR : bodyEN
+    }
 }
 
 struct BossLore: Identifiable, Codable, Equatable {
@@ -22,6 +29,13 @@ struct BossLore: Identifiable, Codable, Equatable {
     let titleEN: String
     let bodyTR: String
     let bodyEN: String
+
+    func title(for lang: AppLanguage) -> String {
+        lang == .turkish ? titleTR : titleEN
+    }
+    func body(for lang: AppLanguage) -> String {
+        lang == .turkish ? bodyTR : bodyEN
+    }
 }
 
 enum LoreEngine {

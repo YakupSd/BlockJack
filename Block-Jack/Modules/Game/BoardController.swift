@@ -117,7 +117,7 @@ final class BoardController {
                                 AudioManager.shared.playSFX(.coin)
                                 vm.addPopup(text: "+\(amount) ALTIN", color: ThemeColors.electricYellow)
                             case .star:
-                                vm.run.addScore(500)
+                                vm.addScore(500)
                                 vm.addPopup(text: "YILDIZ! +500", color: ThemeColors.electricYellow)
                             case .timeBoost(let secs):
                                 vm.timer.addTime(secs)
@@ -133,7 +133,7 @@ final class BoardController {
                             // hücreler bunlar. Üzerine blok koyunca overdrive'a yoğun
                             // şarj transferi olur (tier başına +0.5, max 1.5).
                             let tier = vm.run.perkTier("static_charge")
-                            let boost = min(1.5, 0.5 * Double(max(1, tier)))
+                            let boost = PerkUpgradeRegistry.tierData(for: .staticCharge, tier: tier).effectValue
                             let previousTier = vm.currentOverdriveTier
                             vm.overdriveCharge = min(3.0, vm.overdriveCharge + boost)
                             vm.abilityManager.updateOverdriveTier(previous: previousTier)
@@ -149,6 +149,14 @@ final class BoardController {
                                     self?.vm.scoreManager.triggerStaticShock(row: targetRow)
                                 }
                             }
+                        case .phantomSiphon:
+                            // Phantom Siphon perki: round başında grid'e yerleştirilmiş
+                            // hayalet hücreler. Üzerine blok koyunca tier'a bağlı süre bonusu.
+                            let tier = vm.run.perkTier("phantom_siphon")
+                            let bonusSeconds = PerkUpgradeRegistry.tierData(for: .phantomSiphon, tier: tier).effectValue
+                            vm.timer.addTime(bonusSeconds)
+                            vm.addPopup(text: "PHANTOM +\(Int(bonusSeconds))s", color: ThemeColors.neonPurple)
+                            vm.haptic.play(.success)
                         default:
                             break // Locked is handled in canPlace
                         }
@@ -198,7 +206,7 @@ final class BoardController {
                     colsCleared: 0
                 )
                 
-                vm.run.addScore(scoreResult.totalScore)
+                vm.addScore(scoreResult.totalScore)
                 if scoreResult.totalScore > 0 {
                     vm.addPopup(text: "+\(scoreResult.totalScore)", color: .white)
                 }
@@ -348,6 +356,47 @@ final class BoardController {
         }
     }
 
+    // MARK: - Block Discard / Reroll (Phase 11.5: Deadlock Solution)
+    
+    func discardBlockFromTray(blockId: String) {
+        let cost = 25
+        guard vm.run.gold >= cost else {
+            vm.addPopup(text: "ALTIN YETERSİZ (-\(cost)G)", color: ThemeColors.neonPink)
+            vm.haptic.play(.error)
+            return
+        }
+        
+        guard let index = vm.blockTray.firstIndex(where: { $0.id.uuidString == blockId }) else { return }
+        
+        vm.addRunGold(-cost)
+        vm.blockTray.remove(at: index)
+        vm.addPopup(text: "BLOK ATILDI (-\(cost)G)", color: ThemeColors.neonOrange)
+        vm.haptic.play(.success)
+        
+        checkDeadlock()
+    }
+    
+    func rerollBlockInTray(blockId: String) {
+        let cost = 50
+        guard vm.run.gold >= cost else {
+            vm.addPopup(text: "ALTIN YETERSİZ (-\(cost)G)", color: ThemeColors.neonPink)
+            vm.haptic.play(.error)
+            return
+        }
+        
+        guard let index = vm.blockTray.firstIndex(where: { $0.id.uuidString == blockId }) else { return }
+        
+        let blockLuckLevel = vm.userEnv.goldLevel(for: .blockLuck)
+        let newBlock = GameBlock.random(forRound: vm.run.currentRound, luckLevel: blockLuckLevel)
+        
+        vm.addRunGold(-cost)
+        vm.blockTray[index] = newBlock
+        vm.addPopup(text: "BLOK YENİLENDİ (-\(cost)G)", color: ThemeColors.neonPurple)
+        vm.haptic.play(.success)
+        
+        checkDeadlock()
+    }
+
     // MARK: - Deadlock & Refresh
     
     func checkDeadlock() {
@@ -411,10 +460,41 @@ final class BoardController {
                 guard let self = self, self.vm.phase == .playing else { return }
                 self.triggerEnemyWarning()
             }
+            
+        // Endless modda 30sn'de bir zorluk artışı — 3 rastgele hücre kilitlenir.
+        // Grid sıkışınca deadlock → oyun biter. Event/Duel'in sonsuz uzamasını önler.
+        if vm.eventConfig != nil {
+            vm.endlessEscalationTimer?.cancel()
+            vm.endlessEscalationTimer = Timer.publish(every: 30.0, on: .main, in: .common)
+                .autoconnect()
+                .sink { [weak self] _ in
+                    guard let self = self, self.vm.phase == .playing else { return }
+                    
+                    let positions = self.vm.board.allEmptyPositions().shuffled().prefix(3)
+                    for pos in positions {
+                        self.vm.board.grid[pos.row][pos.col].state = .locked
+                    }
+                    if !positions.isEmpty {
+                        self.vm.addPopup(text: "⚠️ ZORLUK ARTTI! 3 HÜCRE KİLİTLENDİ", color: ThemeColors.neonPink)
+                        self.vm.haptic.play(.heavy)
+                        // Kilitleme sonrası deadlock varsa game over tetikle
+                        if self.vm.board.isDeadlock(blocks: self.vm.blockTray) {
+                            self.vm.triggerGameOver()
+                        }
+                    }
+                }
+        }
     }
     
     private func triggerEnemyWarning() {
         guard let attackType = vm.enemy.currentAttack else { return }
+        
+        // Enemy Ability Notification Panel
+        vm.showEnemyAbility(
+            title: attackType.name,
+            description: attackType.description,
+            color: attackType.warningColor
+        )
         
         // 3sn uyarı aşaması
         vm.showEnemyAttackWarning = true
@@ -505,18 +585,30 @@ final class BoardController {
             vm.board.applyCursedCells(count: 5)
             vm.addPopup(text: "☠️ 5 LANET YERLEŞTİRİLDİ!", color: Color(red: 0.6, green: 0.1, blue: 0.8))
             
-        // --- ZAMAN HIRSIZI: 20sn çal ---
+        // --- ZAMAN HIRSIZI: 20sn çal (Endless modda Puan Çalar) ---
         case .timeHeist:
-            vm.timer.addTime(-20)
-            vm.addPopup(text: "⏳ -20SN ÇALINDI!", color: ThemeColors.neonCyan)
+            if vm.eventConfig != nil {
+                // Endless modda süre yok, puan çal (Mevcut puanın %10'u veya minimum 100)
+                let stolen = min(vm.run.currentScore, max(100, Int(Double(vm.run.currentScore) * 0.1)))
+                vm.run.currentScore -= stolen
+                vm.addPopup(text: "🦇 -\(stolen) PUAN ÇALINDI!", color: ThemeColors.neonPink)
+            } else {
+                vm.timer.addTime(-20)
+                vm.addPopup(text: "⏳ -20SN ÇALINDI!", color: ThemeColors.neonCyan)
+            }
             
         // --- AĞIR ZIRH: 4 adet ağır hücre yerleştir ---
         case .heavyArmor:
             let positions = vm.board.allEmptyPositions().shuffled().prefix(4)
+            let hits = vm.eventConfig != nil ? 4 : 2
             for pos in positions {
-                vm.board.grid[pos.row][pos.col].state = .heavy(hits: 2)
+                vm.board.grid[pos.row][pos.col].state = .heavy(hits: hits)
             }
-            vm.addPopup(text: "🛡️ 4 AĞIR ENGEL KOYULDU!", color: ThemeColors.neonOrange)
+            if vm.eventConfig != nil {
+                vm.addPopup(text: "🛡️ 4 SÜPER AĞIR ENGEL KOYULDU!", color: ThemeColors.neonOrange)
+            } else {
+                vm.addPopup(text: "🛡️ 4 AĞIR ENGEL KOYULDU!", color: ThemeColors.neonOrange)
+            }
         }
         
         // Sonraki atak türünü değiştir (her ataktan sonra farklı biri)
@@ -537,6 +629,8 @@ final class BoardController {
         vm.enemyWarningTimer = nil
         vm.enemyTrayUnlockTimer?.cancel()
         vm.enemyTrayUnlockTimer = nil
+        vm.endlessEscalationTimer?.cancel()
+        vm.endlessEscalationTimer = nil
         vm.enemy.isTrayLocked = false
         vm.showEnemyAttackWarning = false
     }

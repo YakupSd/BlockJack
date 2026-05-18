@@ -26,18 +26,15 @@ struct DailyRewardOverlay: View {
                 .onTapGesture { close() }
 
             VStack(spacing: 20) {
-                Text(userEnv.localizedString("GÜNLÜK ÖDÜL", "DAILY REWARD"))
+                Text(userEnv.labelDailyRewardCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 22))
                     .foregroundStyle(ThemeColors.electricYellow)
                     .tracking(3)
 
-                Text(userEnv.localizedString(
-                    "Üst üste giriş yaparak büyük ödülleri topla!",
-                    "Log in daily to unlock bigger rewards!"
-                ))
-                .font(.setCustomFont(name: .InterMedium, size: 12))
-                .foregroundStyle(ThemeColors.textSecondary)
-                .multilineTextAlignment(.center)
+                Text(userEnv.labelDailyRewardDesc)
+                    .font(.setCustomFont(name: .InterMedium, size: 12))
+                    .foregroundStyle(ThemeColors.textSecondary)
+                    .multilineTextAlignment(.center)
 
                 streakGrid
 
@@ -52,7 +49,7 @@ struct DailyRewardOverlay: View {
                 Button {
                     close()
                 } label: {
-                    Text(userEnv.localizedString("KAPAT", "CLOSE"))
+                    Text(userEnv.btnCloseCaps)
                         .font(.setCustomFont(name: .InterBold, size: 13))
                         .foregroundStyle(ThemeColors.textMuted)
                         .padding(.vertical, 8)
@@ -90,7 +87,7 @@ struct DailyRewardOverlay: View {
         let isPast = tier.day < todayIndex
 
         return VStack(spacing: 4) {
-            Text(userEnv.localizedString("GÜN \(tier.day)", "DAY \(tier.day)"))
+            Text(userEnv.labelDailyRewardDayTemplate.replacingOccurrences(of: "{{day}}", with: "\(tier.day)"))
                 .font(.setCustomFont(name: .InterBold, size: 9))
                 .foregroundStyle(isNext ? ThemeColors.electricYellow : ThemeColors.textMuted)
 
@@ -132,7 +129,7 @@ struct DailyRewardOverlay: View {
                 AudioManager.shared.playSFX(.coin)
             }
         } label: {
-            Text(userEnv.localizedString("ÖDÜLÜ AL", "CLAIM"))
+            Text(userEnv.btnClaimCaps)
                 .font(.setCustomFont(name: .InterBlack, size: 16))
                 .tracking(4)
                 .foregroundStyle(.black)
@@ -150,10 +147,10 @@ struct DailyRewardOverlay: View {
             Image(systemName: "checkmark.seal.fill")
                 .foregroundStyle(ThemeColors.neonCyan)
             VStack(alignment: .leading, spacing: 2) {
-                Text(userEnv.localizedString("ALINDI", "CLAIMED"))
+                Text(userEnv.labelClaimedCaps)
                     .font(.setCustomFont(name: .InterBold, size: 11))
                     .foregroundStyle(ThemeColors.neonCyan)
-                Text("+\(tier.gold) \(userEnv.localizedString("Altın", "Gold"))" + (tier.diamonds > 0 ? " · +\(tier.diamonds) 💎" : ""))
+                Text("+\(tier.gold) \(userEnv.labelGoldWord)" + (tier.diamonds > 0 ? " · +\(tier.diamonds) 💎" : ""))
                     .font(.setCustomFont(name: .InterMedium, size: 13))
                     .foregroundStyle(.white)
             }
@@ -172,7 +169,7 @@ struct DailyRewardOverlay: View {
         let s = seconds % 60
         let pretty = String(format: "%02d:%02d:%02d", h, m, s)
         return VStack(spacing: 4) {
-            Text(userEnv.localizedString("SONRAKİ ÖDÜL", "NEXT REWARD"))
+            Text(userEnv.labelNextRewardCaps)
                 .font(.setCustomFont(name: .InterMedium, size: 10))
                 .foregroundStyle(ThemeColors.textMuted)
                 .tracking(2)

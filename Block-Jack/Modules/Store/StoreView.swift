@@ -18,21 +18,22 @@ enum StoreTab: Int, CaseIterable {
     case specials
     case cosmetics
 
-    func titleTR() -> String {
-        switch self {
-        case .diamonds: return "ELMAS"
-        case .gold:     return "ALTIN"
-        case .specials: return "ÖZEL"
-        case .cosmetics: return "KOZMETİK"
-        }
-    }
-
-    func titleEN() -> String {
-        switch self {
-        case .diamonds: return "GEMS"
-        case .gold:     return "GOLD"
-        case .specials: return "DEALS"
-        case .cosmetics: return "COSMETICS"
+    func title(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish:
+            switch self {
+            case .diamonds: return "ELMAS"
+            case .gold:     return "ALTIN"
+            case .specials: return "ÖZEL"
+            case .cosmetics: return "KOZMETİK"
+            }
+        case .english:
+            switch self {
+            case .diamonds: return "GEMS"
+            case .gold:     return "GOLD"
+            case .specials: return "DEALS"
+            case .cosmetics: return "COSMETICS"
+            }
         }
     }
 }
@@ -46,6 +47,20 @@ struct CosmeticItem: Identifiable, Hashable {
     let priceLabel: String
     let iconSystemName: String
     let tag: PackageTag?
+
+    func title(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish: return titleTR
+        case .english: return titleEN
+        }
+    }
+
+    func subtitle(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish: return subtitleTR
+        case .english: return subtitleEN
+        }
+    }
 }
 
 struct StorePackage: Identifiable, Hashable {
@@ -61,6 +76,13 @@ struct StorePackage: Identifiable, Hashable {
     let iconSystemName: String?   // SF Symbol (özel teklifler için)
 
     var totalAmount: Int { currencyAmount + bonusAmount }
+
+    func title(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish: return titleTR
+        case .english: return titleEN
+        }
+    }
 }
 
 enum PackageTag {
@@ -69,21 +91,22 @@ enum PackageTag {
     case limited
     case starter
 
-    func titleTR() -> String {
-        switch self {
-        case .popular: return "EN POPÜLER"
-        case .bestValue: return "EN İYİ DEĞER"
-        case .limited: return "SINIRLI"
-        case .starter: return "YENİ OYUNCU"
-        }
-    }
-
-    func titleEN() -> String {
-        switch self {
-        case .popular: return "MOST POPULAR"
-        case .bestValue: return "BEST VALUE"
-        case .limited: return "LIMITED"
-        case .starter: return "NEW PLAYER"
+    func title(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish:
+            switch self {
+            case .popular: return "EN POPÜLER"
+            case .bestValue: return "EN İYİ DEĞER"
+            case .limited: return "SINIRLI"
+            case .starter: return "YENİ OYUNCU"
+            }
+        case .english:
+            switch self {
+            case .popular: return "MOST POPULAR"
+            case .bestValue: return "BEST VALUE"
+            case .limited: return "LIMITED"
+            case .starter: return "NEW PLAYER"
+            }
         }
     }
 
@@ -107,6 +130,20 @@ struct StoreSpecialPackage: Identifiable, Hashable {
     let diamondAmount: Int
     let priceLabel: String
     let tag: PackageTag
+
+    func title(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish: return titleTR
+        case .english: return titleEN
+        }
+    }
+
+    func subtitle(lang: AppLanguage) -> String {
+        switch lang {
+        case .turkish: return subtitleTR
+        case .english: return subtitleEN
+        }
+    }
 }
 
 // MARK: - Katalog
@@ -279,12 +316,12 @@ struct StoreView: View {
         }
         .alert(item: $pendingPackage) { pending in
             Alert(
-                title: Text(userEnv.localizedString("Satın Alma Onayı", "Confirm Purchase")),
+                title: Text(userEnv.titleConfirmPurchase),
                 message: Text(pending.confirmationText(lang: userEnv.language)),
                 primaryButton: .default(Text(pending.price), action: {
                     performPurchase(pending)
                 }),
-                secondaryButton: .cancel(Text(userEnv.localizedString("İptal", "Cancel")))
+                secondaryButton: .cancel(Text(userEnv.btnCancel))
             )
         }
     }
@@ -308,11 +345,11 @@ struct StoreView: View {
             Spacer()
 
             VStack(spacing: 2) {
-                Text(userEnv.localizedString("MAĞAZA", "STORE"))
+                Text(userEnv.labelStoreTitle)
                     .font(.setCustomFont(name: .InterBlack, size: 24))
                     .foregroundStyle(ThemeColors.neonCyan)
                     .tracking(3)
-                Text(userEnv.localizedString("GERÇEK PARA İLE", "REAL MONEY"))
+                Text(userEnv.labelRealMoney)
                     .font(.setCustomFont(name: .InterBold, size: 9))
                     .tracking(3)
                     .foregroundStyle(ThemeColors.textMuted)
@@ -366,7 +403,7 @@ struct StoreView: View {
                         selectedTab = tab
                     }
                 } label: {
-                    Text(userEnv.localizedString(tab.titleTR(), tab.titleEN()))
+                    Text(tab.title(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterExtraBold, size: 13))
                         .tracking(2)
                         .foregroundStyle(
@@ -415,7 +452,7 @@ struct StoreView: View {
             HapticManager.shared.play(.buttonTap)
             pendingPackage = PendingPurchase(
                 id: pkg.id,
-                title: userEnv.localizedString(pkg.titleTR, pkg.titleEN),
+                title: pkg.title(lang: userEnv.language),
                 amountText: "\(pkg.totalAmount)",
                 price: pkg.priceLabel,
                 iconName: iconName,
@@ -437,7 +474,7 @@ struct StoreView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(userEnv.localizedString(pkg.titleTR, pkg.titleEN))
+                    Text(pkg.title(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterBold, size: 12))
                         .tracking(1)
                         .foregroundStyle(ThemeColors.textSecondary)
@@ -447,8 +484,8 @@ struct StoreView: View {
                             .font(.setCustomFont(name: .InterBlack, size: 26))
                             .foregroundStyle(accent)
                         Text(pkg.isGold
-                             ? userEnv.localizedString("ALTIN", "GOLD")
-                             : userEnv.localizedString("ELMAS", "GEMS"))
+                             ? userEnv.labelGoldCaps
+                             : userEnv.labelDiamondsCaps)
                             .font(.setCustomFont(name: .InterExtraBold, size: 11))
                             .tracking(2)
                             .foregroundStyle(ThemeColors.textMuted)
@@ -489,7 +526,7 @@ struct StoreView: View {
             HapticManager.shared.play(.buttonTap)
             pendingPackage = PendingPurchase(
                 id: pkg.id,
-                title: userEnv.localizedString(pkg.titleTR, pkg.titleEN),
+                title: pkg.title(lang: userEnv.language),
                 amountText: "\(pkg.goldAmount) + \(pkg.diamondAmount)",
                 price: pkg.priceLabel,
                 iconName: "icon_diamond",
@@ -501,11 +538,11 @@ struct StoreView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(userEnv.localizedString(pkg.titleTR, pkg.titleEN))
+                        Text(pkg.title(lang: userEnv.language))
                             .font(.setCustomFont(name: .InterBlack, size: 18))
                             .foregroundStyle(ThemeColors.textPrimary)
                             .tracking(1)
-                        Text(userEnv.localizedString(pkg.subtitleTR, pkg.subtitleEN))
+                        Text(pkg.subtitle(lang: userEnv.language))
                             .font(.setCustomFont(name: .InterMedium, size: 11))
                             .foregroundStyle(ThemeColors.textMuted)
                             .multilineTextAlignment(.leading)
@@ -549,8 +586,8 @@ struct StoreView: View {
             guard !owned else { return }
             pendingPackage = PendingPurchase(
                 id: item.id,
-                title: userEnv.localizedString(item.titleTR, item.titleEN),
-                amountText: userEnv.localizedString("Kozmetik kilidi açılır", "Cosmetic unlock"),
+                title: item.title(lang: userEnv.language),
+                amountText: userEnv.labelCosmeticUnlock,
                 price: item.priceLabel,
                 iconName: item.iconSystemName,
                 isGold: false,
@@ -572,14 +609,14 @@ struct StoreView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
-                        Text(userEnv.localizedString(item.titleTR, item.titleEN))
+                        Text(item.title(lang: userEnv.language))
                             .font(.setCustomFont(name: .InterBlack, size: 16))
                             .foregroundStyle(.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
 
                         if owned {
-                            Text(userEnv.localizedString("SAHİP", "OWNED"))
+                            Text(userEnv.labelOwned)
                                 .font(.setCustomFont(name: .InterBlack, size: 10))
                                 .foregroundStyle(ThemeColors.cosmicBlack)
                                 .padding(.horizontal, 8)
@@ -589,13 +626,13 @@ struct StoreView: View {
                         }
                     }
 
-                    Text(userEnv.localizedString(item.subtitleTR, item.subtitleEN))
+                    Text(item.subtitle(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterMedium, size: 11))
                         .foregroundStyle(ThemeColors.textSecondary)
                         .lineLimit(2)
 
                     if let tag = item.tag {
-                        Text(userEnv.localizedString(tag.titleTR(), tag.titleEN()))
+                        Text(tag.title(lang: userEnv.language))
                             .font(.setCustomFont(name: .InterExtraBold, size: 9))
                             .tracking(2)
                             .foregroundStyle(tag.color)
@@ -667,7 +704,7 @@ struct StoreView: View {
     }
 
     private func tagBadge(_ tag: PackageTag) -> some View {
-        Text(userEnv.localizedString(tag.titleTR(), tag.titleEN()))
+        Text(tag.title(lang: userEnv.language))
             .font(.setCustomFont(name: .InterBlack, size: 9))
             .tracking(2)
             .foregroundStyle(ThemeColors.cosmicBlack)
@@ -683,16 +720,10 @@ struct StoreView: View {
 
     private var footer: some View {
         VStack(spacing: 4) {
-            Text(userEnv.localizedString(
-                "Satın alımlar hesabınıza bağlıdır.",
-                "Purchases are tied to your account."
-            ))
+            Text(userEnv.labelPurchasesTiedToAccount)
             .font(.setCustomFont(name: .InterMedium, size: 10))
             .foregroundStyle(ThemeColors.textMuted)
-            Text(userEnv.localizedString(
-                "Geri Yükle · Kullanım Şartları · Gizlilik",
-                "Restore · Terms · Privacy"
-            ))
+            Text(userEnv.labelRestoreTermsPrivacy)
             .font(.setCustomFont(name: .InterMedium, size: 10))
             .foregroundStyle(ThemeColors.textMuted.opacity(0.75))
         }
@@ -748,10 +779,9 @@ struct StoreView: View {
             HapticManager.shared.play(.success)
             AudioManager.shared.playSFX(.perkUnlock)
 
-            let msg = userEnv.localizedString(
-                "\(pending.title) açıldı!",
-                "\(pending.title) unlocked!"
-            )
+            let msg = userEnv.language == .turkish
+                ? "\(pending.title) açıldı!"
+                : "\(pending.title) unlocked!"
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                 successToast = msg
             }
@@ -775,20 +805,17 @@ struct StoreView: View {
 
         let msg: String
         if pending.goldAmount > 0 && pending.diamondAmount > 0 {
-            msg = userEnv.localizedString(
-                "+\(pending.goldAmount) Altın, +\(pending.diamondAmount) Elmas eklendi!",
-                "+\(pending.goldAmount) Gold, +\(pending.diamondAmount) Gems added!"
-            )
+            msg = userEnv.language == .turkish
+                ? "+\(pending.goldAmount) Altın, +\(pending.diamondAmount) Elmas eklendi!"
+                : "+\(pending.goldAmount) Gold, +\(pending.diamondAmount) Gems added!"
         } else if pending.goldAmount > 0 {
-            msg = userEnv.localizedString(
-                "+\(pending.goldAmount) Altın eklendi!",
-                "+\(pending.goldAmount) Gold added!"
-            )
+            msg = userEnv.language == .turkish
+                ? "+\(pending.goldAmount) Altın eklendi!"
+                : "+\(pending.goldAmount) Gold added!"
         } else {
-            msg = userEnv.localizedString(
-                "+\(pending.diamondAmount) Elmas eklendi!",
-                "+\(pending.diamondAmount) Gems added!"
-            )
+            msg = userEnv.language == .turkish
+                ? "+\(pending.diamondAmount) Elmas eklendi!"
+                : "+\(pending.diamondAmount) Gems added!"
         }
 
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {

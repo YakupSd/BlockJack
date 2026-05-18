@@ -56,7 +56,7 @@ struct PerkShopView: View {
                             .clipShape(Circle())
                     }
                     Spacer()
-                    Text(userEnv.localizedString("PERK DÜKKANI", "PERK SHOP"))
+                    Text(userEnv.labelPerkShopCaps)
                         .font(.setCustomFont(name: .InterBlack, size: 18))
                         .tracking(4)
                         .foregroundStyle(ThemeColors.electricYellow)
@@ -81,7 +81,7 @@ struct PerkShopView: View {
 
                 // Insufficient gold banner
                 if showInsufficientGold {
-                    Text(userEnv.localizedString("⚠️ Yetersiz altın!", "⚠️ Not enough gold!"))
+                    Text(userEnv.labelInsufficientGoldBanner)
                         .font(.setCustomFont(name: .InterBold, size: 13))
                         .foregroundStyle(ThemeColors.neonPink)
                         .padding(.horizontal, 16)
@@ -124,7 +124,7 @@ struct PerkShopView: View {
                     .tracking(3)
                     .foregroundStyle(tierColor(tier))
                 if tier == 1 {
-                    Text(userEnv.localizedString("BAŞLANGIÇ", "STARTER"))
+                    Text(userEnv.labelStarterCaps)
                         .font(.setCustomFont(name: .InterBold, size: 10))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8).padding(.vertical, 2)
@@ -241,7 +241,7 @@ struct PerkShopView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if unlocked {
-                    Label(userEnv.localizedString("Açık", "Unlocked"), systemImage: "checkmark.circle.fill")
+                    Label(userEnv.labelUnlockedStatus, systemImage: "checkmark.circle.fill")
                         .font(.setCustomFont(name: .InterBold, size: 15))
                         .foregroundStyle(ThemeColors.success)
                         .frame(maxWidth: .infinity)
@@ -249,7 +249,7 @@ struct PerkShopView: View {
                         .background(ThemeColors.success.opacity(0.12))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 } else if perk.tier == 1 {
-                    Text(userEnv.localizedString("Başlangıç perki — otomatik açık", "Starter perk — always free"))
+                    Text(userEnv.labelStarterPerkAlwaysFree)
                         .font(.setCustomFont(name: .InterMedium, size: 13))
                         .foregroundStyle(ThemeColors.textMuted)
                 } else {
@@ -258,7 +258,7 @@ struct PerkShopView: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image("icon_gold").resizable().frame(width: 18, height: 18)
-                            Text("\(perk.goldCost) \(userEnv.localizedString("Altın ile Aç", "Gold to Unlock"))")
+                            Text("\(perk.goldCost) \(userEnv.labelGoldToUnlock)")
                                 .font(.setCustomFont(name: .InterExtraBold, size: 16))
                                 .foregroundStyle(canAfford ? ThemeColors.cosmicBlack : .white.opacity(0.4))
                         }
@@ -319,7 +319,7 @@ struct PerkShopView: View {
 
     private func tierLabel(_ tier: Int) -> String {
         switch tier {
-        case 1: return userEnv.localizedString("TIER 1 — ÜCRETSİZ", "TIER 1 — FREE")
+        case 1: return userEnv.labelTier1FreeCaps
         case 2: return "TIER 2 — 200 🪙"
         case 3: return "TIER 3 — 400 🪙"
         case 4: return "TIER 4 — 600 🪙"

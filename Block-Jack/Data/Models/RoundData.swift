@@ -153,9 +153,19 @@ struct RunState {
     var maxRotationUses: Int = 0
     var currentRotationUses: Int = 0
     
+    // MARK: - Event Mode Modifiers
+    var blockSpeedMultiplier: Double = 1.0     // Block drop hızı
+    var eventGoldBonus: Int = 0                // Bonus altın per line clear
+    
     // MARK: - Lives System (Balatro tarzı)
     var lives: Int = 3
     var maxLives: Int = 5
+    
+    /// Alias: Perk sistemi (Vampiric Core, Glass Cannon vb.) `health` kullanır.
+    var health: Int {
+        get { lives }
+        set { lives = min(newValue, maxLives) }
+    }
     
     mutating func loseLife() { /* No-op: Can mantığı kaldırıldı */ }
     mutating func gainLife() { /* No-op: Can mantığı kaldırıldı */ }

@@ -22,13 +22,76 @@ struct WorldMapView: View {
             // MARK: - Holographic Map Content
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
-                    ZStack {
-                        NeuralParticleLayer(scrollOffset: scrollOffset)
+                    VStack(spacing: 0) {
+                        // Top padding as spacer
+                        Spacer()
+                            .frame(height: 160)
                         
-                        TacticalMapCanvas(vm: vm, width: UIScreen.main.bounds.width)
-                            .frame(height: mapHeight)
-                            .padding(.top, 160)
-                            .padding(.bottom, 160)
+                        // Anchor points in correct visual order (top to bottom)
+                        VStack(spacing: 0) {
+                            let sortedByPixel = vm.levels.sorted { level1, level2 in
+                                let y1 = vm.nodePositions[level1.id]?.y ?? 0
+                                let y2 = vm.nodePositions[level2.id]?.y ?? 0
+                                return y1 < y2  // Top to bottom (lower y = higher on screen)
+                            }
+                            
+                            ForEach(sortedByPixel.indices, id: \.self) { idx in
+                                let level = sortedByPixel[idx]
+                                if let pos = vm.nodePositions[level.id] {
+                                    let currentPixel = pos.y * 1800
+                                    
+                                    // Add spacing from previous item
+                                    if idx == 0 {
+                                        Spacer().frame(height: currentPixel)
+                                    } else {
+                                        let prevPos = vm.nodePositions[sortedByPixel[idx-1].id]?.y ?? 0
+                                        let prevPixel = prevPos * 1800
+                                        let spacingPt = currentPixel - prevPixel
+                                        if spacingPt > 0 {
+                                            Spacer().frame(height: spacingPt)
+                                        }
+                                    }
+                                    
+                                    Color.clear
+                                        .frame(height: 1)
+                                        .id("level_anchor_\(level.id)")
+                                }
+                            }
+                            
+                            Spacer()  // Fill remaining space
+                        }
+                        .frame(height: 1800)
+                        .background {
+                            // Visual layer OVERLAY on anchors
+                            ZStack {
+                                NeuralParticleLayer(scrollOffset: scrollOffset)
+                                
+                                ZStack {
+                                    SplinePathView(levels: vm.levels, positions: vm.nodePositions, width: UIScreen.main.bounds.width, height: 1800)
+                                    
+                                    ForEach(vm.levels) { level in
+                                        if let pos = vm.nodePositions[level.id] {
+                                            TacticalOrbNode(
+                                                level: level,
+                                                isPlayerHere: level.id == vm.playerLevelId,
+                                                onTap: { vm.selectLevel(level) }
+                                            )
+                                            .position(x: pos.x * UIScreen.main.bounds.width, y: pos.y * 1800)
+                                        }
+                                    }
+                                    
+                                    if let playerPos = vm.nodePositions[vm.playerLevelId] {
+                                        TacticalPlayerMarker()
+                                            .position(x: playerPos.x * UIScreen.main.bounds.width, y: playerPos.y * 1800)
+                                            .allowsHitTesting(false)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Bottom padding as spacer
+                        Spacer()
+                            .frame(height: 160)
                     }
                     .background(
                         GeometryReader { geo in
@@ -40,14 +103,17 @@ struct WorldMapView: View {
                     self.scrollOffset = value
                 }
                 .onAppear {
-                    // Initial focus on appear
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // Initial focus on appear - longer delay for layout
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        print("⏱️ DELAYED FOCUS: Attempting to focus after 3.0s delay")
                         focusOnPlayer(proxy: proxy)
                     }
                 }
                 .onChange(of: vm.playerLevelId) { oldValue, newValue in
                     // Re-focus when player level changes
-                    focusOnPlayer(proxy: proxy)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        focusOnPlayer(proxy: proxy)
+                    }
                 }
             }
 
@@ -85,45 +151,25 @@ struct WorldMapView: View {
     
     private func focusOnPlayer(proxy: ScrollViewProxy) {
         let target = "level_anchor_\(vm.playerLevelId)"
-        withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-            proxy.scrollTo(target, anchor: .center)
-        }
-    }
-}
-
-// MARK: - Tactical Map Canvas
-
-struct TacticalMapCanvas: View {
-    @ObservedObject var vm: WorldMapViewModel
-    let width: CGFloat
-    
-    var body: some View {
-        ZStack {
-            SplinePathView(levels: vm.levels, positions: vm.nodePositions, width: width, height: 1800)
-            
-            ForEach(vm.levels) { level in
-                if let pos = vm.nodePositions[level.id] {
-                    // Invisible Scroll Anchor
-                    Color.clear
-                        .frame(width: 1, height: 1)
-                        .id("level_anchor_\(level.id)")
-                        .position(x: pos.x * width, y: pos.y * 1800)
-
-                    TacticalOrbNode(
-                        level: level,
-                        isPlayerHere: level.id == vm.playerLevelId,
-                        onTap: { vm.selectLevel(level) }
-                    )
-                    .position(x: pos.x * width, y: pos.y * 1800)
-                }
-            }
-            
-            if let playerPos = vm.nodePositions[vm.playerLevelId] {
-                TacticalPlayerMarker()
-                    .position(x: playerPos.x * width, y: playerPos.y * 1800)
-                    .allowsHitTesting(false)
+        print("🎯 DEBUG: Focusing on playerLevelId=\(vm.playerLevelId), target=\(target)")
+        print("📍 DEBUG: Available anchors in map:")
+        for level in vm.levels {
+            if let pos = vm.nodePositions[level.id] {
+                print("  - level_anchor_\(level.id) at y=\(pos.y) (status: \(level.status))")
             }
         }
+        
+        // Manual scroll calculation
+        if let pos = vm.nodePositions[vm.playerLevelId] {
+            // Level position is normalized 0-1, map height 1800
+            let levelPixels = pos.y * 1800
+            // Add top padding (160) + account for scroll frame
+            let targetOffset = levelPixels - 80  // Center it with some top margin
+            print("📍 SCROLL CALC: levelPixels=\(levelPixels), targetOffset=\(targetOffset)")
+        }
+        
+        // Try scrollTo with instant scroll
+        proxy.scrollTo(target, anchor: .top)
     }
 }
 

@@ -40,7 +40,7 @@ class MerchantViewModel: ObservableObject {
         let activeIds = currentSlot?.activePassivePerks.map { $0.id } ?? []
         
         // Sadece açık olan ve henüz alınmamış perkleri filtrele
-        let availablePerks = PerkEngine.getPerkPool(lang: lang).filter { perk in
+        let availablePerks = PerkEngine.getPerkPool(lang: lang, perkLevels: currentSlot?.perkLevels ?? [:]).filter { perk in
             unlockedIds.contains(perk.id) && !activeIds.contains(perk.id)
         }.shuffled()
         
@@ -111,7 +111,7 @@ class MerchantViewModel: ObservableObject {
         let activeIds = currentSlot?.activePassivePerks.map { $0.id } ?? []
         let selectionIds = forgeSelection.map { $0.id }
         
-        let forgePool = PerkEngine.getPerkPool(lang: lang).filter { perk in
+        let forgePool = PerkEngine.getPerkPool(lang: lang, perkLevels: perkLevels).filter { perk in
             unlockedIds.contains(perk.id) && !activeIds.contains(perk.id) && !selectionIds.contains(perk.id)
         }
         

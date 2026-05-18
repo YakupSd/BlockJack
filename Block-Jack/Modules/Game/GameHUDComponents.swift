@@ -49,7 +49,11 @@ struct TopHUDBar: View {
             Button {
                 HapticManager.shared.play(.buttonTap)
                 vm.saveGameState()
-                MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
+                if vm.eventConfig != nil {
+                    MainViewsRouter.shared.nav?.popViewController(animated: true)
+                } else {
+                    MainViewsRouter.shared.popToSlotHub(slotId: vm.activeSlotId)
+                }
             } label: {
                 Image(systemName: "house.fill")
                     .font(.system(size: 13, weight: .bold))
@@ -137,15 +141,15 @@ struct TopHUDBar: View {
     private var difficultyLabel: String {
         let charId = vm.activeCharacterId
         guard let diff = GameCharacter.roster.first(where: { $0.id == charId })?.difficulty else {
-            return userEnv.localizedString("Pilot", "Pilot")
+            return userEnv.labelDifficultyPilot
         }
         switch diff {
         case .beginner:
-            return userEnv.localizedString("Acemi", "Beginner")
+            return userEnv.labelDifficultyBeginner
         case .advanced:
-            return userEnv.localizedString("İleri", "Advanced")
+            return userEnv.labelDifficultyAdvanced
         case .expert:
-            return userEnv.localizedString("Uzman", "Expert")
+            return userEnv.labelDifficultyExpert
         }
     }
     
@@ -153,17 +157,30 @@ struct TopHUDBar: View {
     @ViewBuilder
     private var chapterBadge: some View {
         VStack(spacing: 1) {
-            Text(String(format: userEnv.localizedString("BÖLÜM %d", "CHAPTER %d"), vm.run.worldLevel))
-                .font(.setCustomFont(name: .InterBold, size: 9))
-                .foregroundStyle(ThemeColors.textMuted)
-                .tracking(1.4)
-                .lineLimit(1)
-            
-            Text(String(format: userEnv.localizedString("Tur %d", "Round %d"), vm.run.currentRound))
-                .font(.setCustomFont(name: .InterBlack, size: 13))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .monospacedDigit()
+            if let config = vm.eventConfig {
+                Text(config.title.uppercased())
+                    .font(.setCustomFont(name: .InterBold, size: 9))
+                    .foregroundStyle(ThemeColors.neonPink)
+                    .tracking(1.4)
+                    .lineLimit(1)
+                
+                Text("ENDLESS")
+                    .font(.setCustomFont(name: .InterBlack, size: 13))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+            } else {
+                Text(userEnv.labelChapterTemplate.replacingOccurrences(of: "{{value}}", with: "\(vm.run.worldLevel)"))
+                    .font(.setCustomFont(name: .InterBold, size: 9))
+                    .foregroundStyle(ThemeColors.textMuted)
+                    .tracking(1.4)
+                    .lineLimit(1)
+                
+                Text(userEnv.labelRoundTemplate.replacingOccurrences(of: "{{value}}", with: "\(vm.run.currentRound)"))
+                    .font(.setCustomFont(name: .InterBlack, size: 13))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .monospacedDigit()
+            }
         }
         .fixedSize(horizontal: true, vertical: false)
     }
@@ -190,13 +207,21 @@ struct TopHUDBar: View {
                     .easeInOut(duration: 0.45).repeatForever(autoreverses: true)
                 }
             
-            Text("\(Int(max(0, vm.timer.timeRemaining)))s")
-                .font(.setCustomFont(name: .InterBlack, size: 13))
-                .foregroundStyle(color)
-                .contentTransition(.numericText())
-                .monospacedDigit()
-                .frame(minWidth: 30, alignment: .trailing)
-                .lineLimit(1)
+            if vm.eventConfig != nil {
+                Text("∞")
+                    .font(.setCustomFont(name: .InterBlack, size: 16))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 30, alignment: .trailing)
+                    .lineLimit(1)
+            } else {
+                Text("\(Int(max(0, vm.timer.timeRemaining)))s")
+                    .font(.setCustomFont(name: .InterBlack, size: 13))
+                    .foregroundStyle(color)
+                    .contentTransition(.numericText())
+                    .monospacedDigit()
+                    .frame(minWidth: 30, alignment: .trailing)
+                    .lineLimit(1)
+            }
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
@@ -240,7 +265,9 @@ struct ModifierCounterTipPill: View {
         guard let mod = vm.run.activeModifier else { return AnyView(EmptyView()) }
         let recId = mod.recommendedCharacterId
         let recName = GameCharacter.roster.first(where: { $0.id == recId })?.name ?? "?"
-        let text = userEnv.localizedString(mod.counterTipTR(recommendedName: recName), mod.counterTipEN(recommendedName: recName))
+        let text = userEnv.language == .turkish
+            ? mod.counterTipTR(recommendedName: recName)
+            : mod.counterTipEN(recommendedName: recName)
 
         return AnyView(
             HStack(spacing: 8) {

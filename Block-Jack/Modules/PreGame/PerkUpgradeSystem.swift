@@ -1,4 +1,3 @@
-
 import SwiftUI
 import Combine
 
@@ -67,7 +66,7 @@ struct PerkShopItem: Identifiable {
     let name: String
     let description: String
     let category: PerkCategory
-    let icon: String
+    var icon: String { "perk_\(id)" }
     var isComingSoon: Bool = false
 }
 
@@ -79,21 +78,21 @@ struct PerkUpgradeRegistry {
         
         switch id {
         case .goldenStamp:
-            let values = [0: 0.0, 1: 0.10, 2: 0.15, 3: 0.17, 4: 0.20, 5: 0.25]
-            let gold = [1: 0, 2: 200, 3: 400, 4: 600, 5: 1000]
-            let diamond = [1: 0, 2: 0, 3: 0, 4: 50, 5: 100]
+            let values = [0: 0.0, 1: 0.15, 2: 0.25, 3: 0.35, 4: 0.45, 5: 0.60]
+            let gold = [1: 0, 2: 300, 3: 600, 4: 1000, 5: 2000]
+            let diamond = [1: 0, 2: 0, 3: 20, 4: 80, 5: 150]
             return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: diamond[safeTier] ?? 0, effectValue: values[safeTier] ?? 0.0)
             
         case .overkill:
-            let values = [0: 0.0, 1: 0.15, 2: 0.25, 3: 0.35, 4: 0.50, 5: 0.75]
-            let gold = [1: 0, 2: 250, 3: 450, 4: 700, 5: 1200]
-            let diamond = [1: 0, 2: 0, 3: 0, 4: 60, 5: 120]
+            let values = [0: 0.0, 1: 0.30, 2: 0.45, 3: 0.60, 4: 0.75, 5: 1.00]
+            let gold = [1: 0, 2: 350, 3: 700, 4: 1200, 5: 2500]
+            let diamond = [1: 0, 2: 0, 3: 30, 4: 100, 5: 200]
             return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: diamond[safeTier] ?? 0, effectValue: values[safeTier] ?? 0.0)
             
         case .safeHouse:
-            let values = [0: 0.0, 1: 20.0, 2: 40.0, 3: 75.0, 4: 120.0, 5: 200.0]
-            let gold = [1: 0, 2: 150, 3: 350, 4: 550, 5: 900]
-            let diamond = [1: 0, 2: 0, 3: 0, 4: 40, 5: 80]
+            let values = [0: 0.0, 1: 50.0, 2: 100.0, 3: 150.0, 4: 250.0, 5: 400.0]
+            let gold = [1: 0, 2: 250, 3: 500, 4: 800, 5: 1500]
+            let diamond = [1: 0, 2: 0, 3: 25, 4: 60, 5: 120]
             return PerkUpgradeTierData(tier: safeTier, goldCost: gold[safeTier] ?? 0, diamondCost: diamond[safeTier] ?? 0, effectValue: values[safeTier] ?? 0.0)
             
         case .bluePill, .leadPill:
@@ -194,33 +193,55 @@ struct PerkUpgradeRegistry {
     static func effectDescription(for id: PerkUpgradeID, tier: Int) -> String {
         let data = tierData(for: id, tier: tier)
         let v = data.effectValue
+        let isTR = UserEnvironment.shared.language == .turkish
         
         switch id {
-        case .goldenStamp: return "-\(Int(v * 100))% Target Score"
-        case .overkill: return "\(Int(v * 100))% Carry Over"
-        case .safeHouse: return "+\(Int(v)) Gold / Rest"
-        case .bluePill: return "Blue Score x\((1.0 + v).formatted())"
-        case .leadPill: return "Green Score x\((1.0 + v).formatted())"
-        case .luckyClover: return "Streak Limit +\(Int(v))"
-        case .momentum: return "Streak Bonus +\(Int(v * 100))%"
-        case .midasTouch: return "+\(Int(v)) Gold per Flush"
-        case .wideLoad: return "Storage: \(Int(v)) Blocks"
-        case .sculptor: return v > 100 ? "Unlimited Rotations" : "\(Int(v)) Rotation / Round"
+        case .goldenStamp: 
+            return isTR ? "Hedef skor %\(Int(v * 100)) azalır." : "Reduces target score by \(Int(v * 100))%."
+        case .overkill: 
+            return isTR ? "Artan puanların %\(Int(v * 100))'i aktarılır." : "Carries over \(Int(v * 100))% of excess score."
+        case .safeHouse: 
+            return isTR ? "Dinlenme alanlarında +\(Int(v)) Altın verir." : "Grants +\(Int(v)) Gold at rest sites."
+        case .bluePill: 
+            return isTR ? "Mavi blok puanları ×\((1.0 + v).formatted()) artar." : "Blue block score increased by ×\((1.0 + v).formatted())."
+        case .leadPill: 
+            return isTR ? "Yeşil blok puanları ×\((1.0 + v).formatted()) artar." : "Green block score increased by ×\((1.0 + v).formatted())."
+        case .luckyClover: 
+            return isTR ? "Seri (Streak) limiti +\(Int(v)) artar." : "Increases streak limit by +\(Int(v))."
+        case .momentum: 
+            return isTR ? "Seri bonusu %\(Int(v * 100)) artar." : "Increases streak bonus by \(Int(v * 100))%."
+        case .midasTouch: 
+            return isTR ? "Her Flush (Temizlik) +\(Int(v)) Altın verir." : "Grants +\(Int(v)) Gold per Flush."
+        case .wideLoad: 
+            return isTR ? "Blok haznesi \(Int(v)) slot olur." : "Tray capacity increased to \(Int(v)) slots."
+        case .sculptor: 
+            if v > 100 { return isTR ? "Sınırsız blok döndürme." : "Unlimited block rotations." }
+            return isTR ? "Tur başına \(Int(v)) döndürme hakkı." : "Allows \(Int(v)) rotations per round."
         case .glassCannon: 
-            if tier <= 2 { return "HP=1 -> x\(v.formatted()) Score" }
-            else if tier <= 4 { return "HP<=2 -> x\(v.formatted()) Score" }
-            else { return "HP<=3 -> x\(v.formatted()) Score" }
-        case .lastStand: return "One free revive per run"
-        case .recycler: return "\(Int(v * 100))% chance to refresh storage"
-        case .echoes: return "Repeat best move score (x\(v.formatted()))"
-        case .clockwork: return "Time bonus adds multiplier (+\(Int(v * 100))%)"
-        case .vampiricCore: return "\(Int(v * 100))% chance for +1 Life every 5k pts"
-        case .chainPulse: return "\(Int(v * 100))% chance for chain reaction"
-        case .staticCharge: return "Static cells charge overdrive x\(v.formatted())"
-        case .heavyDuty: return "Heavy cells multiplier x\(v.formatted())"
-        case .phantomSiphon: return "Phantom cells grant +\(Int(v))s time"
-        case .doubleDown: return "Clear on last move: +\(Int(v)) extra moves"
-        case .tacticalLens: return "Highlights the best placement on grid"
+            let hp = tier <= 2 ? 1 : (tier <= 4 ? 2 : 3)
+            return isTR ? "Can \(hp) veya altındayken puanlar ×\(v.formatted()) artar." : "Score ×\(v.formatted()) when HP is \(hp) or less."
+        case .lastStand: 
+            return isTR ? "Her run'da \(tier) kez ücretsiz canlanma." : "Revive for free \(tier) time(s) per run."
+        case .recycler: 
+            return isTR ? "Hazneyi yenileme şansı %\(Int(v * 100))." : "\(Int(v * 100))% chance to refresh tray."
+        case .echoes: 
+            return isTR ? "En iyi hamle puanının ×\(v.formatted()) kadarı eklenir." : "Repeats \(Int(v * 100))% of best move score."
+        case .clockwork: 
+            return isTR ? "Zaman bonusu çarpanı %\(Int(v * 100)) artar." : "Time bonus increases multiplier by \(Int(v * 100))%."
+        case .vampiricCore: 
+            return isTR ? "Her 5k puanda %\(Int(v * 100)) can şansı." : "\(Int(v * 100))% chance for +1 Life every 5k pts."
+        case .chainPulse: 
+            return isTR ? "Zincirleme reaksiyon şansı %\(Int(v * 100))." : "\(Int(v * 100))% chance for chain reaction."
+        case .staticCharge: 
+            return isTR ? "Statik hücreler Overdrive'ı ×\(v.formatted()) doldurur." : "Static cells charge overdrive ×\(v.formatted())."
+        case .heavyDuty: 
+            return isTR ? "Ağır blok çarpanı ×\(v.formatted()) artar." : "Heavy cells multiplier ×\(v.formatted())."
+        case .phantomSiphon: 
+            return isTR ? "Hayalet hücreler +\(Int(v))sn süre verir." : "Phantom cells grant +\(Int(v))s time."
+        case .doubleDown: 
+            return isTR ? "Son hamlede temizlik: +\(Int(v)) ek hamle." : "Clear on last move: +\(Int(v)) extra moves."
+        case .tacticalLens: 
+            return isTR ? "En iyi yerleşimi sahada vurgular." : "Highlights the best placement on grid."
         }
     }
     
@@ -238,28 +259,28 @@ struct PerkShopRegistry {
         switch category {
         case .core:
             return [
-                PerkShopItem(id: "golden_stamp", name: "GOLDEN STAMP", description: "Reduces target score needed to win.", category: .core, icon: "seal.fill"),
-                PerkShopItem(id: "overkill", name: "OVERKILL", description: "Carries over excess score to next round.", category: .core, icon: "bolt.fill"),
-                PerkShopItem(id: "safe_house", name: "SAFE HOUSE", description: "Bonus gold at rest sites.", category: .core, icon: "house.fill")
+                PerkShopItem(id: "golden_stamp", name: "GOLDEN STAMP", description: UserEnvironment.shared.localizedString("Kazanmak için gereken hedef skoru düşürür.", "Reduces target score needed to win."), category: .core),
+                PerkShopItem(id: "overkill", name: "OVERKILL", description: UserEnvironment.shared.localizedString("Artan puanları bir sonraki tura aktarır.", "Carries over excess score to next round."), category: .core),
+                PerkShopItem(id: "safe_house", name: "SAFE HOUSE", description: UserEnvironment.shared.localizedString("Dinlenme alanlarında ekstra altın verir.", "Bonus gold at rest sites."), category: .core)
             ]
         case .professional:
             return [
-                PerkShopItem(id: "blue_pill", name: "BLUE PILL", description: "Boost score from blue blocks.", category: .professional, icon: "pills.fill"),
-                PerkShopItem(id: "lead_pill", name: "LEAD PILL", description: "Boost score from green blocks.", category: .professional, icon: "pills.fill"),
-                PerkShopItem(id: "lucky_clover", name: "LUCKY CLOVER", description: "Higher maximum streak limit.", category: .professional, icon: "leaf.fill"),
-                PerkShopItem(id: "momentum", name: "MOMENTUM", description: "Huge bonus at streak milestones.", category: .professional, icon: "speedometer"),
-                PerkShopItem(id: "midas_touch", name: "MIDAS TOUCH", description: "Gold bonus for perfect flushes.", category: .professional, icon: "sparkles")
+                PerkShopItem(id: "blue_pill", name: "BLUE PILL", description: UserEnvironment.shared.localizedString("Mavi bloklardan gelen puanı artırır.", "Boost score from blue blocks."), category: .professional),
+                PerkShopItem(id: "lead_pill", name: "LEAD PILL", description: UserEnvironment.shared.localizedString("Yeşil bloklardan gelen puanı artırır.", "Boost score from green blocks."), category: .professional),
+                PerkShopItem(id: "lucky_clover", name: "LUCKY CLOVER", description: UserEnvironment.shared.localizedString("Maksimum seri (streak) limitini yükseltir.", "Higher maximum streak limit."), category: .professional),
+                PerkShopItem(id: "momentum", name: "MOMENTUM", description: UserEnvironment.shared.localizedString("Seri hedeflerinde büyük bonus sağlar.", "Huge bonus at streak milestones."), category: .professional),
+                PerkShopItem(id: "midas_touch", name: "MIDAS TOUCH", description: UserEnvironment.shared.localizedString("Kusursuz temizlikte (flush) altın bonusu.", "Gold bonus for perfect flushes."), category: .professional)
             ]
         case .legendary:
             return [
-                PerkShopItem(id: "wide_load", name: "WIDE LOAD", description: "Extra storage capacity for blocks.", category: .legendary, icon: "tray.full.fill"),
-                PerkShopItem(id: "sculptor", name: "SCULPTOR", description: "Allows rotating blocks during play.", category: .legendary, icon: "rotate.right.fill"),
-                PerkShopItem(id: "glass_cannon", name: "GLASS CANNON", description: "Massive score boost at low health.", category: .legendary, icon: "flame.fill")
+                PerkShopItem(id: "wide_load", name: "WIDE LOAD", description: UserEnvironment.shared.localizedString("Bloklar için ekstra hazne kapasitesi.", "Extra storage capacity for blocks."), category: .legendary),
+                PerkShopItem(id: "sculptor", name: "SCULPTOR", description: UserEnvironment.shared.localizedString("Oyun sırasında blokları döndürmeni sağlar.", "Allows rotating blocks during play."), category: .legendary),
+                PerkShopItem(id: "glass_cannon", name: "GLASS CANNON", description: UserEnvironment.shared.localizedString("Düşük canda devasa puan bonusu verir.", "Massive score boost at low health."), category: .legendary)
             ]
         case .special:
             return [
-                PerkShopItem(id: "last_stand", name: "LAST STAND", description: "Survive a lethal hit once per run.", category: .special, icon: "heart.text.square.fill"),
-                PerkShopItem(id: "recycler", name: "RECYCLER", description: "Chance to refresh tray on multi-clear.", category: .special, icon: "arrow.3.trianglepath")
+                PerkShopItem(id: "last_stand", name: "LAST STAND", description: UserEnvironment.shared.localizedString("Ölümcül bir darbeden bir kez kurtul.", "Survive a lethal hit once per run."), category: .special),
+                PerkShopItem(id: "recycler", name: "RECYCLER", description: UserEnvironment.shared.localizedString("Çoklu temizlemede hazneyi yenileme şansı.", "Chance to refresh tray on multi-clear."), category: .special)
             ]
         }
     }
@@ -375,7 +396,7 @@ struct PerkUpgradeView: View {
         .navigationBarHidden(true)
         .sheet(item: $viewModel.selectedItem) { item in
             PerkDetailSheet(item: item, viewModel: viewModel)
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.large])
         }
     }
     
@@ -390,10 +411,10 @@ struct PerkUpgradeView: View {
             Spacer()
             
             VStack(spacing: 4) {
-                Text(userEnv.localizedString("PERK MAĞAZASI", "PERK SHOP"))
+                Text(userEnv.labelPerkShopStoreCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 20))
                     .foregroundStyle(.white)
-                Text(userEnv.localizedString("META İLERLEME SİSTEMİ", "META PROGRESSION"))
+                Text(userEnv.labelMetaProgressionCaps)
                     .font(.setCustomFont(name: .InterBold, size: 10))
                     .foregroundStyle(ThemeColors.neonCyan)
                     .tracking(2)
@@ -461,6 +482,7 @@ struct PerkUpgradeView: View {
 }
 
 struct PerkShopCard: View {
+    @EnvironmentObject var userEnv: UserEnvironment
     let item: PerkShopItem
     @ObservedObject var viewModel: PerkShopViewModel
     
@@ -473,9 +495,16 @@ struct PerkShopCard: View {
             HStack(alignment: .top) {
                 ZStack {
                     Circle().fill(color.opacity(0.15)).frame(width: 50, height: 50)
-                    Image(systemName: isLocked ? "lock.fill" : item.icon)
-                        .font(.system(size: 20))
-                        .foregroundStyle(isLocked ? ThemeColors.textMuted : color)
+                    if isLocked {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(ThemeColors.textMuted)
+                    } else {
+                        Image(item.icon)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28, height: 28)
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -486,7 +515,7 @@ struct PerkShopCard: View {
                 Spacer()
                 
                 if current >= 5 {
-                    Text("MAX").font(.setCustomFont(name: .InterBlack, size: 12)).foregroundStyle(ThemeColors.electricYellow).padding(.horizontal, 10).padding(.vertical, 4).background(ThemeColors.electricYellow.opacity(0.1)).clipShape(Capsule())
+                    Text(userEnv.labelMaxCaps).font(.setCustomFont(name: .InterBlack, size: 12)).foregroundStyle(ThemeColors.electricYellow).padding(.horizontal, 10).padding(.vertical, 4).background(ThemeColors.electricYellow.opacity(0.1)).clipShape(Capsule())
                 }
             }
             
@@ -494,15 +523,21 @@ struct PerkShopCard: View {
                 tierIndicator(level: current, color: color)
             }
             
-            HStack {
+            HStack(spacing: 12) {
                 if current > 0 {
                     let effect = PerkUpgradeRegistry.effectDescription(for: PerkUpgradeID(rawValue: item.id)!, tier: current)
-                    Text(effect).font(.setCustomFont(name: .InterBold, size: 14)).foregroundStyle(color)
+                    Text(effect)
+                        .font(.setCustomFont(name: .InterBold, size: 13))
+                        .foregroundStyle(color)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                 } else if isLocked {
-                    Text("LOCKED").font(.setCustomFont(name: .InterBold, size: 12)).foregroundStyle(ThemeColors.textMuted)
+                    Text(userEnv.labelLockedCaps)
+                        .font(.setCustomFont(name: .InterBold, size: 12))
+                        .foregroundStyle(ThemeColors.textMuted)
                 }
                 
-                Spacer()
+                Spacer(minLength: 0)
                 
                 if current < 5 {
                     upgradeButton(isLocked: isLocked, nextTier: current + 1)
@@ -549,7 +584,7 @@ struct PerkShopCard: View {
                     }
                 }
                 
-                Text(isLocked ? "UNLOCK" : "UPGRADE")
+                Text(isLocked ? userEnv.btnUnlockCaps : userEnv.btnUpgradeCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 11))
                     .lineLimit(1)
                     .fixedSize()
@@ -574,6 +609,7 @@ struct PerkShopCard: View {
 }
 
 struct PerkDetailSheet: View {
+    @EnvironmentObject var userEnv: UserEnvironment
     let item: PerkShopItem
     @ObservedObject var viewModel: PerkShopViewModel
     @Environment(\.dismiss) var dismiss
@@ -587,59 +623,82 @@ struct PerkDetailSheet: View {
         ZStack {
             ThemeColors.surfaceDark.ignoresSafeArea()
             
-            VStack(spacing: 24) {
-                // Header
-                ZStack {
-                    Circle().fill(color.opacity(0.1)).frame(width: 100, height: 100)
-                    Image(systemName: item.icon).font(.system(size: 40)).foregroundStyle(color)
-                }
-                .padding(.top, 40)
-                
-                VStack(spacing: 8) {
-                    Text(item.name).font(.setCustomFont(name: .InterBlack, size: 28)).foregroundStyle(.white)
-                    Text(item.category.title).font(.setCustomFont(name: .InterBold, size: 14)).foregroundStyle(color).tracking(3)
-                }
-                
-                Text(item.description)
-                    .font(.setCustomFont(name: .InterMedium, size: 16))
-                    .foregroundStyle(ThemeColors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-                
-                if nextTier <= 5 {
-                    comparisonView(current: current, next: nextTier, color: color)
-                        .padding(.horizontal, 20)
-                }
-                
-                Spacer()
-                
-                if nextTier <= 5 {
-                    upgradeActionBlock(isLocked: isLocked, nextTier: nextTier)
-                } else {
-                    Text("MAX LEVEL REACHED")
-                        .font(.setCustomFont(name: .InterBlack, size: 16))
-                        .foregroundStyle(ThemeColors.electricYellow)
-                        .padding(.bottom, 40)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 24) {
+                    // Header
+                    ZStack {
+                        Circle().fill(color.opacity(0.1)).frame(width: 100, height: 100)
+                        Image(item.icon)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 50, height: 50)
+                    }
+                    .padding(.top, 40)
+                    
+                    VStack(spacing: 8) {
+                        Text(item.name).font(.setCustomFont(name: .InterBlack, size: 28)).foregroundStyle(.white)
+                        Text(item.category.title).font(.setCustomFont(name: .InterBold, size: 14)).foregroundStyle(color).tracking(3)
+                    }
+                    
+                    Text(item.description)
+                        .font(.setCustomFont(name: .InterMedium, size: 16))
+                        .foregroundStyle(ThemeColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 40)
+                    
+                    if nextTier <= 5 {
+                        comparisonView(current: current, next: nextTier, color: color)
+                            .padding(.horizontal, 20)
+                    }
+                    
+                    Spacer(minLength: 40)
+                    
+                    if nextTier <= 5 {
+                        upgradeActionBlock(isLocked: isLocked, nextTier: nextTier)
+                    } else {
+                        Text(userEnv.labelMaxLevelReachedCaps)
+                            .font(.setCustomFont(name: .InterBlack, size: 16))
+                            .foregroundStyle(ThemeColors.electricYellow)
+                            .padding(.bottom, 40)
+                    }
                 }
             }
         }
     }
     
     private func comparisonView(current: Int, next: Int, color: Color) -> some View {
-        HStack(spacing: 20) {
-            comparisonNode(title: "CURRENT", desc: current == 0 ? "Locked" : PerkUpgradeRegistry.effectDescription(for: PerkUpgradeID(rawValue: item.id)!, tier: current), color: ThemeColors.textMuted)
-            Image(systemName: "arrow.right").foregroundStyle(color)
-            comparisonNode(title: "NEXT", desc: PerkUpgradeRegistry.effectDescription(for: PerkUpgradeID(rawValue: item.id)!, tier: next), color: color)
+        VStack(spacing: 16) {
+            comparisonNode(title: userEnv.labelCurrentTierCaps, desc: current == 0 ? (userEnv.language == .turkish ? "Kilitli" : "Locked") : PerkUpgradeRegistry.effectDescription(for: PerkUpgradeID(rawValue: item.id)!, tier: current), color: ThemeColors.textMuted)
+            
+            Image(systemName: "arrow.down")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(color)
+            
+            comparisonNode(title: userEnv.labelNextTierCaps, desc: PerkUpgradeRegistry.effectDescription(for: PerkUpgradeID(rawValue: item.id)!, tier: next), color: color)
         }
         .padding(20)
+        .frame(maxWidth: .infinity)
         .background(Color.black.opacity(0.3))
         .clipShape(RoundedRectangle(cornerRadius: 20))
     }
     
     private func comparisonNode(title: String, desc: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Text(title).font(.setCustomFont(name: .InterBold, size: 10)).foregroundStyle(ThemeColors.textMuted)
-            Text(desc).font(.setCustomFont(name: .InterBlack, size: 14)).foregroundStyle(color)
+        VStack(spacing: 8) {
+            Text(title)
+                .font(.setCustomFont(name: .InterBold, size: 10))
+                .foregroundStyle(ThemeColors.textMuted)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.white.opacity(0.05))
+                .clipShape(Capsule())
+                
+            Text(desc)
+                .font(.setCustomFont(name: .InterBlack, size: 15))
+                .foregroundStyle(color)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
     
@@ -651,7 +710,7 @@ struct PerkDetailSheet: View {
             Button {
                 viewModel.upgrade(item)
             } label: {
-                Text(isLocked ? "UNLOCK PERK" : "UPGRADE TO TIER \(nextTier)")
+                Text(isLocked ? userEnv.btnUnlockPerkCaps : userEnv.formatUpgradeToTierCaps(tier: nextTier))
                     .font(.setCustomFont(name: .InterBlack, size: 16))
                     .foregroundStyle(.black)
                     .frame(maxWidth: .infinity)
@@ -688,6 +747,7 @@ struct PerkDetailSheet: View {
 }
 
 struct SuccessLevelUpOverlay: View {
+    @EnvironmentObject var userEnv: UserEnvironment
     @State private var scale: CGFloat = 0.5
     @State private var opacity: Double = 0
     @State private var circleScale: CGFloat = 1.0
@@ -708,11 +768,11 @@ struct SuccessLevelUpOverlay: View {
                     .foregroundStyle(ThemeColors.electricYellow)
                     .shadow(color: ThemeColors.electricYellow.opacity(0.5), radius: 20)
                 
-                Text(UserEnvironment.shared.localizedString("BAŞARILI!", "SUCCESS!"))
+                Text(userEnv.labelSuccessCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 40))
                     .foregroundStyle(.white)
                 
-                Text(UserEnvironment.shared.localizedString("PERK SEVİYESİ YÜKSELDİ", "PERK LEVEL UPGRADED"))
+                Text(userEnv.labelPerkLevelUpgradedCaps)
                     .font(.setCustomFont(name: .InterBold, size: 16))
                     .foregroundStyle(ThemeColors.textSecondary)
             }

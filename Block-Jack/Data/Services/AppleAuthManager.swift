@@ -12,6 +12,8 @@ final class AppleAuthManager: NSObject, ObservableObject {
     
     @Published var isAuthenticated: Bool = false
     @Published var userId: String? = nil
+    @Published var email: String? = nil
+    @Published var fullName: String? = nil
     
     private override init() {
         super.init()
@@ -32,6 +34,11 @@ extension AppleAuthManager: ASAuthorizationControllerDelegate {
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
             self.userId = appleIDCredential.user
+            self.email = appleIDCredential.email
+            if let nameComponents = appleIDCredential.fullName {
+                let formatter = PersonNameComponentsFormatter()
+                self.fullName = formatter.string(from: nameComponents)
+            }
             self.isAuthenticated = true
             print("Apple Sign In Success: \(appleIDCredential.user)")
         }

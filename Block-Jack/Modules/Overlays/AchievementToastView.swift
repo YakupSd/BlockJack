@@ -22,12 +22,12 @@ struct AchievementToastView: View {
             .overlay(Circle().stroke(ThemeColors.electricYellow.opacity(0.45), lineWidth: 1))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(userEnv.localizedString("BAŞARI AÇILDI!", "ACHIEVEMENT UNLOCKED!"))
+                Text(userEnv.labelAchievementUnlockedCaps)
                     .font(.setCustomFont(name: .InterExtraBold, size: 10))
                     .tracking(1.6)
                     .foregroundStyle(ThemeColors.textMuted)
 
-                Text(userEnv.localizedString(achievement.titleTR, achievement.titleEN))
+                Text(achievement.title(for: userEnv.language))
                     .font(.setCustomFont(name: .InterBlack, size: 14))
                     .foregroundStyle(.white)
                     .lineLimit(1)

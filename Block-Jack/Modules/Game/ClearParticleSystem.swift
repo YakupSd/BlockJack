@@ -43,11 +43,34 @@ enum BurstType {
 final class ClearParticleManager: ObservableObject {
     // ÖNEMLİ: @Published DEĞİL — bkz. yukarıdaki not.
     var particles: [ClearParticle] = []
+    private var displayLink: CADisplayLink?
     
-    /// Bir partikül adımı hesaplar. TimelineView'in her schedule'ında çağrılır,
-    /// view invalidate tetiklemez (SwiftUI TimelineView zaten kendi redraw'ını yapar).
+    // MARK: - Lifecycle
+    
+    private func startEngine() {
+        if displayLink == nil {
+            displayLink = CADisplayLink(target: self, selector: #selector(tick))
+            displayLink?.add(to: .main, forMode: .common)
+        }
+    }
+    
+    private func stopEngine() {
+        displayLink?.invalidate()
+        displayLink = nil
+    }
+    
+    @objc private func tick() {
+        advance()
+    }
+    
+    /// Bir partikül adımı hesaplar. CADisplayLink tarafından ana thread'de çağrılır.
+    /// SwiftUI render pass'i dışında çalıştığı için state mutation crash'ine sebep olmaz.
     func advance() {
-        guard !particles.isEmpty else { return }
+        guard !particles.isEmpty else {
+            stopEngine()
+            return
+        }
+        
         particles = particles.compactMap { p in
             var p = p
             p.x  += p.vx
@@ -70,7 +93,7 @@ final class ClearParticleManager: ObservableObject {
             let cx = CGFloat(pos.col) * step + cellSize / 2
             let cy = CGFloat(pos.row) * step + cellSize / 2
             
-            // Her hücreden 6 partiküljj      
+            // Her hücreden 6 partikül      
             for _ in 0..<6 {
                 let angle = Double.random(in: 0...(2 * .pi))
                 let speed = CGFloat.random(in: 1.5...5.0)
@@ -89,6 +112,7 @@ final class ClearParticleManager: ObservableObject {
         }
         
         particles.append(contentsOf: newParticles)
+        startEngine()
     }
     
     /// Zone (4x4/5x5) dolunca — merkez noktan büyük radyal patlama
@@ -133,6 +157,7 @@ final class ClearParticleManager: ObservableObject {
         }
         
         particles.append(contentsOf: newParticles)
+        startEngine()
     }
     
     /// Architect Overdrive 3x3 — şiddetli kırmızı-turuncu patlama
@@ -159,10 +184,16 @@ final class ClearParticleManager: ObservableObject {
         }
         
         particles.append(contentsOf: newParticles)
+        startEngine()
     }
     
     func clear() {
         particles.removeAll()
+        stopEngine()
+    }
+    
+    deinit {
+        stopEngine()
     }
 }
 
@@ -170,9 +201,8 @@ final class ClearParticleManager: ObservableObject {
 //
 // TimelineView(.animation) SwiftUI'nin render loop'una bağlanır (vsync'e yakın)
 // ve Canvas'ı her frame redraw eder — ama bu redraw sadece Canvas context'ini
-// etkiler, hiçbir observer view invalidate olmaz. ClearParticleManager
-// observer olarak view ağacına dokunmaz, sadece emit/clear'da objectWillChange
-// tetikleyebilir (nadir).
+// etkiler, hiçbir observer view invalidate olmaz.
+// Partikül state'i artık CADisplayLink ile main loop üzerinde güncelleniyor.
 
 struct ClearParticleOverlayView: View {
     @ObservedObject var manager: ClearParticleManager
@@ -180,7 +210,8 @@ struct ClearParticleOverlayView: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: false)) { _ in
             Canvas { ctx, size in
-                manager.advance()
+                // ARTIK manager.advance() BURADA ÇAĞRILMIYOR
+                // SwiftUI render pass sırasında array mutate etmek crashlere sebep olur.
                 for p in manager.particles {
                     ctx.opacity = p.alpha
                     let rect = CGRect(

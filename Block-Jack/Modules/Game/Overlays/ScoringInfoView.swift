@@ -24,58 +24,49 @@ struct ScoringInfoView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 24) {
                         // 1. Base Chips
-                        InfoSectionView(title: userEnv.localizedString("1. TABAN CHIP (YERLEŞTİRME)", "1. BASE CHIPS (THE SNAP)"), icon: "square.grid.3x3.fill", color: .white) {
-                            Text(userEnv.localizedString(
-                                "Her yerleştirilen blok; Kütle, Komşular ve Renk Gruplarına göre chip üretir. Karmaşıklık arttıkça daha fazla chip kazanırsın.",
-                                "Every placed block generates chips based on its **Mass**, **Neighbors**, and **Color Clusters**. Higher complexity = more chips."
-                            ))
+                        InfoSectionView(title: userEnv.labelBaseChipsTitle, icon: "square.grid.3x3.fill", color: .white) {
+                            Text(userEnv.labelBaseChipsDesc)
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             
                             HStack(spacing: 12) {
-                                MiniStatView(label: userEnv.localizedString("KÜTLE", "MASS"), value: "x25", color: ThemeColors.neonCyan)
-                                MiniStatView(label: userEnv.localizedString("KOMŞU", "NEIGHBOR"), value: "x12", color: ThemeColors.electricYellow)
-                                MiniStatView(label: userEnv.localizedString("GRUP", "CLUSTER"), value: "x8", color: ThemeColors.neonPink)
+                                MiniStatView(label: userEnv.labelMass, value: "x25", color: ThemeColors.neonCyan)
+                                MiniStatView(label: userEnv.labelNeighbor, value: "x12", color: ThemeColors.electricYellow)
+                                MiniStatView(label: userEnv.labelCluster, value: "x8", color: ThemeColors.neonPink)
                             }
                         }
                         
                         // 2. Color Values
-                        InfoSectionView(title: userEnv.localizedString("2. RENK ÇARPANLARI", "2. COLOR MULTIPLIERS"), icon: "paintpalette.fill", color: ThemeColors.neonPurple) {
-                            Text(userEnv.localizedString(
-                                "Yüksek değerli renklerle satır temizleyerek çarpanını yükselt. Ortalama renk değeri toplam çarpanına eklenir.",
-                                "Clear lines with high-value colors to boost your multiplier. The average color value is added to your total mult."
-                            ))
+                        InfoSectionView(title: userEnv.labelColorMultipliersTitle, icon: "paintpalette.fill", color: ThemeColors.neonPurple) {
+                            Text(userEnv.labelColorMultipliersDesc)
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             
                             VStack(spacing: 8) {
-                                ColorRowView(colorName: userEnv.localizedString("MOR (PURPLE)", "PURPLE"), value: "+1.5x", color: ThemeColors.blockPurple)
-                                ColorRowView(colorName: userEnv.localizedString("SARI (YELLOW)", "YELLOW"), value: "+1.2x", color: ThemeColors.blockYellow)
-                                ColorRowView(colorName: userEnv.localizedString("KIRMIZI (RED)", "RED"), value: "+1.0x", color: ThemeColors.blockRed)
-                                ColorRowView(colorName: userEnv.localizedString("YEŞİL (GREEN)", "GREEN"), value: "+0.7x", color: ThemeColors.blockGreen)
-                                ColorRowView(colorName: userEnv.localizedString("MAVİ (BLUE)", "BLUE"), value: "+0.5x", color: ThemeColors.blockBlue)
+                                ColorRowView(colorName: userEnv.labelColorPurple, value: "+1.5x", color: ThemeColors.blockPurple)
+                                ColorRowView(colorName: userEnv.labelColorYellow, value: "+1.2x", color: ThemeColors.blockYellow)
+                                ColorRowView(colorName: userEnv.labelColorRed, value: "+1.0x", color: ThemeColors.blockRed)
+                                ColorRowView(colorName: userEnv.labelColorGreen, value: "+0.7x", color: ThemeColors.blockGreen)
+                                ColorRowView(colorName: userEnv.labelColorBlue, value: "+0.5x", color: ThemeColors.blockBlue)
                             }
                         }
                         
                         // 3. Patterns & Combos
-                        InfoSectionView(title: userEnv.localizedString("3. PATERNLER & KOMBOLAR", "3. PATTERNS & COMBOS"), icon: "bolt.fill", color: ThemeColors.electricYellow) {
+                        InfoSectionView(title: userEnv.labelPatternsTitle, icon: "bolt.fill", color: ThemeColors.electricYellow) {
                             Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 10) {
-                                PatternRow(name: userEnv.localizedString("Mixed (Karışık)", "Mixed"), value: "+2.5")
-                                PatternRow(name: userEnv.localizedString("Duo-Tone (2 Renk)", "Duo-Tone"), value: "+5.0")
-                                PatternRow(name: userEnv.localizedString("Flush (Tek Renk)", "Flush"), value: "+16.0")
-                                PatternRow(name: userEnv.localizedString("Super Flush (2+ Flush)", "Super Flush"), value: "+40.0")
+                                PatternRow(name: userEnv.labelPatternMixed, value: "+2.5")
+                                PatternRow(name: userEnv.labelPatternDuoTone, value: "+5.0")
+                                PatternRow(name: userEnv.labelPatternFlush, value: "+16.0")
+                                PatternRow(name: userEnv.labelPatternSuperFlush, value: "+40.0")
                                 Divider().background(Color.gray.opacity(0.3))
-                                PatternRow(name: userEnv.localizedString("2'li Kombo", "2-Line Combo"), value: "+6.0")
-                                PatternRow(name: userEnv.localizedString("4'lü (QUAD) Kombo", "4-Line (QUAD)"), value: "+24.0")
+                                PatternRow(name: userEnv.labelPattern2LineCombo, value: "+6.0")
+                                PatternRow(name: userEnv.labelPattern4LineCombo, value: "+24.0")
                             }
                         }
                         
                         // 4. Streak
-                        InfoSectionView(title: userEnv.localizedString("4. SERİ (STREAK)", "4. THE STREAK"), icon: "flame.fill", color: ThemeColors.neonOrange) {
-                            Text(userEnv.localizedString(
-                                "Serini koruyarak her şeyi katla! Bonus başlangıçta doğrusal artar, denge için **3.8x**'te limitlenir.",
-                                "Maintain your streak to multiply everything! The bonus grows linearly at first, then caps at **3.8x** to keep things balanced."
-                            ))
+                        InfoSectionView(title: userEnv.labelStreakTitle, icon: "flame.fill", color: ThemeColors.neonOrange) {
+                            Text(userEnv.labelStreakDesc)
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             
@@ -94,12 +85,12 @@ struct ScoringInfoView: View {
                         }
                         
                         // 5. Estimated Scores
-                        InfoSectionView(title: userEnv.localizedString("HEDEFLER & TAHMİNLER", "GOALS & MILESTONES"), icon: "target", color: ThemeColors.neonCyan) {
+                        InfoSectionView(title: userEnv.labelGoalsTitle, icon: "target", color: ThemeColors.neonCyan) {
                             VStack(spacing: 12) {
-                                EstimateRow(move: userEnv.localizedString("Tek Karışık Satır", "Single Mixed Line"), score: "700 - 900")
-                                EstimateRow(move: userEnv.localizedString("2'li Duo-Tone Kombo", "2-Line Duo-Tone"), score: "3,000 - 5,000")
-                                EstimateRow(move: userEnv.localizedString("Tek Mor Flush", "Single Flush (Purple)"), score: "8,000 - 12,000")
-                                EstimateRow(move: userEnv.localizedString("4x4 Alan Temizliği", "4x4 Zone Flush"), score: "50,000+")
+                                EstimateRow(move: userEnv.labelGoalSingleMixedLine, score: "700 - 900")
+                                EstimateRow(move: userEnv.labelGoal2LineDuoTone, score: "3,000 - 5,000")
+                                EstimateRow(move: userEnv.labelGoalSinglePurpleFlush, score: "8,000 - 12,000")
+                                EstimateRow(move: userEnv.labelGoalZoneFlush, score: "50,000+")
                             }
                         }
                         
@@ -114,10 +105,10 @@ struct ScoringInfoView: View {
     private var headerView: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(userEnv.localizedString("PUAN SİSTEMİ", "SCORING SYSTEM"))
+                Text(userEnv.labelScoringSystem)
                     .font(.system(size: 24, weight: .black, design: .monospaced))
                     .foregroundColor(ThemeColors.neonCyan)
-                Text(userEnv.localizedString("Matematikte ustalaş, tahtaya hükmet.", "Master the math, dominate the board."))
+                Text(userEnv.labelScoringSystemDesc)
                     .font(.caption)
                     .foregroundColor(.gray)
             }
@@ -238,7 +229,7 @@ struct EstimateRow: View {
             Text(move).font(.caption).foregroundColor(.gray)
             Spacer()
             Text(score).font(.caption.bold()).foregroundColor(ThemeColors.neonCyan)
-            Text(userEnv.localizedString("puan", "pts")).font(.system(size: 8)).foregroundColor(.gray)
+            Text(userEnv.labelPts).font(.system(size: 8)).foregroundColor(.gray)
         }
     }
 }

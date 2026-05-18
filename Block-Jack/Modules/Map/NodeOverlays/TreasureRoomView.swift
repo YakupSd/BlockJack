@@ -62,7 +62,7 @@ struct TreasureRoomView: View {
         
         // Havuz: Sadece slot'ta seviyesi en az 1 olan (unlocked) perkler.
         // Mevcut perkleri de dahil et (seviye atlamak için), ama tier 3+ olanları ele.
-        let pool = PerkEngine.getPerkPool(lang: userEnv.language).filter { perk in
+        let pool = PerkEngine.getPerkPool(lang: userEnv.language, perkLevels: slot.perkLevels).filter { perk in
             let metaLevel = slot.perkLevels[perk.id] ?? 0
             let currentRunTier = slot.activePassivePerks.first(where: { $0.id == perk.id })?.tier ?? 0
             return metaLevel >= 1 && currentRunTier < 3
@@ -75,13 +75,13 @@ struct TreasureRoomView: View {
     private var headerSection: some View {
         VStack(spacing: 10) {
             OverlayTitleBlock(
-                "HAZİNE ODASI",
+                userEnv.labelTreasureVaultCaps,
                 subtitle: treasureOpened
-                    ? "Bir hediye seç!"
-                    : "Karanlık bir köşede eski bir sandık duruyor...",
+                    ? userEnv.labelChooseReward
+                    : userEnv.labelOldChestSitting,
                 color: ThemeColors.neonGreen
             )
-            Text(userEnv.localizedString("SLOT \(slotId)", "SLOT \(slotId)"))
+            Text("\(userEnv.labelSlotCaps) \(slotId)")
                 .font(.setCustomFont(name: .InterBold, size: 10))
                 .tracking(2)
                 .foregroundStyle(ThemeColors.textMuted)
@@ -120,7 +120,7 @@ struct TreasureRoomView: View {
                     .easeInOut(duration: 2).repeatForever(autoreverses: true)
                 }
 
-                Text(userEnv.localizedString("SANDIĞI AÇ", "OPEN CHEST"))
+                Text(userEnv.btnOpenChestCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 18))
                     .foregroundColor(ThemeColors.cosmicBlack)
                     .padding(.horizontal, 30)
@@ -136,7 +136,7 @@ struct TreasureRoomView: View {
     private var perkOptionsSection: some View {
         VStack(spacing: 14) {
             if options.isEmpty {
-                Text(userEnv.localizedString("Tüm açık özel güçleri topladın!", "You've collected all unlocked powers!"))
+                Text(userEnv.labelCollectedAllPowers)
                     .font(.headline)
                     .foregroundColor(ThemeColors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -169,13 +169,13 @@ struct TreasureRoomView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(isOwned ? "LEVEL UP: \(perk.name)" : perk.name)
+                                Text(isOwned ? userEnv.formatPerkLevelUp(name: perk.name) : perk.name)
                                     .font(.headline)
                                     .foregroundColor(.white)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.75)
                                 Text(isOwned 
-                                     ? userEnv.localizedString("L\(currentTier) -> L\(currentTier + 1) seviyesine yükselt.", "Upgrade from L\(currentTier) to L\(currentTier + 1).")
+                                     ? userEnv.formatPerkUpgrade(from: currentTier, to: currentTier + 1)
                                      : perk.desc)
                                     .font(.caption)
                                     .foregroundColor(ThemeColors.textSecondary)
@@ -217,7 +217,7 @@ struct TreasureRoomView: View {
                     .shadow(color: ThemeColors.neonGreen, radius: 20)
             }
 
-            Text("\(selectedPerk?.name ?? "") Elde Edildi!")
+            Text(userEnv.formatPerkClaimed(name: selectedPerk?.name ?? ""))
                 .font(.title2.weight(.bold))
                 .foregroundColor(.white)
                 .lineLimit(2)
@@ -233,7 +233,7 @@ struct TreasureRoomView: View {
             NotificationCenter.default.post(name: NSNotification.Name("mapOverlayDidDismiss"), object: nil)
             dismiss()
         }) {
-            Text(selectedPerk != nil ? "DEVAM ET" : "ATLA")
+            Text(selectedPerk != nil ? userEnv.btnContinue : userEnv.btnSkipCaps)
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)

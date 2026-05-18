@@ -100,7 +100,7 @@ struct CollectionMainView: View {
             
             Spacer()
             
-            Text(userEnv.localizedString("KOLEKSİYON", "COLLECTION"))
+            Text(userEnv.labelCollectionCaps)
                 .font(.setCustomFont(name: .InterBlack, size: 22))
                 .foregroundStyle(ThemeColors.electricYellow)
                 .tracking(2)
@@ -116,7 +116,7 @@ struct CollectionMainView: View {
                 Text("\(percent)%")
                     .font(.setCustomFont(name: .InterBold, size: 16))
                     .foregroundStyle(ThemeColors.neonCyan)
-                Text(userEnv.localizedString("TAMAMLANDI", "COMPLETED"))
+                Text(userEnv.labelCompletedCaps)
                     .font(.setCustomFont(name: .InterMedium, size: 8))
                     .foregroundStyle(ThemeColors.textMuted)
             }
@@ -234,7 +234,7 @@ struct CollectionMainView: View {
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(isDiscovered ? ThemeColors.neonPink : ThemeColors.gridStroke, lineWidth: 1))
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(isDiscovered ? boss.name : "GİZLİ VERİ")
+                        Text(isDiscovered ? boss.name : userEnv.labelClassifiedData)
                             .font(.setCustomFont(name: .InterBlack, size: 18))
                             .foregroundStyle(isDiscovered ? ThemeColors.neonPink : ThemeColors.textMuted)
                         
@@ -278,72 +278,59 @@ struct CollectionMainView: View {
     private var loreTab: some View {
         VStack(alignment: .leading, spacing: 18) {
             loreSectionTitle(
-                titleTR: "DÜNYA KAYITLARI",
-                titleEN: "WORLD LOGS",
-                subtitleTR: "Dünyaların kısa giriş metinleri.",
-                subtitleEN: "Short introductions for each world."
+                title: userEnv.labelWorldLogsCaps,
+                subtitle: userEnv.labelWorldLogsDesc
             )
 
             ForEach(1...5, id: \.self) { world in
                 if let w = LoreEngine.worldLore(for: world) {
                     loreCard(
-                        titleTR: w.titleTR,
-                        titleEN: w.titleEN,
-                        bodyTR: w.bodyTR,
-                        bodyEN: w.bodyEN,
+                        title: w.title(for: userEnv.language),
+                        body: w.body(for: userEnv.language),
                         isUnlocked: userEnv.unlockedWorldLevel >= (world - 1) * 20 + 1,
-                        lockHintTR: "Bu dünya henüz kilitli.",
-                        lockHintEN: "This world is still locked."
+                        lockHint: userEnv.labelWorldLockedHint
                     )
                 }
             }
 
             loreSectionTitle(
-                titleTR: "BOSS DOSYALARI",
-                titleEN: "BOSS FILES",
-                subtitleTR: "Keşfettikçe biyografiler açılır (spoiler yok).",
-                subtitleEN: "Bios unlock as you discover them (spoiler-free)."
+                title: userEnv.labelBossFilesCaps,
+                subtitle: userEnv.labelBossFilesDesc
             )
 
             ForEach(BossRegistry.shared.bossesSnapshot) { boss in
                 let unlocked = userEnv.discoveredBossIDs.contains(boss.id)
                 let lore = LoreEngine.bossLore(for: boss.id)
                 loreCard(
-                    titleTR: lore?.titleTR ?? "GİZLİ DOSYA",
-                    titleEN: lore?.titleEN ?? "REDACTED FILE",
-                    bodyTR: lore?.bodyTR ?? "Bu boss ile karşılaşınca dosya açılacak.",
-                    bodyEN: lore?.bodyEN ?? "Defeat this boss to unlock the file.",
+                    title: lore?.title(for: userEnv.language) ?? userEnv.labelRedactedFile,
+                    body: lore?.body(for: userEnv.language) ?? userEnv.labelUnlockFileHint,
                     isUnlocked: unlocked,
-                    lockHintTR: BossRegistry.shared.levelRangeLabel(for: boss.id),
-                    lockHintEN: BossRegistry.shared.levelRangeLabel(for: boss.id)
+                    lockHint: BossRegistry.shared.levelRangeLabel(for: boss.id)
                 )
             }
         }
     }
 
-    private func loreSectionTitle(titleTR: String, titleEN: String, subtitleTR: String, subtitleEN: String) -> some View {
+    private func loreSectionTitle(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(userEnv.localizedString(titleTR, titleEN))
+            Text(title)
                 .font(.setCustomFont(name: .InterBlack, size: 16))
                 .foregroundStyle(.white)
-            Text(userEnv.localizedString(subtitleTR, subtitleEN))
+            Text(subtitle)
                 .font(.setCustomFont(name: .InterMedium, size: 12))
                 .foregroundStyle(ThemeColors.textSecondary)
         }
     }
 
     private func loreCard(
-        titleTR: String,
-        titleEN: String,
-        bodyTR: String,
-        bodyEN: String,
+        title: String,
+        body: String,
         isUnlocked: Bool,
-        lockHintTR: String,
-        lockHintEN: String
+        lockHint: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(userEnv.localizedString(titleTR, titleEN))
+                Text(title)
                     .font(.setCustomFont(name: .InterBlack, size: 14))
                     .foregroundStyle(isUnlocked ? ThemeColors.electricYellow : ThemeColors.textMuted)
                     .lineLimit(1)
@@ -353,7 +340,7 @@ struct CollectionMainView: View {
                     Image(systemName: "lock.open.fill")
                         .foregroundStyle(ThemeColors.neonCyan)
                 } else {
-                    Text(userEnv.localizedString(lockHintTR, lockHintEN))
+                    Text(lockHint)
                         .font(.setCustomFont(name: .InterBold, size: 10))
                         .foregroundStyle(ThemeColors.textMuted)
                         .padding(.horizontal, 8)
@@ -363,14 +350,11 @@ struct CollectionMainView: View {
                 }
             }
 
-            Text(userEnv.localizedString(
-                isUnlocked ? bodyTR : "???",
-                isUnlocked ? bodyEN : "???"
-            ))
-            .font(.setCustomFont(name: .InterMedium, size: 12))
-            .foregroundStyle(isUnlocked ? ThemeColors.textSecondary : ThemeColors.textMuted)
-            .lineLimit(nil)
-            .fixedSize(horizontal: false, vertical: true)
+            Text(isUnlocked ? body : "???")
+                .font(.setCustomFont(name: .InterMedium, size: 12))
+                .foregroundStyle(isUnlocked ? ThemeColors.textSecondary : ThemeColors.textMuted)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
         .background(Color.white.opacity(0.05))
@@ -383,12 +367,12 @@ struct CollectionMainView: View {
     
     private var statsTab: some View {
         VStack(spacing: 16) {
-            StatRow(title: userEnv.localizedString("En Yüksek Skor", "High Score"), value: "\(userEnv.highScore.formatted())", icon: "crown.fill", color: ThemeColors.electricYellow)
-            StatRow(title: userEnv.localizedString("Toplam Altın Kazancı", "Total Gold Earned"), value: "\(userEnv.totalGoldEarned.formatted())", icon: "dollarsign.circle.fill", color: ThemeColors.electricYellow)
-            StatRow(title: userEnv.localizedString("Temizlenen Satırlar", "Lines Cleared"), value: "\(userEnv.totalLinesCleared.formatted())", icon: "trapezoid.and.line.horizontal", color: ThemeColors.neonCyan)
-            StatRow(title: userEnv.localizedString("Yenilen Bosslar", "Bosses Defeated"), value: "\(userEnv.totalBossesDefeated.formatted())", icon: "shield.fill", color: ThemeColors.neonPink)
-            StatRow(title: userEnv.localizedString("Keşfedilen Perkler", "Perks Discovered"), value: "\(userEnv.discoveredPerkIDs.count) / \(PerkEngine.getPerkPool(lang: userEnv.language).count)", icon: "sparkles", color: ThemeColors.neonPurple)
-            StatRow(title: userEnv.localizedString("Giriş Serisi", "Login Streak"), value: "\(userEnv.dailyStreak) \(userEnv.localizedString("gün", "days"))", icon: "calendar.badge.checkmark", color: ThemeColors.neonCyan)
+            StatRow(title: userEnv.labelHighScore, value: "\(userEnv.highScore.formatted())", icon: "crown.fill", color: ThemeColors.electricYellow)
+            StatRow(title: userEnv.labelTotalGoldEarned, value: "\(userEnv.totalGoldEarned.formatted())", icon: "dollarsign.circle.fill", color: ThemeColors.electricYellow)
+            StatRow(title: userEnv.labelLinesCleared, value: "\(userEnv.totalLinesCleared.formatted())", icon: "trapezoid.and.line.horizontal", color: ThemeColors.neonCyan)
+            StatRow(title: userEnv.labelBossesDefeated, value: "\(userEnv.totalBossesDefeated.formatted())", icon: "shield.fill", color: ThemeColors.neonPink)
+            StatRow(title: userEnv.labelPerksDiscovered, value: "\(userEnv.discoveredPerkIDs.count) / \(PerkEngine.getPerkPool(lang: userEnv.language).count)", icon: "sparkles", color: ThemeColors.neonPurple)
+            StatRow(title: userEnv.labelLoginStreak, value: "\(userEnv.dailyStreak) \(userEnv.labelDaysSuffix)", icon: "calendar.badge.checkmark", color: ThemeColors.neonCyan)
         }
     }
 
@@ -397,10 +381,10 @@ struct CollectionMainView: View {
     private var questsTab: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(userEnv.localizedString("KARAKTER GÖREVLERİ", "CHARACTER QUESTS"))
+                Text(userEnv.labelCharacterQuestsCaps)
                     .font(.setCustomFont(name: .InterBlack, size: 18))
                     .foregroundStyle(.white)
-                Text(userEnv.localizedString("Her karakter için 7 günlük zincir. Her karakter günde 1 adım ilerler.", "A 7-day chain per character. Each character advances 1 step per day."))
+                Text(userEnv.labelCharacterQuestsDesc)
                     .font(.setCustomFont(name: .InterMedium, size: 12))
                     .foregroundStyle(ThemeColors.textSecondary)
             }
@@ -431,7 +415,7 @@ struct CollectionMainView: View {
                     Text(char.name)
                         .font(.setCustomFont(name: .InterBlack, size: 14))
                         .foregroundStyle(.white)
-                    Text(userEnv.localizedString("GÜN \(day)/7", "DAY \(day)/7"))
+                    Text(userEnv.labelQuestDayTemplate.replacingOccurrences(of: "{{day}}", with: "\(day)"))
                         .font(.setCustomFont(name: .InterBold, size: 10))
                         .foregroundStyle(ThemeColors.neonCyan)
                         .tracking(1.2)
@@ -440,7 +424,7 @@ struct CollectionMainView: View {
                 Spacer()
 
                 if isLocked {
-                    Text(userEnv.localizedString("YARIN", "TOMORROW"))
+                    Text(userEnv.labelTomorrowCaps)
                         .font(.setCustomFont(name: .InterBlack, size: 10))
                         .foregroundStyle(ThemeColors.cosmicBlack)
                         .padding(.horizontal, 10)
@@ -451,11 +435,11 @@ struct CollectionMainView: View {
             }
 
             if let quest {
-                Text(userEnv.localizedString(quest.titleTR, quest.titleEN))
+                Text(quest.title(for: userEnv.language))
                     .font(.setCustomFont(name: .InterExtraBold, size: 14))
                     .foregroundStyle(.white)
 
-                Text(userEnv.localizedString(quest.descTR, quest.descEN))
+                Text(quest.desc(for: userEnv.language))
                     .font(.setCustomFont(name: .InterMedium, size: 12))
                     .foregroundStyle(ThemeColors.textSecondary)
 
@@ -467,7 +451,7 @@ struct CollectionMainView: View {
                             .font(.setCustomFont(name: .InterBold, size: 11))
                             .foregroundStyle(ThemeColors.neonCyan)
                         Spacer()
-                        Text(userEnv.localizedString("ÖDÜL", "REWARD"))
+                        Text(userEnv.labelRewardCaps)
                             .font(.setCustomFont(name: .InterBold, size: 10))
                             .foregroundStyle(ThemeColors.textMuted)
                         Text("\(quest.rewardGold)🪙  \(quest.rewardDiamonds)💎")
@@ -488,7 +472,7 @@ struct CollectionMainView: View {
                 }
                 .opacity(isLocked ? 0.55 : 1.0)
             } else {
-                Text(userEnv.localizedString("Görev bulunamadı.", "Quest not found."))
+                Text(userEnv.labelQuestNotFound)
                     .font(.setCustomFont(name: .InterMedium, size: 12))
                     .foregroundStyle(ThemeColors.textSecondary)
             }
@@ -535,7 +519,7 @@ struct CollectionMainView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(userEnv.localizedString(ach.titleTR, ach.titleEN))
+                    Text(ach.title(for: userEnv.language))
                         .font(.setCustomFont(name: .InterBold, size: 14))
                         .foregroundStyle(isUnlocked ? .white : ThemeColors.textSecondary)
                     Spacer()
@@ -545,7 +529,7 @@ struct CollectionMainView: View {
                             .font(.system(size: 14))
                     }
                 }
-                Text(userEnv.localizedString(ach.descTR, ach.descEN))
+                Text(ach.desc(for: userEnv.language))
                     .font(.setCustomFont(name: .InterMedium, size: 11))
                     .foregroundStyle(ThemeColors.textMuted)
                     .lineLimit(2)
@@ -592,25 +576,10 @@ struct CollectionMainView: View {
     // MARK: - Phase 8: Leaderboard Tab
 
     private var leaderboardTab: some View {
-        VStack(spacing: 14) {
-            if userEnv.topScores.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "list.number")
-                        .font(.system(size: 40))
-                        .foregroundStyle(ThemeColors.textMuted)
-                    Text(userEnv.localizedString("Henüz bir sefer tamamlamadın.", "No completed runs yet."))
-                        .font(.setCustomFont(name: .InterMedium, size: 13))
-                        .foregroundStyle(ThemeColors.textMuted)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.vertical, 40)
-            } else {
-                ForEach(Array(userEnv.topScores.enumerated()), id: \.element.id) { pair in
-                    leaderboardRow(rank: pair.offset + 1, entry: pair.element)
-                }
-            }
-        }
+        LeaderboardTabContent()
+            .environmentObject(userEnv)
     }
+
 
     @ViewBuilder
     private func leaderboardRow(rank: Int, entry: LocalScoreEntry) -> some View {
@@ -632,7 +601,7 @@ struct CollectionMainView: View {
                     .font(.setCustomFont(name: .InterBlack, size: 20))
                     .foregroundStyle(.white)
                 HStack(spacing: 8) {
-                    Label(userEnv.localizedString("Dünya \(entry.worldLevelReached)", "World \(entry.worldLevelReached)"), systemImage: "map.fill")
+                    Label(userEnv.labelWorldLevelTemplate.replacingOccurrences(of: "{{value}}", with: "\(entry.worldLevelReached)"), systemImage: "map.fill")
                         .font(.setCustomFont(name: .InterMedium, size: 10))
                         .foregroundStyle(ThemeColors.neonPurple)
                     Text(formatter.string(from: date))

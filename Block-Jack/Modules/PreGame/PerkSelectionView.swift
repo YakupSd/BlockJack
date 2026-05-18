@@ -42,7 +42,7 @@ struct PerkSelectionView: View {
                             .clipShape(Circle())
                     }
                     Spacer()
-                    Text(userEnv.localizedString("ÖZEL GÜÇ", "STARTING PERK"))
+                    Text(userEnv.labelStartingPerkCaps)
                         .font(.setCustomFont(name: .InterBlack, size: 20))
                         .foregroundStyle(ThemeColors.electricYellow)
                         .tracking(2)
@@ -64,10 +64,7 @@ struct PerkSelectionView: View {
                         if lockedCount > 0 {
                             HStack(spacing: 8) {
                                 Image(systemName: "lock.fill")
-                                Text(userEnv.localizedString(
-                                    "\(lockedCount) perk kilitli — Perk Dükkanı’ndan aç",
-                                    "\(lockedCount) perks locked — unlock in Perk Shop"
-                                ))
+                                Text(userEnv.formatPerksLockedDesc(count: lockedCount))
                                 .font(.setCustomFont(name: .InterMedium, size: 12))
                             }
                             .foregroundStyle(ThemeColors.textMuted)
@@ -114,7 +111,7 @@ struct PerkSelectionView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "play.fill")
                             .font(.system(size: 20, weight: .black))
-                        Text(userEnv.localizedString("OYUNA BAŞLA", "START RUN"))
+                        Text(userEnv.btnStartRunCaps)
                             .font(.setCustomFont(name: .InterExtraBold, size: 22))
                             .tracking(2)
                     }
@@ -162,11 +159,11 @@ struct PerkSelectionView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(userEnv.localizedString(perk.nameTR, perk.nameEN))
+                    Text(perk.displayName(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterBold, size: 16))
                         .foregroundStyle(isSelected ? ThemeColors.electricYellow : .white)
                     
-                    Text(userEnv.localizedString(perk.descTR, perk.descEN))
+                    Text(perk.displayDesc(lang: userEnv.language))
                         .font(.setCustomFont(name: .InterMedium, size: 12))
                         .foregroundStyle(ThemeColors.textSecondary)
                         .multilineTextAlignment(.leading)
@@ -176,7 +173,7 @@ struct PerkSelectionView: View {
                        let partnerName = PerkEngine.getPerkPool(lang: userEnv.language).first(where: { $0.id == partnerId })?.name {
                         HStack(spacing: 4) {
                             Image(systemName: "link")
-                            Text(userEnv.localizedString("Sinerji: \(partnerName)", "Synergy: \(partnerName)"))
+                            Text(userEnv.formatSynergyHint(partnerName: partnerName))
                         }
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(ThemeColors.neonPurple)
