@@ -100,19 +100,27 @@ class MerchantViewModel: ObservableObject {
         guard canForge() else { return }
         
         // 2 perk'i sil
-        for perk in forgeSelection {
+        let deletedPerks = forgeSelection
+        for perk in deletedPerks {
             SaveManager.shared.removePassivePerk(slotId: slotId, perkId: perk.id)
         }
         
-        // Yeni bir rastgele (belki daha güçlü) perk ver
+        // Yeni bir rastgele perk ver
         // Sadece açık olan ve seçilenler HARİCİ aktif olmayan perkler
         let perkLevels = currentSlot?.perkLevels ?? [:]
         let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
         let activeIds = currentSlot?.activePassivePerks.map { $0.id } ?? []
-        let selectionIds = forgeSelection.map { $0.id }
+        let selectionIds = deletedPerks.map { $0.id }
         
-        let forgePool = PerkEngine.getPerkPool(lang: lang, perkLevels: perkLevels).filter { perk in
+        var forgePool = PerkEngine.getPerkPool(lang: lang, perkLevels: perkLevels).filter { perk in
             unlockedIds.contains(perk.id) && !activeIds.contains(perk.id) && !selectionIds.contains(perk.id)
+        }
+        
+        // Fallback: Eğer seçilmemiş diğer açık pasif perk kalmadıysa, feda edilen 2 perkten birini rastgele geri ver
+        if forgePool.isEmpty {
+            forgePool = PerkEngine.getPerkPool(lang: lang, perkLevels: perkLevels).filter { perk in
+                unlockedIds.contains(perk.id) && !activeIds.contains(perk.id)
+            }
         }
         
         if let newPerk = forgePool.randomElement() {
