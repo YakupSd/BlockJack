@@ -9,6 +9,7 @@ struct MerchantView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var userEnv: UserEnvironment
     @StateObject private var viewModel: MerchantViewModel
+    @State private var showFallbackWarningAlert = false
     
     let slotId: Int
     
@@ -142,6 +143,20 @@ struct MerchantView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: viewModel.forgedPerkResult != nil)
+        .alert(isPresented: $showFallbackWarningAlert) {
+            Alert(
+                title: Text(userEnv.localizedString("UYARI", "WARNING")),
+                message: Text(userEnv.localizedString(
+                    "Havuzunda açık olan başka aktif olmayan perk kalmadı! Eğer birleştirme yaparsan, seçtiğin 2 perki feda edip bunlardan yalnızca birini geri kazanacaksın. Devam etmek istiyor musun?",
+                    "No other unlocked perks are available in your pool! If you forge, you will sacrifice these 2 perks and only get one of them back. Do you want to proceed?"
+                )),
+                primaryButton: .destructive(Text(userEnv.localizedString("Evet, Birleştir", "Yes, Forge"))) {
+                    viewModel.forge()
+                    HapticManager.shared.play(.success)
+                },
+                secondaryButton: .cancel(Text(userEnv.localizedString("Vazgeç", "Cancel")))
+            )
+        }
     }
     
     // MARK: - Components
@@ -245,8 +260,12 @@ struct MerchantView: View {
                 
                 // Forge Button
                 Button(action: {
-                    viewModel.forge()
-                    HapticManager.shared.play(.success)
+                    if viewModel.willTriggerFallback() {
+                        showFallbackWarningAlert = true
+                    } else {
+                        viewModel.forge()
+                        HapticManager.shared.play(.success)
+                    }
                 }) {
                     HStack {
                         Image(systemName: "hammer.fill")

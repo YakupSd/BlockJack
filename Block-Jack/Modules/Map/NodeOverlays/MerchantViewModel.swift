@@ -97,6 +97,21 @@ class MerchantViewModel: ObservableObject {
         return forgeSelection.count == 2
     }
     
+    func willTriggerFallback() -> Bool {
+        guard canForge() else { return false }
+        
+        let perkLevels = currentSlot?.perkLevels ?? [:]
+        let unlockedIds = Set(perkLevels.filter { $0.value >= 1 }.map { $0.key })
+        let activeIds = currentSlot?.activePassivePerks.map { $0.id } ?? []
+        let selectionIds = forgeSelection.map { $0.id }
+        
+        let forgePool = PerkEngine.getPerkPool(lang: lang, perkLevels: perkLevels).filter { perk in
+            unlockedIds.contains(perk.id) && !activeIds.contains(perk.id) && !selectionIds.contains(perk.id)
+        }
+        
+        return forgePool.isEmpty
+    }
+    
     func forge() {
         guard canForge() else { return }
         
