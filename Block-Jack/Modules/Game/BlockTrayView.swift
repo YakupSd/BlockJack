@@ -64,7 +64,8 @@ struct BlockTrayView: View {
                 ForEach(vm.blockTray) { block in
                     traySlot(block: block, size: slotSize)
                 }
-                ForEach(vm.blockTray.count..<totalSlots, id: \.self) { _ in
+                let emptyCount = max(0, totalSlots - vm.blockTray.count)
+                ForEach(0..<emptyCount, id: \.self) { _ in
                     emptySlot(size: slotSize)
                 }
             }
