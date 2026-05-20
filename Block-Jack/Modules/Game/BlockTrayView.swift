@@ -159,7 +159,6 @@ struct BlockTrayView: View {
     private func traySlot(block: GameBlock, size: CGFloat) -> some View {
         let tileSize: CGFloat = max(9, min(14, (size - 24) / 5))
         let isActive = vm.draggingBlock?.id == block.id
-        @State var showActions = false
         
         ZStack(alignment: .topTrailing) {
             if block.isSpecial {
@@ -202,40 +201,29 @@ struct BlockTrayView: View {
                         .padding(.bottom, 3)
                 }
             }
-            
-            // Action menu button
-            VStack(spacing: 0) {
-                Menu {
-                    Section("BLOK İŞLEMLERİ") {
-                        Button(role: .destructive) {
-                            HapticManager.shared.play(.buttonTap)
-                            vm.discardBlockFromTray(blockId: block.id)
-                        } label: {
-                            Label("Çöpe At (25G)", systemImage: "trash.fill")
-                        }
-                        
-                        Button {
-                            HapticManager.shared.play(.buttonTap)
-                            vm.rerollBlockInTray(blockId: block.id)
-                        } label: {
-                            Label("Yenile (50G)", systemImage: "arrow.2.squarepath")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(ThemeColors.neonOrange)
-                        .padding(3)
-                        .background(Circle().fill(ThemeColors.hudBg))
-                }
-            }
-            .offset(x: -2, y: 2)
         }
         .frame(width: size, height: size)
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                 vm.rotateBlockInTray(id: block.id)
+            }
+        }
+        .contextMenu {
+            Section("BLOK İŞLEMLERİ") {
+                Button(role: .destructive, action: {
+                    HapticManager.shared.play(.buttonTap)
+                    vm.discardBlockFromTray(blockId: block.id)
+                }) {
+                    Label("Çöpe At (25G)", systemImage: "trash.fill")
+                }
+                
+                Button(action: {
+                    HapticManager.shared.play(.buttonTap)
+                    vm.rerollBlockInTray(blockId: block.id)
+                }) {
+                    Label("Yenile (50G)", systemImage: "arrow.2.squarepath")
+                }
             }
         }
         .gesture(

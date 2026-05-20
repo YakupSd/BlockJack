@@ -197,7 +197,7 @@ struct MapView: View {
             
             VStack(spacing: 24) {
                 // Header of Panel
-                HStack(spacing: 16) {
+                HStack(alignment: .top, spacing: 16) {
                     ZStack {
                         Circle()
                             .fill(colorForNodeType(node.type).opacity(0.1))
@@ -221,6 +221,17 @@ struct MapView: View {
                             .lineLimit(3)
                     }
                     Spacer()
+                    
+                    Button(action: {
+                        HapticManager.shared.play(.buttonTap)
+                        viewModel.selectedNode = nil
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white.opacity(0.4))
+                            .background(Circle().fill(Color.black.opacity(0.5)))
+                    }
+                    .buttonStyle(.plain)
                 }
                 
                 // Action Button
